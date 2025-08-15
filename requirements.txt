@@ -1,0 +1,12 @@
+fastapi==0.116.1
+uvicorn==0.35.0
+torch==2.5.1+cu121
+torchvision==0.20.1+cu121
+torchaudio==2.5.1+cu121
+diffusers==0.34.0
+transformers==4.55.2
+accelerate==1.10.0
+safetensors==0.6.2
+python-multipart==0.0.20
+pillow>=11.3.0
+psutil>=7.0.0
