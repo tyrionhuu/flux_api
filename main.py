@@ -20,11 +20,31 @@ class GenerateRequest(BaseModel):
 pipe: Optional[FluxPipeline] = None
 model_loaded = False
 model_type = "none"
-test_mode = True  # Enable test mode for development
+test_mode = False  # Disable test mode to use real model
+selected_gpu = 0
+
+def select_best_gpu():
+    """Select GPU with most free memory"""
+    if not torch.cuda.is_available():
+        return None
+    
+    gpu_memory = []
+    for i in range(torch.cuda.device_count()):
+        torch.cuda.set_device(i)
+        total_memory = torch.cuda.get_device_properties(i).total_memory / 1024**3
+        free_memory = (torch.cuda.get_device_properties(i).total_memory - torch.cuda.memory_allocated(i)) / 1024**3
+        gpu_memory.append((i, free_memory, total_memory))
+        print(f"GPU {i}: {free_memory:.1f}GB free / {total_memory:.1f}GB total")
+    
+    # Select GPU with most free memory
+    best_gpu = max(gpu_memory, key=lambda x: x[1])
+    selected_gpu = best_gpu[0]
+    print(f"Selected GPU {selected_gpu} with {best_gpu[1]:.1f}GB free memory")
+    return selected_gpu
 
 def load_flux_model():
-    """Load the FLUX model with BF16 precision"""
-    global pipe, model_loaded, model_type
+    """Load the FLUX model with BF16 precision and memory optimization"""
+    global pipe, model_loaded, model_type, selected_gpu
     
     if test_mode:
         print("Test mode: Simulating FLUX model load")
@@ -35,16 +55,64 @@ def load_flux_model():
     
     try:
         print("Loading FLUX model...")
-        pipe = FluxPipeline.from_pretrained(
-            "black-forest-labs/FLUX.1-dev", 
-            torch_dtype=torch.bfloat16
-        ).to("cuda")
+        
+        # Check if CUDA is actually working (not just available)
+        cuda_working = False
+        if torch.cuda.is_available():
+            try:
+                # Test if we can actually use CUDA
+                test_tensor = torch.randn(100, 100, device='cuda:0')
+                del test_tensor
+                torch.cuda.empty_cache()
+                cuda_working = True
+                print("CUDA is working properly")
+            except Exception as cuda_error:
+                print(f"CUDA compatibility issue: {cuda_error}")
+                print("Falling back to CPU mode")
+                cuda_working = False
+        
+        if cuda_working:
+            # Select best GPU
+            selected_gpu = select_best_gpu()
+            if selected_gpu is not None:
+                torch.cuda.set_device(selected_gpu)
+                device = f"cuda:{selected_gpu}"
+                print(f"Using device: {device}")
+            else:
+                device = "cpu"
+                print("No suitable GPU found, using CPU")
+        else:
+            device = "cpu"
+            selected_gpu = None
+            print("CUDA not working, using CPU mode")
+        
+        # Load model with memory optimization
+        if device == "cpu":
+            # CPU mode - use float32 for better compatibility
+            pipe = FluxPipeline.from_pretrained(
+                "black-forest-labs/FLUX.1-dev", 
+                torch_dtype=torch.float32,
+                device_map="balanced",  # Use balanced strategy for CPU fallback
+                low_cpu_mem_usage=True
+            )
+            model_type = "float32_cpu"
+        else:
+            # GPU mode
+            pipe = FluxPipeline.from_pretrained(
+                "black-forest-labs/FLUX.1-dev", 
+                torch_dtype=torch.bfloat16,
+                device_map="balanced",  # Use balanced strategy for multi-GPU
+                low_cpu_mem_usage=True
+            )
+            model_type = "bf16_gpu"
+        
         model_loaded = True
-        model_type = "bf16"
-        print("FLUX model loaded successfully!")
+        print(f"FLUX model loaded successfully on {device}!")
         return True
+        
     except Exception as e:
         print(f"Error loading FLUX model: {e}")
+        print(f"Error type: {type(e).__name__}")
         return False
 
 def load_quantized_model():
@@ -77,8 +145,8 @@ def load_quantized_model():
 def get_vram_usage():
     """Get current VRAM usage in GB"""
     try:
-        if torch.cuda.is_available():
-            return torch.cuda.memory_allocated() / 1024**3
+        if torch.cuda.is_available() and selected_gpu is not None:
+            return torch.cuda.memory_allocated(selected_gpu) / 1024**3
         return 0.0
     except:
         return 0.0
@@ -176,6 +244,17 @@ def generate_image_internal(prompt: str, model_type_name: str = "FLUX"):
             # Real mode: generate image with FLUX
             if pipe is None:
                 raise HTTPException(status_code=500, detail=f"{model_type_name} model not properly loaded")
+            
+            # Set device for generation
+            if torch.cuda.is_available() and selected_gpu is not None:
+                try:
+                    torch.cuda.set_device(selected_gpu)
+                    print(f"Generating on GPU {selected_gpu}")
+                except Exception as gpu_error:
+                    print(f"GPU error, falling back to CPU: {gpu_error}")
+            else:
+                print("Generating on CPU")
+            
             result = pipe(prompt)
             image = extract_image_from_result(result)
         
@@ -310,6 +389,35 @@ def get_model_status():
         "model_loaded": model_loaded,
         "model_type": model_type,
         "test_mode": test_mode,
+        "selected_gpu": selected_gpu,
         "vram_usage_gb": f"{get_vram_usage():.2f}GB",
         "system_memory_used_gb": f"{get_system_memory()[0]:.2f}GB"
+    }
+
+@app.get("/gpu-info")
+def get_gpu_info():
+    """Get detailed GPU information"""
+    gpu_info = []
+    
+    if torch.cuda.is_available():
+        for i in range(torch.cuda.device_count()):
+            props = torch.cuda.get_device_properties(i)
+            total_memory = props.total_memory / 1024**3
+            allocated_memory = torch.cuda.memory_allocated(i) / 1024**3
+            free_memory = total_memory - allocated_memory
+            
+            gpu_info.append({
+                "gpu_id": i,
+                "name": props.name,
+                "total_memory_gb": f"{total_memory:.1f}",
+                "allocated_memory_gb": f"{allocated_memory:.1f}",
+                "free_memory_gb": f"{free_memory:.1f}",
+                "compute_capability": f"{props.major}.{props.minor}"
+            })
+    
+    return {
+        "cuda_available": torch.cuda.is_available(),
+        "device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
+        "selected_gpu": selected_gpu,
+        "gpus": gpu_info
     }
