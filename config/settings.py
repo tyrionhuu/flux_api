@@ -3,26 +3,17 @@ Configuration settings for the FLUX API
 """
 
 # Model Configuration
-FLUX_MODEL_ID = "black-forest-labs/FLUX.1-dev"
 NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-dev"
 
-# Quantized Model Files
-FP4_WEIGHTS_FILE = "svdq-fp4_r32-flux.1-dev.safetensors"
-INT4_WEIGHTS_FILE = "svdq-int4_r32-flux.1-dev.safetensors"
+# Quantized Model Files (for reference - not currently used)
+# FP4_WEIGHTS_FILE = "svdq-fp4_r32-flux.1-dev.safetensors"
+# INT4_WEIGHTS_FILE = "svdq-int4_r32-flux.1-dev.safetensors"
 
 # Model Types
-MODEL_TYPE_STANDARD_CPU = "flux_cpu"
-MODEL_TYPE_STANDARD_GPU = "flux_gpu"
 MODEL_TYPE_QUANTIZED_GPU = "flux_quantized_gpu"
 
 # Device Configuration
 DEFAULT_GPU = 0
-DEFAULT_DEVICE_MAP = "balanced"
-DEFAULT_TORCH_DTYPE_CPU = "float32"
-DEFAULT_TORCH_DTYPE_GPU = "bfloat16"
-
-# Memory Configuration
-LOW_CPU_MEMORY_USAGE = True
 CUDA_TEST_TENSOR_SIZE = (100, 100)
 
 # Image Configuration
@@ -44,3 +35,8 @@ HUGGINGFACE_CACHE_DIR = "~/.cache/huggingface/hub"
 # File Paths
 GENERATED_IMAGES_DIR = "generated_images"
 STATIC_IMAGES_DIR = "static"
+
+# LoRA Configuration
+DEFAULT_LORA_WEIGHT = 1.0
+MIN_LORA_WEIGHT = 0.0
+MAX_LORA_WEIGHT = 2.0

@@ -3,7 +3,7 @@ Image utilities for the FLUX API
 """
 
 from PIL import Image
-from typing import Any
+from typing import Any, Optional
 from config.settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
 
 
@@ -32,7 +32,7 @@ def extract_image_from_result(result: Any) -> Image.Image:
         return Image.new("RGB", DEFAULT_IMAGE_SIZE, color=PLACEHOLDER_COLORS["error"])
 
 
-def create_placeholder_image(text: str = "Placeholder", color: str = None) -> Image.Image:
+def create_placeholder_image(text: str = "Placeholder", color: Optional[str] = None) -> Image.Image:
     """Create a placeholder image with optional text"""
     if color is None:
         color = PLACEHOLDER_COLORS["default"]

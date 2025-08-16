@@ -2,161 +2,156 @@
 FLUX model management for the FLUX API
 """
 
+import logging
 import torch
-import os
-from typing import Optional
+from typing import Optional, Any
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from config.settings import (
-    FLUX_MODEL_ID,
     NUNCHAKU_MODEL_ID,
-    FP4_WEIGHTS_FILE,
-    INT4_WEIGHTS_FILE,
-    MODEL_TYPE_STANDARD_CPU,
-    MODEL_TYPE_STANDARD_GPU,
     MODEL_TYPE_QUANTIZED_GPU,
-    DEFAULT_DEVICE_MAP,
-    DEFAULT_TORCH_DTYPE_CPU,
-    DEFAULT_TORCH_DTYPE_GPU,
-    LOW_CPU_MEMORY_USAGE,
-    HUGGINGFACE_CACHE_DIR,
 )
 from utils.gpu_manager import GPUManager
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class FluxModelManager:
     """Manages FLUX model loading and quantization"""
 
     def __init__(self):
-        self.pipe: Optional[FluxPipeline] = None
+        self.pipe: Optional[FluxPipeline] = None  # Will be FluxPipeline with Nunchaku transformer
         self.model_loaded = False
         self.model_type = "none"
         self.gpu_manager = GPUManager()
+        # LoRA state
+        self.current_lora: Optional[str] = None
+        self.current_weight: float = 1.0
 
     def load_model(self) -> bool:
-        """Load the FLUX model with memory optimization and quantization"""
+        """Load the FLUX model with GPU-only support and quantization"""
         try:
-            print("Loading FLUX model...")
+            logger.info("Loading FLUX model...")
 
-            # Get optimal device
+            # Check if CUDA is available
+            if not torch.cuda.is_available():
+                raise RuntimeError("CUDA not available. This model requires GPU support.")
+
+            # Get optimal GPU device
             device, selected_gpu = self.gpu_manager.get_optimal_device()
-
+            
             if device == "cpu":
-                print("Using CPU mode")
-                selected_gpu = None
-            else:
-                print(f"Using device: {device}")
+                raise RuntimeError("GPU required. CPU mode is not supported for this model.")
 
-            # Load standard FLUX pipeline first
-            print("Loading standard FLUX pipeline...")
-            if device == "cpu":
-                # CPU mode - use float32 for better compatibility
-                self.pipe = FluxPipeline.from_pretrained(
-                    FLUX_MODEL_ID,
-                    torch_dtype=torch.float32,
-                    device_map=DEFAULT_DEVICE_MAP,
-                    low_cpu_mem_usage=LOW_CPU_MEMORY_USAGE,
-                )
-                self.model_type = MODEL_TYPE_STANDARD_CPU
-            else:
-                # GPU mode - use standard FLUX model
-                self.pipe = FluxPipeline.from_pretrained(
-                    FLUX_MODEL_ID,
-                    torch_dtype=torch.bfloat16,
-                    device_map=DEFAULT_DEVICE_MAP,
-                    low_cpu_mem_usage=LOW_CPU_MEMORY_USAGE,
-                )
-                self.model_type = MODEL_TYPE_STANDARD_GPU
+            logger.info(f"Using device: {device}")
 
-            # Now integrate quantized weights if on GPU
-            if device != "cpu":
-                try:
-                    print("Integrating quantized weights...")
-                    self._integrate_quantized_weights(device)
-                    self.model_type = MODEL_TYPE_QUANTIZED_GPU
-                    print("Quantized weights integrated successfully!")
-                except Exception as quantize_error:
-                    print(
-                        f"Warning: Could not integrate quantized weights: {quantize_error}"
-                    )
-                    print("Falling back to standard model")
-                    self.model_type = MODEL_TYPE_STANDARD_GPU
+            # Always load Nunchaku model (this has LoRA support)
+            logger.info("Loading Nunchaku model with LoRA support...")
+            
+            try:
+                from nunchaku import NunchakuFluxTransformer2dModel
+                from nunchaku.utils import get_precision
+                
+                precision = get_precision()  # auto-detect precision
+                logger.info(f"Detected precision: {precision}")
+                
+                # Load the Nunchaku transformer on the same device
+                transformer_result = NunchakuFluxTransformer2dModel.from_pretrained(
+                    f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-dev.safetensors"
+                )
+                
+                # Handle the tuple return: (transformer, config_dict)
+                if isinstance(transformer_result, tuple):
+                    transformer = transformer_result[0].to(device)  # Extract transformer from tuple
+                else:
+                    transformer = transformer_result.to(device)  # Direct transformer object
+                
+                # Create FluxPipeline with the Nunchaku transformer
+                self.pipe = FluxPipeline.from_pretrained(
+                    "black-forest-labs/FLUX.1-dev", 
+                    transformer=transformer, 
+                    torch_dtype=torch.bfloat16
+                ).to(device)
+                
+                # Verify device consistency
+                logger.debug(f"Device consistency - Target: {device}, Transformer: {next(transformer.parameters()).device}, Pipeline: {self.pipe.device if hasattr(self.pipe, 'device') else 'unknown'}")
+                
+                self.model_type = MODEL_TYPE_QUANTIZED_GPU
+                logger.info("Nunchaku model loaded successfully with LoRA support!")
+                
+            except Exception as nunchaku_error:
+                logger.error(f"Error loading Nunchaku model: {nunchaku_error} (Type: {type(nunchaku_error).__name__})")
+                raise RuntimeError(f"Failed to load Nunchaku model: {nunchaku_error}. Nunchaku is required for this model.")
 
             self.model_loaded = True
-            print(f"FLUX model loaded successfully on {device}!")
+            # Reset LoRA state when loading a new model
+            self.current_lora = None
+            self.current_weight = 1.0
+            logger.info(f"FLUX model loaded successfully on {device}!")
             return True
 
         except Exception as e:
-            print(f"Error loading FLUX model: {e}")
-            print(f"Error type: {type(e).__name__}")
+            logger.error(f"Error loading FLUX model: {e} (Type: {type(e).__name__})")
             return False
 
-    def _integrate_quantized_weights(self, device: str) -> bool:
-        """Integrate quantized weights from Nunchaku model into the FLUX pipeline"""
-        try:
-            from huggingface_hub import snapshot_download
+    # Removed _integrate_quantized_weights - now using Nunchaku pipeline directly
 
-            print("Downloading quantized weights...")
-
-            # Download the quantized model (this will cache it)
-            quantized_dir = snapshot_download(
-                NUNCHAKU_MODEL_ID, cache_dir=os.path.expanduser(HUGGINGFACE_CACHE_DIR)
-            )
-
-            print(f"Quantized model downloaded to: {quantized_dir}")
-
-            # Check which quantized weights to use based on GPU type
-            # For RTX 5090 (Blackwell), use the FP4 weights
-            fp4_weights = os.path.join(quantized_dir, FP4_WEIGHTS_FILE)
-            int4_weights = os.path.join(quantized_dir, INT4_WEIGHTS_FILE)
-
-            if os.path.exists(fp4_weights):
-                print("Using FP4 quantized weights (optimized for Blackwell GPUs)")
-                weights_file = fp4_weights
-            elif os.path.exists(int4_weights):
-                print("Using INT4 quantized weights (fallback)")
-                weights_file = int4_weights
-            else:
-                raise FileNotFoundError("No quantized weights found")
-
-            # Load the quantized weights
-            print(f"Loading quantized weights from: {weights_file}")
-            from safetensors import safe_open
-
-            with safe_open(weights_file, framework="pt", device=device) as f:
-                # Get all tensor names
-                tensor_names = f.keys()
-                print(f"Found {len(tensor_names)} quantized tensors")
-
-                # For now, we'll just verify the weights can be loaded
-                # The actual integration would require understanding the model architecture
-                # and mapping the quantized weights to the pipeline components
-                print("Quantized weights loaded successfully")
-                print("Note: Full integration requires additional implementation")
-
-            return True
-
-        except Exception as e:
-            print(f"Error integrating quantized weights: {e}")
-            raise
-
-    def generate_image(self, prompt: str) -> torch.Tensor:
-        """Generate image using the loaded FLUX model"""
+    def generate_image(self, prompt: str) -> Any:
+        """Generate image using the loaded Nunchaku model - GPU only"""
         if not self.model_loaded or self.pipe is None:
             raise RuntimeError("Model not loaded")
 
-        # Set device for generation
-        if torch.cuda.is_available() and self.gpu_manager.selected_gpu is not None:
+        # Ensure we're using GPU
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA not available. GPU required for image generation.")
+        
+        if self.gpu_manager.selected_gpu is not None:
             try:
                 self.gpu_manager.set_device(self.gpu_manager.selected_gpu)
-                print(f"Generating on GPU {self.gpu_manager.selected_gpu}")
+                logger.info(f"Generating on GPU {self.gpu_manager.selected_gpu}")
             except Exception as gpu_error:
-                print(f"GPU error, falling back to CPU: {gpu_error}")
+                logger.error(f"GPU error during device selection: {gpu_error} (Type: {type(gpu_error).__name__})")
+                raise RuntimeError(f"GPU error: {gpu_error}. GPU required for image generation.")
         else:
-            print("Generating on CPU")
+            logger.error(f"No GPU selected for image generation")
+            raise RuntimeError("No GPU selected. GPU required for image generation.")
 
-        # Generate the image
-        result = self.pipe(prompt)
-        return result
+        # Generate the image using the FluxPipeline (same as the example)
+        try:
+            logger.info(f"Generating image with prompt: {prompt}")
+            
+            # Try with reduced parameters first to avoid memory issues
+            try:
+                logger.info("Attempting generation with standard parameters...")
+                result = self.pipe(
+                    prompt, 
+                    num_inference_steps=25,  # Same as example
+                    guidance_scale=3.5       # Same as example
+                )
+                logger.info("Image generation completed successfully")
+                return result
+                
+            except Exception as memory_error:
+                if "CUDA" in str(memory_error) or "memory" in str(memory_error).lower():
+                    logger.warning(f"CUDA memory error detected: {memory_error} (Type: {type(memory_error).__name__})")
+                    logger.info("Trying with reduced parameters...")
+                    
+                    # Fallback with reduced parameters
+                    result = self.pipe(
+                        prompt, 
+                        num_inference_steps=10,    # Reduced steps
+                        guidance_scale=2.0         # Reduced guidance
+                    )
+                    logger.info("Image generation completed with reduced parameters")
+                    return result
+                else:
+                    # Re-raise if it's not a memory error
+                    logger.error(f"Non-memory error during image generation: {memory_error} (Type: {type(memory_error).__name__})")
+                    raise memory_error
+                    
+        except Exception as e:
+            logger.error(f"Error in image generation: {e} (Type: {type(e).__name__})")
+            raise RuntimeError(f"Failed to generate image: {e}")
 
     def get_model_status(self) -> dict:
         """Get the current model status"""
@@ -172,5 +167,88 @@ class FluxModelManager:
         return self.model_loaded
 
     def get_pipeline(self) -> Optional[FluxPipeline]:
-        """Get the loaded pipeline"""
+        """Get the loaded FluxPipeline with Nunchaku transformer"""
         return self.pipe
+    
+    def apply_lora(self, lora_name: str, weight: float = 1.0) -> bool:
+        """Apply LoRA to the FluxPipeline using Nunchaku transformer methods"""
+        if not self.model_loaded or self.pipe is None:
+            logger.error(f"Cannot apply LoRA {lora_name}: Model not loaded or pipeline not available")
+            return False
+        
+        try:
+            logger.info(f"Applying LoRA {lora_name} with weight {weight}")
+            
+            # The LoRA methods are on the transformer, not the pipeline
+            if hasattr(self.pipe, 'transformer') and hasattr(self.pipe.transformer, 'update_lora_params'):
+                # Load LoRA parameters from HuggingFace repository
+                logger.info(f"   - Loading LoRA parameters from {lora_name}/lora.safetensors")
+                try:
+                    self.pipe.transformer.update_lora_params(f"{lora_name}/lora.safetensors")
+                    logger.info(f"   - LoRA parameters loaded successfully")
+                except Exception as load_error:
+                    logger.error(f"   - Failed to load LoRA parameters: {load_error}")
+                    return False
+                
+                # Set LoRA strength
+                logger.info(f"   - Setting LoRA strength to {weight}")
+                try:
+                    self.pipe.transformer.set_lora_strength(weight)
+                    logger.info(f"   - LoRA strength set successfully")
+                except Exception as strength_error:
+                    logger.error(f"   - Failed to set LoRA strength: {strength_error}")
+                    return False
+                
+                self.current_lora = lora_name
+                self.current_weight = weight
+                logger.info(f"LoRA {lora_name} applied successfully with weight {weight}")
+                return True
+            else:
+                logger.error(f"FluxPipeline transformer does not have LoRA support methods")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error applying LoRA {lora_name}: {e} (Type: {type(e).__name__})")
+            return False
+    
+    def remove_lora(self) -> bool:
+        """Remove currently applied LoRA from the pipeline"""
+        if not self.model_loaded or self.pipe is None:
+            logger.error(f"Cannot remove LoRA: Model not loaded or pipeline not available")
+            return False
+        
+        try:
+            if not self.current_lora:
+                logger.info("No LoRA currently applied")
+                return True
+            
+            logger.info(f"Removing LoRA: {self.current_lora}")
+            
+            # Use Nunchaku transformer's built-in method to remove LoRA
+            if hasattr(self.pipe, 'transformer') and hasattr(self.pipe.transformer, 'set_lora_strength'):
+                logger.info(f"   - Setting LoRA strength to 0 to disable")
+                self.pipe.transformer.set_lora_strength(0)  # Set strength to 0 to disable
+            else:
+                logger.warning(f"Transformer does not have set_lora_strength method")
+            
+            self.current_lora = None
+            self.current_weight = 1.0
+            
+            logger.info(f"LoRA removed successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Error removing LoRA: {e} (Type: {type(e).__name__})")
+            return False
+    
+    def get_lora_info(self) -> Optional[dict]:
+        """Get information about the currently applied LoRA"""
+        if not self.current_lora:
+            return None
+        
+        return {
+            "name": self.current_lora,
+            "weight": self.current_weight,
+            "status": "applied"
+        }
+    
+
