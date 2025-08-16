@@ -1,5 +1,5 @@
 /flux_env
 /generated_images
-/__pycache__
+**/__pycache__
 /.DS_Store
 /outputs
