@@ -11,20 +11,18 @@ from config.settings import API_TITLE, API_DESCRIPTION, API_VERSION
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('flux_api.log')
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(), logging.FileHandler("flux_api.log")],
 )
 
 # Configure specific loggers for better error visibility
-logging.getLogger('api.routes').setLevel(logging.INFO)
-logging.getLogger('models.flux_model').setLevel(logging.INFO)
+logging.getLogger("api.routes").setLevel(logging.INFO)
+logging.getLogger("models.flux_model").setLevel(logging.INFO)
 
 # Add a single enhanced console handler for better formatting
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
+
 
 # Create a custom formatter that adds emojis and better structure
 class EnhancedFormatter(logging.Formatter):
@@ -32,9 +30,10 @@ class EnhancedFormatter(logging.Formatter):
         # No emojis - just clean formatting
         return super().format(record)
 
+
 # Apply the enhanced formatter
 enhanced_formatter = EnhancedFormatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 console_handler.setFormatter(enhanced_formatter)
 
@@ -42,7 +41,9 @@ console_handler.setFormatter(enhanced_formatter)
 root_logger = logging.getLogger()
 # Remove existing stream handlers
 for handler in root_logger.handlers[:]:
-    if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+    if isinstance(handler, logging.StreamHandler) and not isinstance(
+        handler, logging.FileHandler
+    ):
         root_logger.removeHandler(handler)
 # Add our enhanced handler
 root_logger.addHandler(console_handler)

@@ -20,12 +20,14 @@ def get_system_info() -> dict:
     try:
         memory_used, memory_total = get_system_memory()
         cpu_percent = psutil.cpu_percent(interval=1)
-        
+
         return {
             "cpu_percent": cpu_percent,
             "memory_used_gb": memory_used,
             "memory_total_gb": memory_total,
-            "memory_percent": (memory_used / memory_total) * 100 if memory_total > 0 else 0,
+            "memory_percent": (
+                (memory_used / memory_total) * 100 if memory_total > 0 else 0
+            ),
         }
     except Exception as e:
         print(f"Error getting system info: {e}")

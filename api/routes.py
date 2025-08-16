@@ -22,11 +22,13 @@ router = APIRouter()
 # Global model manager instance - singleton pattern
 _model_manager_instance = None
 
+
 def get_model_manager():
     global _model_manager_instance
     if _model_manager_instance is None:
         _model_manager_instance = FluxModelManager()
     return _model_manager_instance
+
 
 model_manager = get_model_manager()
 
@@ -37,12 +39,12 @@ def read_root():
     return {
         "message": "FLUX API is running!",
         "endpoints": [
-            "/static-image", 
-            "/generate", 
-            "/loras", 
-            "/apply-lora", 
-            "/remove-lora", 
-            "/lora-status"
+            "/static-image",
+            "/generate",
+            "/loras",
+            "/apply-lora",
+            "/remove-lora",
+            "/lora-status",
         ],
         "model_loaded": model_manager.is_loaded(),
         "model_type": model_manager.model_type,
@@ -66,47 +68,62 @@ async def generate_image(request: GenerateRequest):
             if not model_manager.load_model():
                 raise HTTPException(status_code=500, detail="Failed to load FLUX model")
             logger.info("Model loaded successfully")
-        
+
         # Now check if LoRA is already applied
         current_lora = model_manager.get_lora_info()
         lora_applied = None
         lora_weight = None
-        
+
         if request.lora_name:
             # Only apply LoRA if it's different from the current one
-            if not current_lora or current_lora.get("name") != request.lora_name or current_lora.get("weight") != request.lora_weight:
-                logger.info(f"Applying new LoRA: {request.lora_name} with weight {request.lora_weight}")
+            if (
+                not current_lora
+                or current_lora.get("name") != request.lora_name
+                or current_lora.get("weight") != request.lora_weight
+            ):
+                logger.info(
+                    f"Applying new LoRA: {request.lora_name} with weight {request.lora_weight}"
+                )
                 try:
                     if model_manager.apply_lora(request.lora_name, request.lora_weight):
                         lora_applied = request.lora_name
                         lora_weight = request.lora_weight
-                        logger.info(f"LoRA {request.lora_name} applied successfully with weight {request.lora_weight}")
+                        logger.info(
+                            f"LoRA {request.lora_name} applied successfully with weight {request.lora_weight}"
+                        )
                     else:
-                        logger.error(f"LoRA application failed: {request.lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}")
+                        logger.error(
+                            f"LoRA application failed: {request.lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+                        )
                 except Exception as lora_error:
-                    logger.error(f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})")
+                    logger.error(
+                        f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})"
+                    )
             else:
                 # Use the already applied LoRA
                 lora_applied = current_lora.get("name")
                 lora_weight = current_lora.get("weight")
-                logger.info(f"Using already applied LoRA: {lora_applied} with weight {lora_weight}")
+                logger.info(
+                    f"Using already applied LoRA: {lora_applied} with weight {lora_weight}"
+                )
         else:
             # No LoRA specified, check if one is currently applied
             if current_lora:
                 lora_applied = current_lora.get("name")
                 lora_weight = current_lora.get("weight")
-                logger.info(f"Using currently applied LoRA: {lora_applied} with weight {lora_weight}")
-        
-        result = generate_image_internal(request.prompt, "FLUX", lora_applied, lora_weight)
+                logger.info(
+                    f"Using currently applied LoRA: {lora_applied} with weight {lora_weight}"
+                )
+
+        result = generate_image_internal(
+            request.prompt, "FLUX", lora_applied, lora_weight
+        )
         return result
     except Exception as e:
         logger.error(f"Request processing failed: {e} (Type: {type(e).__name__})")
         raise HTTPException(
             status_code=500, detail=f"Request processing failed: {str(e)}"
         )
-
-
-
 
 
 @router.post("/load-model")
@@ -117,7 +134,9 @@ def load_model():
             logger.info("FLUX model loaded successfully")
             return {"message": "FLUX model loaded successfully"}
         else:
-            logger.error(f"Failed to load FLUX model - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}")
+            logger.error(
+                f"Failed to load FLUX model - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+            )
             raise HTTPException(status_code=500, detail="Failed to load FLUX model")
     except Exception as e:
         logger.error(f"Exception during model loading: {e} (Type: {type(e).__name__})")
@@ -153,7 +172,7 @@ def list_loras():
     """List all available LoRA files - only Hugging Face LoRAs supported"""
     return {
         "available_loras": [],
-        "note": "Only Hugging Face LoRAs are supported. Use /apply-lora with a Hugging Face repository ID."
+        "note": "Only Hugging Face LoRAs are supported. Use /apply-lora with a Hugging Face repository ID.",
     }
 
 
@@ -163,7 +182,7 @@ async def apply_lora(lora_name: str, weight: float = 1.0):
     if not model_manager.is_loaded():
         logger.error(f"Cannot apply LoRA {lora_name}: Model not loaded")
         raise HTTPException(status_code=500, detail="Model not loaded")
-    
+
     try:
         if model_manager.apply_lora(lora_name, weight):
             logger.info(f"LoRA {lora_name} applied successfully with weight {weight}")
@@ -171,17 +190,22 @@ async def apply_lora(lora_name: str, weight: float = 1.0):
                 "message": f"LoRA {lora_name} applied successfully with weight {weight}",
                 "lora_name": lora_name,
                 "weight": weight,
-                "status": "applied"
+                "status": "applied",
             }
         else:
-            logger.error(f"Failed to apply LoRA {lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}")
-            raise HTTPException(status_code=500, detail=f"Failed to apply LoRA {lora_name}")
+            logger.error(
+                f"Failed to apply LoRA {lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+            )
+            raise HTTPException(
+                status_code=500, detail=f"Failed to apply LoRA {lora_name}"
+            )
     except Exception as e:
-        logger.error(f"Exception during LoRA application: {e} (Type: {type(e).__name__})")
-        raise HTTPException(status_code=500, detail=f"LoRA application failed: {str(e)}")
-
-
-
+        logger.error(
+            f"Exception during LoRA application: {e} (Type: {type(e).__name__})"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"LoRA application failed: {str(e)}"
+        )
 
 
 @router.post("/remove-lora")
@@ -190,16 +214,15 @@ async def remove_lora():
     if not model_manager.is_loaded():
         logger.error(f"Cannot remove LoRA: Model not loaded")
         raise HTTPException(status_code=500, detail="Model not loaded")
-    
+
     try:
         if model_manager.remove_lora():
             logger.info("LoRA removed successfully")
-            return {
-                "message": "LoRA removed successfully",
-                "status": "removed"
-            }
+            return {"message": "LoRA removed successfully", "status": "removed"}
         else:
-            logger.error(f"Failed to remove LoRA - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}")
+            logger.error(
+                f"Failed to remove LoRA - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+            )
             raise HTTPException(status_code=500, detail="Failed to remove LoRA")
     except Exception as e:
         logger.error(f"Exception during LoRA removal: {e} (Type: {type(e).__name__})")
@@ -211,18 +234,23 @@ def get_lora_status():
     """Get the current LoRA status"""
     return {
         "current_lora": model_manager.get_lora_info(),
-        "note": "Only Hugging Face LoRAs are supported. Use /apply-lora to apply a LoRA."
+        "note": "Only Hugging Face LoRAs are supported. Use /apply-lora to apply a LoRA.",
     }
 
 
-def generate_image_internal(prompt: str, model_type_name: str = "FLUX", lora_applied: Optional[str] = None, lora_weight: Optional[float] = None):
+def generate_image_internal(
+    prompt: str,
+    model_type_name: str = "FLUX",
+    lora_applied: Optional[str] = None,
+    lora_weight: Optional[float] = None,
+):
     """Internal function to generate images - used by both endpoints"""
     logger.info(f"Starting image generation for prompt: {prompt}")
-    
+
     # Model should already be loaded at this point
     if not model_manager.is_loaded():
         raise HTTPException(status_code=500, detail="Model not loaded")
-    
+
     # Apply LoRA if specified and not already applied
     if lora_applied and not model_manager.get_lora_info():
         logger.info(f"Applying LoRA {lora_applied} to loaded model")
@@ -232,7 +260,9 @@ def generate_image_internal(prompt: str, model_type_name: str = "FLUX", lora_app
             else:
                 logger.info(f"LoRA {lora_applied} applied successfully to loaded model")
         except Exception as lora_error:
-            logger.error(f"Exception during LoRA application to loaded model: {lora_error} (Type: {type(lora_error).__name__})")
+            logger.error(
+                f"Exception during LoRA application to loaded model: {lora_error} (Type: {type(lora_error).__name__})"
+            )
 
     try:
         logger.info(f"Generating {model_type_name} image for prompt: {prompt}")
@@ -246,10 +276,10 @@ def generate_image_internal(prompt: str, model_type_name: str = "FLUX", lora_app
                 status_code=500,
                 detail=f"{model_type_name} model not properly loaded",
             )
-        
+
         # Generate the image
         result = model_manager.generate_image(prompt)
-        
+
         image = extract_image_from_result(result)
 
         # End timing
@@ -279,7 +309,9 @@ def generate_image_internal(prompt: str, model_type_name: str = "FLUX", lora_app
         }
 
     except Exception as e:
-        logger.error(f"Error generating {model_type_name} image: {e} (Type: {type(e).__name__})")
+        logger.error(
+            f"Error generating {model_type_name} image: {e} (Type: {type(e).__name__})"
+        )
         raise HTTPException(
             status_code=500,
             detail=f"{model_type_name} image generation failed: {str(e)}",
