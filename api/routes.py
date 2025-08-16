@@ -88,12 +88,14 @@ def get_model_status():
     """Get the current model status"""
     status = model_manager.get_model_status()
     system_memory_used, system_memory_total = get_system_memory()
-    
-    status.update({
-        "system_memory_used_gb": f"{system_memory_used:.2f}GB",
-        "system_memory_total_gb": f"{system_memory_total:.2f}GB",
-    })
-    
+
+    status.update(
+        {
+            "system_memory_used_gb": f"{system_memory_used:.2f}GB",
+            "system_memory_total_gb": f"{system_memory_total:.2f}GB",
+        }
+    )
+
     return status
 
 

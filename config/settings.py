@@ -30,7 +30,7 @@ DEFAULT_IMAGE_SIZE = (512, 512)
 PLACEHOLDER_COLORS = {
     "default": "lightblue",
     "error": "red",
-    "placeholder": "lightblue"
+    "placeholder": "lightblue",
 }
 
 # API Configuration
