@@ -1,223 +1,124 @@
-# FLUX API - Modular Architecture
+# FLUX API
 
-A high-performance image generation API using the FLUX model with quantized weights support, built with FastAPI and organized in a clean, modular architecture.
+AI image generation API with CUDA support.
 
-## 🏗️ Architecture Overview
+## 🚀 Quick Start
 
-The application is organized into logical modules for better maintainability, testability, and scalability:
-
-```
-flux_api/
-├── main.py               # Main FastAPI application entry point
-├── config/               # Configuration and settings
-│   ├── __init__.py
-│   └── settings.py       # All configuration constants
-├── models/               # Model management
-│   ├── __init__.py
-│   └── flux_model.py     # FLUX model loading and quantization
-├── api/                  # API endpoints and routes
-│   ├── __init__.py
-│   └── routes.py         # All FastAPI route handlers
-├── utils/                # Utility functions
-│   ├── __init__.py
-│   ├── gpu_manager.py    # GPU management and CUDA operations
-│   ├── image_utils.py    # Image processing utilities
-│   └── system_utils.py   # System monitoring utilities
-├── requirements.txt      # Python dependencies
-├── start_api.sh         # Startup script
-└── README.md            # This file
-```
-
-## 🚀 Features
-
-- **Modular Design**: Clean separation of concerns
-- **Quantized Model Support**: Automatic integration of Nunchaku quantized weights
-- **GPU Optimization**: Smart GPU selection and memory management
-- **FastAPI**: Modern, fast web framework with automatic API documentation
-- **Type Safety**: Full type hints throughout the codebase
-- **Error Handling**: Comprehensive error handling and fallbacks
-
-## 📦 Module Details
-
-### Config Module (`config/`)
-- **`settings.py`**: Centralized configuration constants
-- Model IDs, file paths, device settings, API configuration
-- Easy to modify without touching business logic
-
-### Models Module (`models/`)
-- **`flux_model.py`**: Core model management
-- Handles FLUX model loading, quantization integration
-- GPU/CPU device management
-- Model status and pipeline access
-
-### API Module (`api/`)
-- **`routes.py`**: All FastAPI endpoint definitions
-- Clean route organization
-- Request/response handling
-- Business logic coordination
-
-### Utils Module (`utils/`)
-- **`gpu_manager.py`**: GPU operations and CUDA management
-- **`image_utils.py`**: Image processing and file operations
-- **`system_utils.py`**: System monitoring and memory tracking
-
-## 🔧 Installation & Setup
-
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd flux_api
-   ```
-
-2. **Create virtual environment**:
-   ```bash
-   python -m venv flux_env
-   source flux_env/bin/activate  # On Windows: flux_env\Scripts\activate
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Start the API**:
-   ```bash
-   ./start_api.sh
-   ```
-   
-   Or run directly:
-   ```bash
-   python main.py
-   ```
-
-## 🎯 API Endpoints
-
-- **`GET /`**: Root endpoint with API status
-- **`GET /health`**: Health check endpoint
-- **`POST /generate`**: Generate images from text prompts
-- **`GET /static-image`**: Serve static images
-- **`POST /load-model`**: Manually load the FLUX model
-- **`GET /model-status`**: Get current model status
-- **`GET /gpu-info`**: Detailed GPU information
-
-## 🖼️ Image Generation
-
-### Basic Usage
+### Start the API (Recommended)
 ```bash
-curl -X POST "http://localhost:8000/generate" \
-     -H "Content-Type: application/json" \
-     -d '{"prompt": "Astronaut in a jungle, cold color palette, muted colors, detailed, 8k"}'
+./start_api.sh
 ```
 
-### Form Data Support
+This will:
+- Activate the flux_env virtual environment
+- Check GPU and dependency availability
+- Start the API service directly
+- Show real-time logs
+
+### Alternative: Direct Python
 ```bash
-curl -X POST "http://localhost:8000/generate" \
-     -F "prompt=Astronaut in a jungle, cold color palette, muted colors, detailed, 8k"
+# Activate virtual environment
+source flux_env/bin/activate
+
+# Start the service
+python start_service.py
 ```
 
-## 🔍 Model Management
-
-### Automatic Loading
-The model is automatically loaded when you first call the `/generate` endpoint.
-
-### Manual Loading
+### Manual Start (Advanced)
 ```bash
-curl -X POST "http://localhost:8000/load-model"
+# Activate virtual environment
+source flux_env/bin/activate
+
+# Start the service directly
+python main.py
 ```
 
-### Status Check
-```bash
-curl "http://localhost:8000/model-status"
+## 📋 Scripts Overview
+
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| **`start_api.sh`** | **Start the API service** | **Use this to start the API** |
+| `start_service.py` | Python service starter | For advanced users |
+
+## 🔧 GPU Configuration
+
+The FLUX API automatically detects and uses available GPUs from your flux_env environment.
+
+### GPU Requirements
+
+- NVIDIA CUDA drivers installed
+- PyTorch with CUDA support in flux_env
+- Sufficient GPU memory for model loading
+
+### Check GPU Status
+
+The service starter will automatically show:
+- Available GPUs and memory
+- CUDA version and compatibility
+- PyTorch GPU support status
+
+## 🌐 API Endpoints
+
+- **Health**: `http://localhost:8000/health`
+- **API Docs**: `http://localhost:8000/docs`
+- **Generate Image**: `POST http://localhost:8000/generate`
+- **Queue Management**: `POST http://localhost:8000/submit-request`
+
+## ⚙️ Generation Parameters
+
+The FLUX API now supports configurable sampling parameters for fine-tuned image generation:
+
+### **Core Parameters**
+- **`num_inference_steps`** (1-100): Number of denoising steps
+  - Lower values (10-20): Faster generation, lower quality
+  - Higher values (30-50): Slower generation, higher quality
+  - Default: 25
+
+- **`guidance_scale`** (0.0-20.0): Classifier-free guidance strength
+  - Lower values (1.0-3.0): More creative, less prompt adherence
+  - Higher values (5.0-10.0): More prompt adherence, less creative
+  - Default: 3.5
+
+### **Image Parameters**
+- **`width`** (256-1024): Image width in pixels
+- **`height`** (256-1024): Image height in pixels
+- **`seed`** (0-4294967295): Random seed for reproducible results
+
+### **Advanced Parameters**
+- **`negative_prompt`**: Text to avoid in the generated image
+- **`lora_name`**: Hugging Face LoRA repository ID
+- **`lora_weight`** (0.0-2.0): LoRA influence strength
+
+### **Example Request**
+```json
+{
+  "prompt": "A beautiful sunset over mountains",
+  "num_inference_steps": 30,
+  "guidance_scale": 4.0,
+  "width": 768,
+  "height": 768,
+  "seed": 42,
+  "negative_prompt": "blurry, low quality"
+}
 ```
 
-## 🎮 GPU Management
+## 📁 Files
 
-### Automatic GPU Selection
-- Automatically detects available GPUs
-- Selects GPU with most free memory
-- Falls back to CPU if CUDA issues occur
+- `start_service.py` - Service starter script
+- `main.py` - FastAPI application entry point
+- `flux_env/` - Python virtual environment with dependencies
+- `requirements.txt` - Python dependencies (in flux_env)
 
-### GPU Information
-```bash
-curl "http://localhost:8000/gpu-info"
-```
+## 🆘 Troubleshooting
 
-## 🧠 Quantized Model Integration
+- **Virtual environment not found**: Ensure flux_env is properly set up
+- **Missing dependencies**: Activate flux_env and install requirements
+- **GPU not working**: Check nvidia-smi and PyTorch CUDA installation
+- **Port in use**: Change port in main.py if needed
 
-The API automatically integrates Nunchaku quantized weights when available:
+## 🎯 Benefits of Direct Python Setup
 
-- **FP4 Weights**: Optimized for Blackwell GPUs (RTX 5090)
-- **INT4 Weights**: Fallback for older GPUs
-- **Automatic Fallback**: Uses standard model if quantization fails
-
-## 🛠️ Development
-
-### Code Structure
-- **Separation of Concerns**: Each module has a specific responsibility
-- **Dependency Injection**: Clean interfaces between modules
-- **Type Hints**: Full type safety throughout
-- **Error Handling**: Comprehensive error handling and logging
-
-### Adding New Features
-1. **New Endpoints**: Add to `api/routes.py`
-2. **New Models**: Add to `models/` directory
-3. **New Utilities**: Add to `utils/` directory
-4. **Configuration**: Update `config/settings.py`
-
-### Testing
-```bash
-# Test individual modules
-python -c "from models.flux_model import FluxModelManager; print('Models OK')"
-python -c "from api.routes import router; print('Routes OK')"
-python -c "from utils.gpu_manager import GPUManager; print('GPU Manager OK')"
-
-# Test the main application
-python -m py_compile app.py
-```
-
-## 📊 Performance
-
-- **Memory Optimization**: Low CPU memory usage, efficient GPU utilization
-- **Quantized Weights**: Reduced memory footprint with quantized models
-- **Smart Device Selection**: Automatic GPU/CPU selection based on availability
-- **Caching**: HuggingFace model caching for faster subsequent loads
-
-## 🔒 Security
-
-- **CORS Configuration**: Configurable CORS middleware
-- **Input Validation**: Comprehensive request validation
-- **Error Handling**: Safe error responses without information leakage
-
-## 🚀 Production Deployment
-
-### Environment Variables
-Set appropriate environment variables for production:
-- `CORS_ORIGINS`: Configure allowed origins
-- `HOST`: Bind address (default: 0.0.0.0)
-- `PORT`: Server port (default: 8000)
-
-### Process Management
-Use process managers like `systemd`, `supervisor`, or `pm2` for production deployment.
-
-## 📝 Contributing
-
-1. **Fork the repository**
-2. **Create a feature branch**
-3. **Make your changes**
-4. **Add tests if applicable**
-5. **Submit a pull request**
-
-## 📄 License
-
-This project uses the FLUX model which is subject to its own license terms.
-
-## 🤝 Support
-
-For issues and questions:
-1. Check the existing issues
-2. Create a new issue with detailed information
-3. Include system information and error logs
-
----
-
-**Built with ❤️ using FastAPI and the FLUX model**
+- **Full GPU Access**: Direct access to all 8 RTX 5090 GPUs
+- **No Docker Overhead**: Faster startup and better performance
+- **Easier Debugging**: Direct access to logs and environment
+- **Simpler Development**: No container rebuilds needed

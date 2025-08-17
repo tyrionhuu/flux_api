@@ -17,6 +17,44 @@ class GenerateRequest(BaseModel):
     lora_weight: float = Field(
         1.0, ge=0.0, le=2.0, description="LoRA weight (0.0 to 2.0)"
     )
+    # Generation parameters
+    num_inference_steps: Optional[int] = Field(
+        25, ge=1, le=100, description="Number of denoising steps (1-100, higher = better quality but slower)"
+    )
+    guidance_scale: Optional[float] = Field(
+        3.5, ge=0.0, le=20.0, description="Guidance scale for classifier-free guidance (0.0-20.0, higher = more prompt adherence)"
+    )
+    width: Optional[int] = Field(
+        512, ge=256, le=1024, description="Image width in pixels (256-1024)"
+    )
+    height: Optional[int] = Field(
+        512, ge=256, le=1024, description="Image height in pixels (256-1024)"
+    )
+    seed: Optional[int] = Field(
+        None, ge=0, le=2**32-1, description="Random seed for reproducible results (0-4294967295)"
+    )
+    negative_prompt: Optional[str] = Field(
+        None, description="Negative prompt to avoid certain elements in the image"
+    )
+    # Generation parameters
+    num_inference_steps: Optional[int] = Field(
+        25, ge=1, le=100, description="Number of denoising steps (1-100, higher = better quality but slower)"
+    )
+    guidance_scale: Optional[float] = Field(
+        3.5, ge=0.0, le=20.0, description="Guidance scale for classifier-free guidance (0.0-20.0, higher = more prompt adherence)"
+    )
+    width: Optional[int] = Field(
+        512, ge=256, le=1024, description="Image width in pixels (256-1024)"
+    )
+    height: Optional[int] = Field(
+        512, ge=256, le=1024, description="Image height in pixels (256-1024)"
+    )
+    seed: Optional[int] = Field(
+        None, ge=0, le=2**32-1, description="Random seed for reproducible results (0-4294967295)"
+    )
+    negative_prompt: Optional[str] = Field(
+        None, description="Negative prompt to avoid certain elements in the image"
+    )
 
 
 class GenerateResponse(BaseModel):
@@ -31,6 +69,18 @@ class GenerateResponse(BaseModel):
     model_type: str = Field(..., description="Type of model used")
     lora_applied: Optional[str] = Field(None, description="LoRA file that was applied")
     lora_weight: Optional[float] = Field(None, description="LoRA weight that was used")
+    # Generation parameters used
+    num_inference_steps: int = Field(..., description="Number of inference steps used")
+    guidance_scale: float = Field(..., description="Guidance scale used")
+    width: int = Field(..., description="Image width generated")
+    height: int = Field(..., description="Image height generated")
+    seed: Optional[int] = Field(None, description="Random seed used (if any)")
+    # Generation parameters used
+    num_inference_steps: int = Field(..., description="Number of inference steps used")
+    guidance_scale: float = Field(..., description="Guidance scale used")
+    width: int = Field(..., description="Image width generated")
+    height: int = Field(..., description="Image height generated")
+    seed: Optional[int] = Field(None, description="Random seed used (if any)")
 
 
 class LoRAInfo(BaseModel):

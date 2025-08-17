@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from models.flux_model import FluxModelManager
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
 from utils.system_utils import get_system_memory
+from utils.queue_manager import QueueManager
 from config.settings import STATIC_IMAGES_DIR
 from api.models import GenerateRequest, GenerateResponse, ModelStatusResponse
 
@@ -31,6 +32,9 @@ def get_model_manager():
 
 
 model_manager = get_model_manager()
+
+# Global queue manager instance
+queue_manager = QueueManager(max_concurrent=2, max_queue_size=100)
 
 
 @router.get("/")
@@ -62,6 +66,21 @@ def get_static_image():
 async def generate_image(request: GenerateRequest):
     """Generate image using FLUX model with optional LoRA support - lora_name should be a Hugging Face repo ID"""
     try:
+        # Validate request parameters
+        if not request.prompt or request.prompt.strip() == "":
+            raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+            
+        if request.lora_name and not request.lora_name.strip():
+            raise HTTPException(status_code=400, detail="LoRA name cannot be empty if provided")
+            
+        if request.lora_weight < 0 or request.lora_weight > 2.0:
+            raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
+            
+        # Clean up input
+        prompt = request.prompt.strip()
+        lora_name = request.lora_name.strip() if request.lora_name else None
+        lora_weight = request.lora_weight
+        
         # First, ensure the model is loaded
         if not model_manager.is_loaded():
             logger.info("Model not loaded, loading it first...")
@@ -72,33 +91,54 @@ async def generate_image(request: GenerateRequest):
         # Now check if LoRA is already applied
         current_lora = model_manager.get_lora_info()
         lora_applied = None
-        lora_weight = None
+        lora_weight_applied = None
 
-        if request.lora_name:
+        if lora_name:
+            # Validate LoRA name format (should be a valid Hugging Face repo ID)
+            if not lora_name or "/" not in lora_name:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Invalid LoRA name format. Must be a Hugging Face repository ID (e.g., 'username/model-name')"
+                )
+                
             # Only apply LoRA if it's different from the current one
             if (
                 not current_lora
-                or current_lora.get("name") != request.lora_name
-                or current_lora.get("weight") != request.lora_weight
+                or current_lora.get("name") != lora_name
+                or current_lora.get("weight") != lora_weight
             ):
                 logger.info(
-                    f"Applying new LoRA: {request.lora_name} with weight {request.lora_weight}"
+                    f"Applying new LoRA: {lora_name} with weight {lora_weight}"
                 )
                 try:
-                    if model_manager.apply_lora(request.lora_name, request.lora_weight):
-                        lora_applied = request.lora_name
-                        lora_weight = request.lora_weight
+                    if model_manager.apply_lora(lora_name, lora_weight):
+                        lora_applied = lora_name
+                        lora_weight_applied = lora_weight
                         logger.info(
-                            f"LoRA {request.lora_name} applied successfully with weight {request.lora_weight}"
+                            f"LoRA {lora_name} applied successfully with weight {lora_weight}"
                         )
                     else:
                         logger.error(
-                            f"LoRA application failed: {request.lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+                            f"LoRA application failed: {lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+                        )
+                        raise HTTPException(
+                            status_code=500, 
+                            detail=f"Failed to apply LoRA {lora_name}. Please check if the LoRA exists and is compatible."
                         )
                 except Exception as lora_error:
                     logger.error(
                         f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})"
                     )
+                    if "not found" in str(lora_error).lower() or "404" in str(lora_error):
+                        raise HTTPException(
+                            status_code=400, 
+                            detail=f"LoRA {lora_name} not found. Please check the repository ID."
+                        )
+                    else:
+                        raise HTTPException(
+                            status_code=500, 
+                            detail=f"Failed to apply LoRA {lora_name}: {str(lora_error)}"
+                        )
             else:
                 # Use the already applied LoRA
                 lora_applied = current_lora.get("name")
@@ -116,7 +156,9 @@ async def generate_image(request: GenerateRequest):
                 )
 
         result = generate_image_internal(
-            request.prompt, "FLUX", lora_applied, lora_weight
+            prompt, "FLUX", lora_applied, lora_weight_applied,
+            request.num_inference_steps, request.guidance_scale,
+            request.width, request.height, request.seed, request.negative_prompt
         )
         return result
     except Exception as e:
@@ -238,11 +280,118 @@ def get_lora_status():
     }
 
 
+# Queue management endpoints
+@router.post("/submit-request")
+async def submit_generation_request(request: GenerateRequest):
+    """Submit a generation request to the queue"""
+    try:
+        # Validate request
+        if not request.prompt or request.prompt.strip() == "":
+            raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+            
+        if request.lora_name and not request.lora_name.strip():
+            raise HTTPException(status_code=400, detail="LoRA name cannot be empty if provided")
+            
+        if request.lora_weight < 0 or request.lora_weight > 2.0:
+            raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
+            
+        # Submit to queue
+        request_id = await queue_manager.submit_request(
+            prompt=request.prompt.strip(),
+            lora_name=request.lora_name.strip() if request.lora_name else None,
+            lora_weight=request.lora_weight,
+            num_inference_steps=request.num_inference_steps,
+            guidance_scale=request.guidance_scale,
+            width=request.width,
+            height=request.height,
+            seed=request.seed,
+            negative_prompt=request.negative_prompt
+        )
+        
+        return {
+            "message": "Request submitted successfully",
+            "request_id": request_id,
+            "status": "queued"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to submit request: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit request: {str(e)}")
+
+
+@router.get("/request-status/{request_id}")
+async def get_request_status(request_id: str):
+    """Get the status of a specific request"""
+    try:
+        request = await queue_manager.get_request_status(request_id)
+        if not request:
+            raise HTTPException(status_code=404, detail="Request not found")
+            
+        return {
+            "request_id": request.id,
+            "status": request.status.value,
+            "prompt": request.prompt,
+            "lora_name": request.lora_name,
+            "lora_weight": request.lora_weight,
+            "created_at": request.created_at,
+            "started_at": request.started_at,
+            "completed_at": request.completed_at,
+            "result": request.result,
+            "error": request.error,
+            # Generation parameters
+            "num_inference_steps": request.num_inference_steps,
+            "guidance_scale": request.guidance_scale,
+            "width": request.width,
+            "height": request.height,
+            "seed": request.seed,
+            "negative_prompt": request.negative_prompt
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get request status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get request status: {str(e)}")
+
+
+@router.delete("/cancel-request/{request_id}")
+async def cancel_request(request_id: str):
+    """Cancel a pending request"""
+    try:
+        success = await queue_manager.cancel_request(request_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Request not found or already processing")
+            
+        return {"message": "Request cancelled successfully", "request_id": request_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to cancel request: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to cancel request: {str(e)}")
+
+
+@router.get("/queue-stats")
+async def get_queue_stats():
+    """Get current queue statistics"""
+    try:
+        return queue_manager.get_queue_stats()
+    except Exception as e:
+        logger.error(f"Failed to get queue stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get queue stats: {str(e)}")
+
+
 def generate_image_internal(
     prompt: str,
     model_type_name: str = "FLUX",
     lora_applied: Optional[str] = None,
     lora_weight: Optional[float] = None,
+    num_inference_steps: int = 25,
+    guidance_scale: float = 3.5,
+    width: int = 512,
+    height: int = 512,
+    seed: Optional[int] = None,
+    negative_prompt: Optional[str] = None,
 ):
     """Internal function to generate images - used by both endpoints"""
     logger.info(f"Starting image generation for prompt: {prompt}")
@@ -278,7 +427,15 @@ def generate_image_internal(
             )
 
         # Generate the image
-        result = model_manager.generate_image(prompt)
+        result = model_manager.generate_image(
+            prompt, 
+            num_inference_steps, 
+            guidance_scale, 
+            width, 
+            height, 
+            seed, 
+            negative_prompt
+        )
 
         image = extract_image_from_result(result)
 
@@ -306,6 +463,12 @@ def generate_image_internal(
             "model_type": model_manager.model_type,
             "lora_applied": actual_lora_info.get("name") if actual_lora_info else None,
             "lora_weight": actual_lora_info.get("weight") if actual_lora_info else None,
+            # Generation parameters used
+            "num_inference_steps": num_inference_steps,
+            "guidance_scale": guidance_scale,
+            "width": width,
+            "height": height,
+            "seed": seed,
         }
 
     except Exception as e:

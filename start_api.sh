@@ -1,153 +1,117 @@
 #!/bin/bash
 
-# FLUX API Startup Script
-# This script starts the FastAPI server with proper environment setup
+# FLUX API Startup Script with Port Cleanup
+# This script ensures clean startup by handling port conflicts
 
-set -e  # Exit on any error
+set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+echo "🚀 FLUX API Startup Script"
+echo "=========================="
 
-# Function to print colored output
-print_status() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-print_header() {
-    echo -e "${BLUE}================================${NC}"
-    echo -e "${BLUE}    FLUX API Startup Script     ${NC}"
-    echo -e "${BLUE}================================${NC}"
-}
-
-# Function to check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
-
-# Function to check Python version
-check_python_version() {
-    if command_exists python3; then
-        PYTHON_CMD="python3"
-    elif command_exists python; then
-        PYTHON_CMD="python"
-    else
-        print_error "Python not found. Please install Python 3.8+"
-        exit 1
-    fi
+# Function to cleanup port
+cleanup_port() {
+    local port=$1
+    echo "🧹 Checking port $port for conflicts..."
     
-    PYTHON_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
-    PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
-    PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+    # Find processes using the port
+    local pids=$(lsof -ti:$port 2>/dev/null || echo "")
     
-    if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 8 ]); then
-        print_error "Python 3.8+ required. Found: $PYTHON_VERSION"
-        exit 1
-    fi
-    
-    print_status "Python version: $PYTHON_VERSION"
-}
-
-# Function to check if virtual environment exists
-check_virtual_env() {
-    if [ ! -d "flux_env" ]; then
-        print_error "Virtual environment 'flux_env' not found!"
-        echo ""
-        print_status "Creating virtual environment..."
-        $PYTHON_CMD -m venv flux_env
-        print_status "Virtual environment created successfully!"
-    fi
-}
-
-# Function to check if requirements are installed
-check_requirements() {
-    if [ ! -f "flux_env/bin/pip" ]; then
-        print_error "Virtual environment is corrupted or incomplete"
-        exit 1
-    fi
-    
-    # Check if key packages are installed
-    if ! flux_env/bin/pip show fastapi >/dev/null 2>&1; then
-        print_warning "Dependencies not installed. Installing now..."
-        print_status "Installing requirements from requirements.txt..."
-        flux_env/bin/pip install -r requirements.txt
-        print_status "Dependencies installed successfully!"
-    else
-        print_status "Dependencies already installed"
-    fi
-}
-
-# Function to check CUDA availability
-check_cuda() {
-    if command_exists nvidia-smi; then
-        print_status "NVIDIA GPU detected:"
-        nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits | while read line; do
-            print_status "  GPU: $line"
+    if [ -n "$pids" ]; then
+        echo "   Found processes using port $port: $pids"
+        
+        # Kill processes gracefully first
+        for pid in $pids; do
+            echo "   🚫 Terminating process $pid..."
+            kill -TERM $pid 2>/dev/null || true
         done
+        
+        # Wait a bit for graceful shutdown
+        sleep 2
+        
+        # Check if processes are still running
+        local remaining_pids=$(lsof -ti:$port 2>/dev/null || echo "")
+        
+        if [ -n "$remaining_pids" ]; then
+            echo "   💀 Force killing remaining processes..."
+            for pid in $remaining_pids; do
+                kill -KILL $pid 2>/dev/null || true
+            done
+            sleep 1
+        fi
+        
+        # Final check
+        local final_check=$(lsof -ti:$port 2>/dev/null || echo "")
+        if [ -n "$final_check" ]; then
+            echo "   ⚠️  Port $port still in use after cleanup"
+            return 1
+        else
+            echo "   ✅ Port $port is now free"
+            return 0
+        fi
     else
-        print_warning "NVIDIA GPU not detected. CUDA features may not work."
+        echo "   ✅ Port $port is free"
+        return 0
     fi
 }
 
-# Function to start the server
-start_server() {
-    print_status "Starting FLUX API server..."
-    echo ""
-    print_status "Server will be available at:"
-    echo "  🌐 API: http://127.0.0.1:8000"
-    echo "  📚 Docs: http://127.0.0.1:8000/docs"
-    echo "  🔍 Status: http://127.0.0.1:8000/"
-    echo ""
-    print_status "Press Ctrl+C to stop the server"
-    echo ""
+# Function to wait for port to be available
+wait_for_port() {
+    local port=$1
+    local max_wait=${2:-30}
+    local wait_time=0
     
-    # Start the server
-    flux_env/bin/uvicorn main:app --reload --host 127.0.0.1 --port 8000
+    echo "⏳ Waiting for port $port to become available..."
+    
+    while [ $wait_time -lt $max_wait ]; do
+        if ! lsof -i:$port >/dev/null 2>&1; then
+            echo "   ✅ Port $port is available"
+            return 0
+        fi
+        sleep 1
+        wait_time=$((wait_time + 1))
+        echo "   ⏳ Still waiting... (${wait_time}s)"
+    done
+    
+    echo "   ❌ Port $port did not become available within $max_wait seconds"
+    return 1
 }
 
-# Function to cleanup on exit
-cleanup() {
-    print_status "Shutting down FLUX API server..."
-    exit 0
-}
+# Check if we're in the right directory
+if [ ! -f "main.py" ]; then
+    echo "❌ main.py not found in current directory!"
+    echo "   Please run this script from the flux_api directory."
+    exit 1
+fi
 
-# Main execution
-main() {
-    print_header
-    
-    # Set up signal handlers
-    trap cleanup SIGINT SIGTERM
-    
-    # Check Python
-    print_status "Checking Python installation..."
-    check_python_version
-    
-    # Check virtual environment
-    print_status "Checking virtual environment..."
-    check_virtual_env
-    
-    # Check requirements
-    print_status "Checking dependencies..."
-    check_requirements
-    
-    # Check CUDA
-    print_status "Checking CUDA availability..."
-    check_cuda
-    
-    # Start server
-    start_server
-}
+# Check if flux_env exists
+if [ ! -d "flux_env" ]; then
+    echo "❌ flux_env virtual environment not found!"
+    echo "   Please ensure the virtual environment is set up correctly."
+    exit 1
+fi
 
-# Run main function
-main "$@"
+# Check if start_service.py exists
+if [ ! -f "start_service.py" ]; then
+    echo "❌ start_service.py not found!"
+    echo "   Please ensure the service starter script exists."
+    exit 1
+fi
+
+echo "✅ Environment check passed"
+
+# Clean up port 8000
+if ! cleanup_port 8000; then
+    echo "⚠️  Port cleanup incomplete, but continuing..."
+fi
+
+# Wait for port to be available
+if ! wait_for_port 8000 30; then
+    echo "❌ Port 8000 is not available, cannot start service"
+    exit 1
+fi
+
+echo "🚀 Starting FLUX API Service..."
+
+# Activate virtual environment and start the service
+source flux_env/bin/activate
+flux_env/bin/python start_service.py
