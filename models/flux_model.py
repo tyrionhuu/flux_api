@@ -104,10 +104,10 @@ class FluxModelManager:
             self.current_lora = None
             self.current_weight = 1.0
             logger.info(f"FLUX model loaded successfully on {device}!")
-            
+
             # Perform CUDA Graph warm-up for better performance
             self._warmup_cuda_graph()
-            
+
             return True
 
         except Exception as e:
@@ -119,27 +119,40 @@ class FluxModelManager:
         try:
             if self.pipe is not None and torch.cuda.is_available():
                 logger.info("Performing CUDA Graph warm-up...")
-                
+
                 # Warm-up with multiple iterations to optimize CUDA graphs
                 for i in range(2):
                     logger.info(f"CUDA Graph warm-up iteration {i+1}/2")
-                    _ = self.pipe("warmup prompt", num_inference_steps=5, guidance_scale=1.0)
-                    
+                    _ = self.pipe(
+                        "warmup prompt", num_inference_steps=5, guidance_scale=1.0
+                    )
+
                     # Clear CUDA cache between warm-up iterations
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
-                
+
                 logger.info("CUDA Graph warm-up completed successfully")
             else:
-                logger.warning("Skipping CUDA Graph warm-up - pipeline not loaded or CUDA not available")
+                logger.warning(
+                    "Skipping CUDA Graph warm-up - pipeline not loaded or CUDA not available"
+                )
         except Exception as e:
-            logger.warning(f"CUDA Graph warm-up failed: {e} - continuing without warm-up")
+            logger.warning(
+                f"CUDA Graph warm-up failed: {e} - continuing without warm-up"
+            )
 
     # Removed _integrate_quantized_weights - now using Nunchaku pipeline directly
 
-    def generate_image(self, prompt: str, num_inference_steps: int = 25, guidance_scale: float = 3.5, 
-                      width: int = 512, height: int = 512, seed: Optional[int] = None, 
-                      negative_prompt: Optional[str] = None) -> Any:
+    def generate_image(
+        self,
+        prompt: str,
+        num_inference_steps: int = 25,
+        guidance_scale: float = 3.5,
+        width: int = 512,
+        height: int = 512,
+        seed: Optional[int] = None,
+        negative_prompt: Optional[str] = None,
+    ) -> Any:
         """Generate image using the loaded Nunchaku model - GPU only"""
         if not self.model_loaded or self.pipe is None:
             raise RuntimeError("Model not loaded")
@@ -169,24 +182,26 @@ class FluxModelManager:
 
             # Try with user-specified parameters first
             try:
-                logger.info(f"Generating with parameters: steps={num_inference_steps}, guidance={guidance_scale}, size={width}x{height}")
-                
+                logger.info(
+                    f"Generating with parameters: steps={num_inference_steps}, guidance={guidance_scale}, size={width}x{height}"
+                )
+
                 # Set seed if provided
                 if seed is not None:
                     torch.manual_seed(seed)
                     logger.info(f"Using seed: {seed}")
-                
+
                 # Prepare generation kwargs
                 generation_kwargs = {
                     "prompt": prompt,
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": guidance_scale,
                 }
-                
+
                 # Add negative prompt if provided
                 if negative_prompt:
                     generation_kwargs["negative_prompt"] = negative_prompt
-                
+
                 result = self.pipe(**generation_kwargs)
                 logger.info("Image generation completed successfully")
                 return result
@@ -201,18 +216,20 @@ class FluxModelManager:
                     # Fallback with reduced parameters
                     fallback_steps = min(num_inference_steps // 2, 10)
                     fallback_guidance = max(guidance_scale * 0.6, 1.0)
-                    
+
                     generation_kwargs = {
                         "prompt": prompt,
                         "num_inference_steps": fallback_steps,
                         "guidance_scale": fallback_guidance,
                     }
-                    
+
                     if negative_prompt:
                         generation_kwargs["negative_prompt"] = negative_prompt
-                    
+
                     result = self.pipe(**generation_kwargs)
-                    logger.info(f"Image generation completed with reduced parameters: steps={fallback_steps}, guidance={fallback_guidance}")
+                    logger.info(
+                        f"Image generation completed with reduced parameters: steps={fallback_steps}, guidance={fallback_guidance}"
+                    )
                     return result
                 else:
                     # Re-raise if it's not a memory error

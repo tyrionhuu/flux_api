@@ -69,18 +69,22 @@ async def generate_image(request: GenerateRequest):
         # Validate request parameters
         if not request.prompt or request.prompt.strip() == "":
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
-            
+
         if request.lora_name and not request.lora_name.strip():
-            raise HTTPException(status_code=400, detail="LoRA name cannot be empty if provided")
-            
+            raise HTTPException(
+                status_code=400, detail="LoRA name cannot be empty if provided"
+            )
+
         if request.lora_weight < 0 or request.lora_weight > 2.0:
-            raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
-            
+            raise HTTPException(
+                status_code=400, detail="LoRA weight must be between 0 and 2.0"
+            )
+
         # Clean up input
         prompt = request.prompt.strip()
         lora_name = request.lora_name.strip() if request.lora_name else None
         lora_weight = request.lora_weight
-        
+
         # First, ensure the model is loaded
         if not model_manager.is_loaded():
             logger.info("Model not loaded, loading it first...")
@@ -97,19 +101,17 @@ async def generate_image(request: GenerateRequest):
             # Validate LoRA name format (should be a valid Hugging Face repo ID)
             if not lora_name or "/" not in lora_name:
                 raise HTTPException(
-                    status_code=400, 
-                    detail="Invalid LoRA name format. Must be a Hugging Face repository ID (e.g., 'username/model-name')"
+                    status_code=400,
+                    detail="Invalid LoRA name format. Must be a Hugging Face repository ID (e.g., 'username/model-name')",
                 )
-                
+
             # Only apply LoRA if it's different from the current one
             if (
                 not current_lora
                 or current_lora.get("name") != lora_name
                 or current_lora.get("weight") != lora_weight
             ):
-                logger.info(
-                    f"Applying new LoRA: {lora_name} with weight {lora_weight}"
-                )
+                logger.info(f"Applying new LoRA: {lora_name} with weight {lora_weight}")
                 try:
                     if model_manager.apply_lora(lora_name, lora_weight):
                         lora_applied = lora_name
@@ -122,22 +124,24 @@ async def generate_image(request: GenerateRequest):
                             f"LoRA application failed: {lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
                         )
                         raise HTTPException(
-                            status_code=500, 
-                            detail=f"Failed to apply LoRA {lora_name}. Please check if the LoRA exists and is compatible."
+                            status_code=500,
+                            detail=f"Failed to apply LoRA {lora_name}. Please check if the LoRA exists and is compatible.",
                         )
                 except Exception as lora_error:
                     logger.error(
                         f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})"
                     )
-                    if "not found" in str(lora_error).lower() or "404" in str(lora_error):
+                    if "not found" in str(lora_error).lower() or "404" in str(
+                        lora_error
+                    ):
                         raise HTTPException(
-                            status_code=400, 
-                            detail=f"LoRA {lora_name} not found. Please check the repository ID."
+                            status_code=400,
+                            detail=f"LoRA {lora_name} not found. Please check the repository ID.",
                         )
                     else:
                         raise HTTPException(
-                            status_code=500, 
-                            detail=f"Failed to apply LoRA {lora_name}: {str(lora_error)}"
+                            status_code=500,
+                            detail=f"Failed to apply LoRA {lora_name}: {str(lora_error)}",
                         )
             else:
                 # Use the already applied LoRA
@@ -156,9 +160,16 @@ async def generate_image(request: GenerateRequest):
                 )
 
         result = generate_image_internal(
-            prompt, "FLUX", lora_applied, lora_weight_applied,
-            request.num_inference_steps, request.guidance_scale,
-            request.width, request.height, request.seed, request.negative_prompt
+            prompt,
+            "FLUX",
+            lora_applied,
+            lora_weight_applied,
+            request.num_inference_steps,
+            request.guidance_scale,
+            request.width,
+            request.height,
+            request.seed,
+            request.negative_prompt,
         )
         return result
     except Exception as e:
@@ -288,13 +299,17 @@ async def submit_generation_request(request: GenerateRequest):
         # Validate request
         if not request.prompt or request.prompt.strip() == "":
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
-            
+
         if request.lora_name and not request.lora_name.strip():
-            raise HTTPException(status_code=400, detail="LoRA name cannot be empty if provided")
-            
+            raise HTTPException(
+                status_code=400, detail="LoRA name cannot be empty if provided"
+            )
+
         if request.lora_weight < 0 or request.lora_weight > 2.0:
-            raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
-            
+            raise HTTPException(
+                status_code=400, detail="LoRA weight must be between 0 and 2.0"
+            )
+
         # Submit to queue
         request_id = await queue_manager.submit_request(
             prompt=request.prompt.strip(),
@@ -305,18 +320,20 @@ async def submit_generation_request(request: GenerateRequest):
             width=request.width,
             height=request.height,
             seed=request.seed,
-            negative_prompt=request.negative_prompt
+            negative_prompt=request.negative_prompt,
         )
-        
+
         return {
             "message": "Request submitted successfully",
             "request_id": request_id,
-            "status": "queued"
+            "status": "queued",
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to submit request: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to submit request: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to submit request: {str(e)}"
+        )
 
 
 @router.get("/request-status/{request_id}")
@@ -326,7 +343,7 @@ async def get_request_status(request_id: str):
         request = await queue_manager.get_request_status(request_id)
         if not request:
             raise HTTPException(status_code=404, detail="Request not found")
-            
+
         return {
             "request_id": request.id,
             "status": request.status.value,
@@ -344,14 +361,16 @@ async def get_request_status(request_id: str):
             "width": request.width,
             "height": request.height,
             "seed": request.seed,
-            "negative_prompt": request.negative_prompt
+            "negative_prompt": request.negative_prompt,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to get request status: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get request status: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get request status: {str(e)}"
+        )
 
 
 @router.delete("/cancel-request/{request_id}")
@@ -360,15 +379,19 @@ async def cancel_request(request_id: str):
     try:
         success = await queue_manager.cancel_request(request_id)
         if not success:
-            raise HTTPException(status_code=404, detail="Request not found or already processing")
-            
+            raise HTTPException(
+                status_code=404, detail="Request not found or already processing"
+            )
+
         return {"message": "Request cancelled successfully", "request_id": request_id}
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to cancel request: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to cancel request: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to cancel request: {str(e)}"
+        )
 
 
 @router.get("/queue-stats")
@@ -378,7 +401,9 @@ async def get_queue_stats():
         return queue_manager.get_queue_stats()
     except Exception as e:
         logger.error(f"Failed to get queue stats: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get queue stats: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get queue stats: {str(e)}"
+        )
 
 
 def generate_image_internal(
@@ -428,13 +453,13 @@ def generate_image_internal(
 
         # Generate the image
         result = model_manager.generate_image(
-            prompt, 
-            num_inference_steps, 
-            guidance_scale, 
-            width, 
-            height, 
-            seed, 
-            negative_prompt
+            prompt,
+            num_inference_steps,
+            guidance_scale,
+            width,
+            height,
+            seed,
+            negative_prompt,
         )
 
         image = extract_image_from_result(result)
