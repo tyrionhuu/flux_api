@@ -1,19 +1,19 @@
 #!/bin/bash
 
-# FLUX API Startup Script with Port Cleanup
+# BF16 FLUX API Startup Script with Port Cleanup (Port 8001)
 # This script ensures clean startup by handling port conflicts
 
 set -e
 
-echo "🚀 FLUX API Startup Script"
-echo "=========================="
+echo "🚀 BF16 FLUX API Startup Script (Port 8001)"
+echo "============================================="
 
 # Parse args (-g supports single GPU id or comma-separated list, e.g., "1,2,3")
 GPU_ID=""
 
 usage() {
     echo "Usage: $0 [-g <gpu_ids>]"
-    echo "  -g <gpu_ids>   GPU index or comma-separated list (e.g., 1 or 1,2,3). If omitted, all GPUs remain visible."
+    echo "  -g <gpu_ids>   GPU index or comma-separated list (e.g., 2 or 2,3). If omitted, all GPUs remain visible."
 }
 
 while getopts ":g:h" opt; do
@@ -107,8 +107,8 @@ wait_for_port() {
 }
 
 # Check if we're in the right directory
-if [ ! -f "main.py" ]; then
-    echo "❌ main.py not found in current directory!"
+if [ ! -f "main_bf16.py" ]; then
+    echo "❌ main_bf16.py not found in current directory!"
     echo "   Please run this script from the flux_api directory."
     exit 1
 fi
@@ -120,27 +120,27 @@ if [ ! -d "flux_env" ]; then
     exit 1
 fi
 
-# Check if start_service.py exists
-if [ ! -f "start_service.py" ]; then
-    echo "❌ start_service.py not found!"
-    echo "   Please ensure the service starter script exists."
+# Check if start_bf16_service.py exists
+if [ ! -f "start_bf16_service.py" ]; then
+    echo "❌ start_bf16_service.py not found!"
+    echo "   Please ensure the BF16 service starter script exists."
     exit 1
 fi
 
 echo "✅ Environment check passed"
 
-# Clean up port 8000
-if ! cleanup_port 8000; then
+# Clean up port 8001
+if ! cleanup_port 8001; then
     echo "⚠️  Port cleanup incomplete, but continuing..."
 fi
 
 # Wait for port to be available
-if ! wait_for_port 8000 30; then
-    echo "❌ Port 8000 is not available, cannot start service"
+if ! wait_for_port 8001 30; then
+    echo "❌ Port 8001 is not available, cannot start service"
     exit 1
 fi
 
-echo "🚀 Starting FLUX API Service..."
+echo "🚀 Starting BF16 FLUX API Service..."
 
 # Activate virtual environment and start the service
 source flux_env/bin/activate
@@ -148,9 +148,9 @@ source flux_env/bin/activate
 # Assign GPU visibility only if -g provided; otherwise leave all GPUs visible
 if [ -n "$GPU_ID" ]; then
   export CUDA_VISIBLE_DEVICES="$GPU_ID"
-  echo "🔧 Using CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} for FP4 service"
+  echo "🔧 Using CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} for BF16 service"
 else
   echo "🔧 No -g provided; using all visible GPUs"
 fi
 
-flux_env/bin/python start_service.py
+flux_env/bin/python start_bf16_service.py

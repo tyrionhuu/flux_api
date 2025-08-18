@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-FLUX API Service Starter
-This script starts the FLUX API service directly using the flux_env virtual environment.
+BF16 FLUX API Service Starter (Port 8001)
+This script starts the BF16 FLUX API service directly using the flux_env virtual environment.
 """
 
 import os
@@ -30,7 +30,7 @@ def check_flux_env():
     return True
 
 
-def cleanup_port(port: int = 8000):
+def cleanup_port(port: int = 8001):
     """Clean up processes using the specified port"""
     print(f"🧹 Checking port {port} for existing processes...")
 
@@ -150,7 +150,7 @@ def cleanup_port(port: int = 8000):
     return False
 
 
-def check_port_available(port: int = 8000) -> bool:
+def check_port_available(port: int = 8001) -> bool:
     """Check if a port is available by attempting to bind to it"""
     import socket
 
@@ -164,7 +164,7 @@ def check_port_available(port: int = 8000) -> bool:
         return False
 
 
-def wait_for_port_free(port: int = 8000, max_wait: int = 30) -> bool:
+def wait_for_port_free(port: int = 8001, max_wait: int = 30) -> bool:
     """Wait for a port to become free"""
     print(f"⏳ Waiting for port {port} to become free...")
 
@@ -209,23 +209,23 @@ def check_dependencies():
 
 
 def start_service():
-    """Start the FLUX API service"""
-    print("\n🚀 Starting FLUX API Service...")
+    """Start the BF16 FLUX API service"""
+    print("\n🚀 Starting BF16 FLUX API Service...")
     print("=" * 50)
 
     # Clean up port before starting
-    if not cleanup_port(8000):
+    if not cleanup_port(8001):
         print("   ⚠️  Port cleanup incomplete, but continuing...")
 
     # Final port verification
     print("🔍 Final port verification...")
     try:
         result = subprocess.run(
-            ["lsof", "-ti", f":8000"], capture_output=True, text=True, timeout=5
+            ["lsof", "-ti", f":8001"], capture_output=True, text=True, timeout=5
         )
 
         if result.returncode == 0 and result.stdout.strip():
-            print(f"   ❌ Port 8000 still in use by: {result.stdout.strip()}")
+            print(f"   ❌ Port 8001 still in use by: {result.stdout.strip()}")
             print("   🚫 Attempting final cleanup...")
             pids = result.stdout.strip().split("\n")
             for pid in pids:
@@ -237,13 +237,13 @@ def start_service():
                         pass
             time.sleep(2)
         else:
-            print("   ✅ Port 8000 is confirmed free")
+            print("   ✅ Port 8001 is confirmed free")
     except Exception as e:
         print(f"   ⚠️  Final verification failed: {e}")
 
     # Wait for port to be truly available
-    if not wait_for_port_free(8000, max_wait=30):
-        print("   ❌ Port 8000 is not available, cannot start service")
+    if not wait_for_port_free(8001, max_wait=30):
+        print("   ❌ Port 8001 is not available, cannot start service")
         return False
 
     # Get the path to the flux_env Python executable
@@ -251,16 +251,19 @@ def start_service():
 
     # Start the service
     try:
-        print("📡 Starting API server...")
+        print("📡 Starting BF16 API server...")
+        
         # Manual GPU selection: respect existing CUDA_VISIBLE_DEVICES
         env = os.environ.copy()
         if env.get("CUDA_VISIBLE_DEVICES"):
-            print(f"🔧 Using CUDA_VISIBLE_DEVICES={env['CUDA_VISIBLE_DEVICES']} for FP4 service")
+            print(f"🔧 Using CUDA_VISIBLE_DEVICES={env['CUDA_VISIBLE_DEVICES']} for BF16 service")
         else:
             print("⚠️  CUDA_VISIBLE_DEVICES not set; default visible GPU will be used")
+        # Reduce fragmentation per PyTorch docs
+        env["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
         
         process = subprocess.Popen(
-            [str(flux_env_python), "main.py"],
+            [str(flux_env_python), "main_bf16.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -268,10 +271,10 @@ def start_service():
             env=env,
         )
 
-        print(f"✅ Service started with PID: {process.pid}")
-        print("📍 API URL: http://localhost:8000")
-        print("🔍 Health check: http://localhost:8000/health")
-        print("📚 API docs: http://localhost:8000/docs")
+        print(f"✅ BF16 service started with PID: {process.pid}")
+        print("📍 BF16 API URL: http://localhost:8001")
+        print("🔍 Health check: http://localhost:8001/health")
+        print("📚 API docs: http://localhost:8001/docs")
         print("\n📋 Service logs:")
         print("-" * 50)
 
@@ -281,16 +284,16 @@ def start_service():
                 print(line.rstrip())
 
     except KeyboardInterrupt:
-        print("\n\n⏹️  Stopping service...")
+        print("\n\n⏹️  Stopping BF16 service...")
         if process:
             process.terminate()
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
-        print("✅ Service stopped")
+        print("✅ BF16 service stopped")
     except Exception as e:
-        print(f"❌ Failed to start service: {e}")
+        print(f"❌ Failed to start BF16 service: {e}")
         return False
 
     return True
@@ -298,12 +301,12 @@ def start_service():
 
 def main():
     """Main function"""
-    print("🐍 FLUX API Service Starter")
-    print("=" * 30)
+    print("🐍 BF16 FLUX API Service Starter (Port 8001)")
+    print("=" * 50)
 
     # Check if we're in the right directory
-    if not Path("main.py").exists():
-        print("❌ main.py not found in current directory!")
+    if not Path("main_bf16.py").exists():
+        print("❌ main_bf16.py not found in current directory!")
         print("   Please run this script from the flux_api directory.")
         sys.exit(1)
 

@@ -41,15 +41,33 @@ class FluxModelManager:
                     "CUDA not available. This model requires GPU support."
                 )
 
-            # Get optimal GPU device
-            device, selected_gpu = self.gpu_manager.get_optimal_device()
-
-            if device == "cpu":
-                raise RuntimeError(
-                    "GPU required. CPU mode is not supported for this model."
-                )
-
-            logger.info(f"Using device: {device}")
+            # Check for balanced multi-GPU mode
+            visible_gpu_count = torch.cuda.device_count()
+            logger.info(f"Visible GPUs: {visible_gpu_count}")
+            
+            device_map = None
+            if visible_gpu_count > 1:
+                # Balanced multi-GPU mode
+                logger.info(f"Using balanced multi-GPU mode across {visible_gpu_count} GPUs")
+                device_map = "balanced"
+                device = "cuda"
+            else:
+                # Single GPU mode
+                device = "cuda:0"
+                logger.info(f"Using single GPU mode: {device}")
+                try:
+                    torch.cuda.set_device(0)
+                except Exception:
+                    pass
+                
+                # Verify device is set correctly
+                current_device = torch.cuda.current_device()
+                logger.info(f"Current CUDA device: {current_device}, Target device: 0")
+                if current_device != 0:
+                    logger.warning(f"Device mismatch! Current: {current_device}, Target device: 0")
+                    torch.cuda.set_device(0)
+                    current_device = torch.cuda.current_device()
+                    logger.info(f"Device after force set: {current_device}")
 
             # Always load Nunchaku model (this has LoRA support)
             logger.info("Loading Nunchaku model with LoRA support...")
@@ -77,11 +95,22 @@ class FluxModelManager:
                     )  # Direct transformer object
 
                 # Create FluxPipeline with the Nunchaku transformer
-                self.pipe = FluxPipeline.from_pretrained(
-                    "black-forest-labs/FLUX.1-dev",
-                    transformer=transformer,
-                    torch_dtype=torch.bfloat16,
-                ).to(device)
+                if device_map == "balanced":
+                    # Multi-GPU balanced mode
+                    logger.info("Loading pipeline with balanced device map")
+                    self.pipe = FluxPipeline.from_pretrained(
+                        "black-forest-labs/FLUX.1-dev",
+                        transformer=transformer,
+                        torch_dtype=torch.bfloat16,
+                        device_map=device_map,
+                    )
+                else:
+                    # Single GPU mode
+                    self.pipe = FluxPipeline.from_pretrained(
+                        "black-forest-labs/FLUX.1-dev",
+                        transformer=transformer,
+                        torch_dtype=torch.bfloat16,
+                    ).to(device)
 
                 # Verify device consistency
                 logger.debug(
@@ -161,10 +190,14 @@ class FluxModelManager:
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA not available. GPU required for image generation.")
 
-        if self.gpu_manager.selected_gpu is not None:
+        # Set device for generation based on mode
+        visible_gpu_count = torch.cuda.device_count()
+        if visible_gpu_count > 1:
+            logger.info(f"Generating with balanced multi-GPU mode ({visible_gpu_count} GPUs)")
+        else:
             try:
-                self.gpu_manager.set_device(self.gpu_manager.selected_gpu)
-                logger.info(f"Generating on GPU {self.gpu_manager.selected_gpu}")
+                torch.cuda.set_device(0)
+                logger.info("Generating on cuda:0 (single GPU)")
             except Exception as gpu_error:
                 logger.error(
                     f"GPU error during device selection: {gpu_error} (Type: {type(gpu_error).__name__})"
@@ -172,9 +205,6 @@ class FluxModelManager:
                 raise RuntimeError(
                     f"GPU error: {gpu_error}. GPU required for image generation."
                 )
-        else:
-            logger.error(f"No GPU selected for image generation")
-            raise RuntimeError("No GPU selected. GPU required for image generation.")
 
         # Generate the image using the FluxPipeline (same as the example)
         try:
