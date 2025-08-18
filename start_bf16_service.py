@@ -252,16 +252,18 @@ def start_service():
     # Start the service
     try:
         print("📡 Starting BF16 API server...")
-        
+
         # Manual GPU selection: respect existing CUDA_VISIBLE_DEVICES
         env = os.environ.copy()
         if env.get("CUDA_VISIBLE_DEVICES"):
-            print(f"🔧 Using CUDA_VISIBLE_DEVICES={env['CUDA_VISIBLE_DEVICES']} for BF16 service")
+            print(
+                f"🔧 Using CUDA_VISIBLE_DEVICES={env['CUDA_VISIBLE_DEVICES']} for BF16 service"
+            )
         else:
             print("⚠️  CUDA_VISIBLE_DEVICES not set; default visible GPU will be used")
         # Reduce fragmentation per PyTorch docs
         env["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
-        
+
         process = subprocess.Popen(
             [str(flux_env_python), "main_bf16.py"],
             stdout=subprocess.PIPE,

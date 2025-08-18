@@ -77,7 +77,9 @@ async def generate_image(request: GenerateRequest):
         if not bf16_model_manager.is_loaded():
             logger.info("BF16 model not loaded, loading it first...")
             if not bf16_model_manager.load_model():
-                raise HTTPException(status_code=500, detail="Failed to load BF16 FLUX model")
+                raise HTTPException(
+                    status_code=500, detail="Failed to load BF16 FLUX model"
+                )
             logger.info("BF16 model loaded successfully")
 
         # Now check if LoRA is already applied
@@ -178,7 +180,9 @@ def load_model():
             logger.error(
                 f"Failed to load BF16 FLUX model - Model: {bf16_model_manager.is_loaded()}, Pipeline: {bf16_model_manager.get_pipeline() is not None}"
             )
-            raise HTTPException(status_code=500, detail="Failed to load BF16 FLUX model")
+            raise HTTPException(
+                status_code=500, detail="Failed to load BF16 FLUX model"
+            )
     except Exception as e:
         logger.error(f"Exception during model loading: {e} (Type: {type(e).__name__})")
         raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
@@ -191,7 +195,11 @@ def get_model_status():
         return ModelStatusResponse(
             model_loaded=bf16_model_manager.is_loaded(),
             model_type=bf16_model_manager.model_type,
-            device=str(bf16_model_manager.gpu_manager.selected_gpu) if bf16_model_manager.gpu_manager.selected_gpu is not None else "unknown",
+            device=(
+                str(bf16_model_manager.gpu_manager.selected_gpu)
+                if bf16_model_manager.gpu_manager.selected_gpu is not None
+                else "unknown"
+            ),
             lora_info=bf16_model_manager.get_lora_info(),
         )
     except Exception as e:
@@ -207,13 +215,21 @@ def apply_lora(lora_name: str, lora_weight: float = 1.0):
             raise HTTPException(status_code=400, detail="Model not loaded")
 
         if bf16_model_manager.apply_lora(lora_name, lora_weight):
-            logger.info(f"LoRA {lora_name} applied successfully with weight {lora_weight}")
+            logger.info(
+                f"LoRA {lora_name} applied successfully with weight {lora_weight}"
+            )
             return {"message": f"LoRA {lora_name} applied successfully"}
         else:
-            raise HTTPException(status_code=500, detail=f"Failed to apply LoRA {lora_name}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to apply LoRA {lora_name}"
+            )
     except Exception as e:
-        logger.error(f"Exception during LoRA application: {e} (Type: {type(e).__name__})")
-        raise HTTPException(status_code=500, detail=f"LoRA application failed: {str(e)}")
+        logger.error(
+            f"Exception during LoRA application: {e} (Type: {type(e).__name__})"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"LoRA application failed: {str(e)}"
+        )
 
 
 @router.post("/remove-lora")
@@ -248,8 +264,12 @@ def get_lora_status():
         else:
             return {"lora_applied": False, "model_type": "bf16"}
     except Exception as e:
-        logger.error(f"Exception during LoRA status check: {e} (Type: {type(e).__name__})")
-        raise HTTPException(status_code=500, detail=f"LoRA status check failed: {str(e)}")
+        logger.error(
+            f"Exception during LoRA status check: {e} (Type: {type(e).__name__})"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"LoRA status check failed: {str(e)}"
+        )
 
 
 @router.get("/loras")
@@ -258,10 +278,7 @@ def get_available_loras():
     try:
         # This would typically query a database or API for available LoRAs
         # For now, return a placeholder response
-        return {
-            "message": "LoRA discovery not implemented yet",
-            "model_type": "bf16"
-        }
+        return {"message": "LoRA discovery not implemented yet", "model_type": "bf16"}
     except Exception as e:
         logger.error(f"Exception during LoRA discovery: {e} (Type: {type(e).__name__})")
         raise HTTPException(status_code=500, detail=f"LoRA discovery failed: {str(e)}")
@@ -291,9 +308,13 @@ def generate_image_internal(
         logger.info(f"Applying LoRA {lora_applied} to loaded BF16 model")
         try:
             if not bf16_model_manager.apply_lora(lora_applied, lora_weight or 1.0):
-                logger.error(f"Failed to apply LoRA {lora_applied} to loaded BF16 model")
+                logger.error(
+                    f"Failed to apply LoRA {lora_applied} to loaded BF16 model"
+                )
             else:
-                logger.info(f"LoRA {lora_applied} applied successfully to loaded BF16 model")
+                logger.info(
+                    f"LoRA {lora_applied} applied successfully to loaded BF16 model"
+                )
         except Exception as lora_error:
             logger.error(
                 f"Exception during LoRA application to loaded BF16 model: {lora_error} (Type: {type(lora_error).__name__})"

@@ -38,11 +38,13 @@ class BF16FluxModelManager(FluxModelManager):
             # Check for balanced multi-GPU mode
             visible_gpu_count = torch.cuda.device_count()
             logger.info(f"Visible GPUs: {visible_gpu_count}")
-            
+
             device_map = None
             if visible_gpu_count > 1:
                 # Balanced multi-GPU mode
-                logger.info(f"Using balanced multi-GPU mode across {visible_gpu_count} GPUs")
+                logger.info(
+                    f"Using balanced multi-GPU mode across {visible_gpu_count} GPUs"
+                )
                 device_map = "balanced"
                 device = "cuda"
             else:
@@ -53,12 +55,14 @@ class BF16FluxModelManager(FluxModelManager):
                     torch.cuda.set_device(0)
                 except Exception:
                     pass
-                
+
                 # Verify device is set correctly
                 current_device = torch.cuda.current_device()
                 logger.info(f"Current CUDA device: {current_device}, Target device: 0")
                 if current_device != 0:
-                    logger.warning(f"Device mismatch! Current: {current_device}, Target device: 0")
+                    logger.warning(
+                        f"Device mismatch! Current: {current_device}, Target device: 0"
+                    )
                     torch.cuda.set_device(0)
                     current_device = torch.cuda.current_device()
                     logger.info(f"Device after force set: {current_device}")
@@ -69,8 +73,10 @@ class BF16FluxModelManager(FluxModelManager):
             try:
                 # Create FluxPipeline with bf16 precision
                 logger.info(f"Loading model to device: {device}")
-                logger.info(f"Current CUDA device before loading: {torch.cuda.current_device()}")
-                
+                logger.info(
+                    f"Current CUDA device before loading: {torch.cuda.current_device()}"
+                )
+
                 if device_map == "balanced":
                     # Multi-GPU balanced mode
                     logger.info("Loading BF16 pipeline with balanced device map")
@@ -85,9 +91,13 @@ class BF16FluxModelManager(FluxModelManager):
                         BF16_MODEL_ID,
                         torch_dtype=torch.bfloat16,
                     ).to(device)
-                
-                logger.info(f"Model loaded. Current CUDA device after loading: {torch.cuda.current_device()}")
-                logger.info(f"Pipeline device: {self.pipe.device if hasattr(self.pipe, 'device') else 'unknown'}")
+
+                logger.info(
+                    f"Model loaded. Current CUDA device after loading: {torch.cuda.current_device()}"
+                )
+                logger.info(
+                    f"Pipeline device: {self.pipe.device if hasattr(self.pipe, 'device') else 'unknown'}"
+                )
 
                 # Verify device consistency
                 logger.debug(
@@ -117,7 +127,9 @@ class BF16FluxModelManager(FluxModelManager):
             return True
 
         except Exception as e:
-            logger.error(f"Error loading BF16 FLUX model: {e} (Type: {type(e).__name__})")
+            logger.error(
+                f"Error loading BF16 FLUX model: {e} (Type: {type(e).__name__})"
+            )
             return False
 
     def generate_image(
@@ -141,7 +153,9 @@ class BF16FluxModelManager(FluxModelManager):
         # Set device for generation based on mode
         visible_gpu_count = torch.cuda.device_count()
         if visible_gpu_count > 1:
-            logger.info(f"Generating with balanced multi-GPU mode ({visible_gpu_count} GPUs)")
+            logger.info(
+                f"Generating with balanced multi-GPU mode ({visible_gpu_count} GPUs)"
+            )
         else:
             try:
                 torch.cuda.set_device(0)
@@ -217,7 +231,9 @@ class BF16FluxModelManager(FluxModelManager):
                     raise memory_error
 
         except Exception as e:
-            logger.error(f"Error in BF16 image generation: {e} (Type: {type(e).__name__})")
+            logger.error(
+                f"Error in BF16 image generation: {e} (Type: {type(e).__name__})"
+            )
             raise RuntimeError(f"Failed to generate BF16 image: {e}")
 
     def apply_lora(self, lora_name: str, lora_weight: float = 1.0) -> bool:
@@ -227,21 +243,23 @@ class BF16FluxModelManager(FluxModelManager):
                 logger.error("Model not loaded, cannot apply LoRA")
                 return False
 
-            logger.info(f"Applying LoRA {lora_name} with weight {lora_weight} to BF16 model...")
-            
+            logger.info(
+                f"Applying LoRA {lora_name} with weight {lora_weight} to BF16 model..."
+            )
+
             # Load and apply LoRA
             self.pipe.load_lora_weights(lora_name)
-            
+
             # Set LoRA scale
             self.pipe.set_adapters([lora_name], adapter_weights=[lora_weight])
-            
+
             # Update state
             self.current_lora = lora_name
             self.current_weight = lora_weight
-            
+
             logger.info(f"LoRA {lora_name} applied successfully to BF16 model")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to apply LoRA to BF16 model: {e}")
             return False
@@ -254,17 +272,17 @@ class BF16FluxModelManager(FluxModelManager):
                 return False
 
             logger.info("Removing LoRA from BF16 model...")
-            
+
             # Remove LoRA adapters
             self.pipe.set_adapters([])
-            
+
             # Update state
             self.current_lora = None
             self.current_weight = 1.0
-            
+
             logger.info("LoRA removed successfully from BF16 model")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to remove LoRA from BF16 model: {e}")
             return False
@@ -275,6 +293,6 @@ class BF16FluxModelManager(FluxModelManager):
             return {
                 "name": self.current_lora,
                 "weight": self.current_weight,
-                "model_type": "bf16"
+                "model_type": "bf16",
             }
         return None

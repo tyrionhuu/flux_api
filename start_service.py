@@ -255,10 +255,12 @@ def start_service():
         # Manual GPU selection: respect existing CUDA_VISIBLE_DEVICES
         env = os.environ.copy()
         if env.get("CUDA_VISIBLE_DEVICES"):
-            print(f"🔧 Using CUDA_VISIBLE_DEVICES={env['CUDA_VISIBLE_DEVICES']} for FP4 service")
+            print(
+                f"🔧 Using CUDA_VISIBLE_DEVICES={env['CUDA_VISIBLE_DEVICES']} for FP4 service"
+            )
         else:
             print("⚠️  CUDA_VISIBLE_DEVICES not set; default visible GPU will be used")
-        
+
         process = subprocess.Popen(
             [str(flux_env_python), "main.py"],
             stdout=subprocess.PIPE,

@@ -44,11 +44,13 @@ class FluxModelManager:
             # Check for balanced multi-GPU mode
             visible_gpu_count = torch.cuda.device_count()
             logger.info(f"Visible GPUs: {visible_gpu_count}")
-            
+
             device_map = None
             if visible_gpu_count > 1:
                 # Balanced multi-GPU mode
-                logger.info(f"Using balanced multi-GPU mode across {visible_gpu_count} GPUs")
+                logger.info(
+                    f"Using balanced multi-GPU mode across {visible_gpu_count} GPUs"
+                )
                 device_map = "balanced"
                 device = "cuda"
             else:
@@ -59,12 +61,14 @@ class FluxModelManager:
                     torch.cuda.set_device(0)
                 except Exception:
                     pass
-                
+
                 # Verify device is set correctly
                 current_device = torch.cuda.current_device()
                 logger.info(f"Current CUDA device: {current_device}, Target device: 0")
                 if current_device != 0:
-                    logger.warning(f"Device mismatch! Current: {current_device}, Target device: 0")
+                    logger.warning(
+                        f"Device mismatch! Current: {current_device}, Target device: 0"
+                    )
                     torch.cuda.set_device(0)
                     current_device = torch.cuda.current_device()
                     logger.info(f"Device after force set: {current_device}")
@@ -193,7 +197,9 @@ class FluxModelManager:
         # Set device for generation based on mode
         visible_gpu_count = torch.cuda.device_count()
         if visible_gpu_count > 1:
-            logger.info(f"Generating with balanced multi-GPU mode ({visible_gpu_count} GPUs)")
+            logger.info(
+                f"Generating with balanced multi-GPU mode ({visible_gpu_count} GPUs)"
+            )
         else:
             try:
                 torch.cuda.set_device(0)
