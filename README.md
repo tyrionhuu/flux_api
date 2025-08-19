@@ -92,6 +92,36 @@ curl -X POST "http://localhost:8001/generate" \
   }'
 ```
 
+### Download to Local Machine
+```bash
+# Step 1: Generate image and get download URL
+response=$(curl -s -X POST "http://localhost:8000/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "A majestic dragon"}')
+
+# Step 2: Extract download URL and filename
+download_url=$(echo $response | jq -r '.download_url')
+filename=$(echo $response | jq -r '.filename')
+
+# Step 3: Download to your local machine
+curl -o "$filename" "http://localhost:8000$download_url"
+
+# Or download with custom name
+curl -o "my_dragon.png" "http://localhost:8000$download_url"
+```
+
+### One-liner Download
+```bash
+# Generate and download in one command
+curl -s -X POST "http://localhost:8000/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "A space station"}' | \
+  jq -r '"curl -o \"" + .filename + "\" \"http://localhost:8000" + .download_url + "\""' | \
+  bash
+```
+
+
+
 ## 🎨 Default LoRA
 
 Both services automatically load **Ghibli-style illustration LoRA** (`aleksa-codes/flux-ghibsky-illustration`) with weight `1.0`:
@@ -113,6 +143,13 @@ Both services automatically load **Ghibli-style illustration LoRA** (`aleksa-cod
 ### LoRA Parameters  
 - `lora_name` (optional): HuggingFace repo ID
 - `lora_weight` (0.0-2.0): LoRA strength (default: 1.0)
+
+
+
+### Response Fields
+- `download_url`: API endpoint to download the image to your local machine
+- `filename`: Generated filename for the image
+- `image_url`: Server path where the image is stored
 
 ## 🔍 Status & Monitoring
 
@@ -191,6 +228,59 @@ flux_api/
 - **Real-time**: Use FP4 with low steps
 - **Multi-GPU**: Use balanced mode for large models
 - **Memory Saving**: Use single GPU with FP4
+- **Direct Downloads**: Use download URLs to get images to your local machine
+
+## 📥 Download Feature
+
+The API now supports downloading generated images directly to your local machine:
+
+### 🔧 How It Works
+1. **Generate**: Make a POST request to `/generate`
+2. **Get URL**: Response includes `download_url` and `filename`
+3. **Download**: Use the download URL to get the file locally
+
+### 🌐 Download Method
+
+```bash
+# Generate and get download info
+curl -X POST "http://localhost:8000/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "A fantasy castle"}' > response.json
+
+# Download to local machine
+download_url=$(jq -r '.download_url' response.json)
+filename=$(jq -r '.filename' response.json)
+curl -o "$filename" "http://localhost:8000$download_url"
+```
+
+### 🛡️ Security Features
+- Download endpoint only serves files from `generated_images/` directory
+- Path validation prevents directory traversal attacks
+- File type validation for supported image formats
+- Error handling with detailed feedback
+
+### 📝 Batch Download Script
+```bash
+#!/bin/bash
+# Generate multiple images and download them
+prompts=("Dragon" "Castle" "Forest" "Ocean" "Mountain")
+
+for i in "${!prompts[@]}"; do
+  echo "Generating: ${prompts[$i]}"
+  
+  # Generate image
+  response=$(curl -s -X POST "http://localhost:8000/generate" \
+    -H "Content-Type: application/json" \
+    -d "{\"prompt\": \"${prompts[$i]}\", \"seed\": $((42 + i))}")
+  
+  # Download image
+  download_url=$(echo $response | jq -r '.download_url')
+  filename=$(echo $response | jq -r '.filename')
+  
+  curl -s -o "${prompts[$i],,}_$filename" "http://localhost:8000$download_url"
+  echo "Downloaded: ${prompts[$i],,}_$filename"
+done
+```
 
 ---
 

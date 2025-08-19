@@ -51,7 +51,9 @@ class GenerateResponse(BaseModel):
     """Response model for image generation"""
 
     message: str = Field(..., description="Success message")
-    image_url: str = Field(..., description="Path to the generated image")
+    image_url: str = Field(..., description="Path to the generated image on server")
+    download_url: str = Field(..., description="URL endpoint to download the image")
+    filename: str = Field(..., description="Generated image filename")
     generation_time: str = Field(..., description="Time taken to generate the image")
     vram_usage_gb: str = Field(..., description="VRAM usage in GB")
     system_memory_used_gb: str = Field(..., description="System memory used in GB")

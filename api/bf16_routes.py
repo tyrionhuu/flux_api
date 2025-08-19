@@ -32,6 +32,31 @@ def get_bf16_model_manager():
 bf16_model_manager = get_bf16_model_manager()
 
 
+@router.get("/download/{filename}")
+def download_image(filename: str):
+    """Download a generated image file"""
+    import os
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+    
+    # Security: only allow files from generated_images directory
+    safe_filename = os.path.basename(filename)  # Remove any path traversal
+    file_path = Path("generated_images") / safe_filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    if not file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp']:
+        raise HTTPException(status_code=400, detail="Invalid file type")
+    
+    return FileResponse(
+        file_path,
+        media_type="application/octet-stream",
+        filename=safe_filename,
+        headers={"Content-Disposition": f"attachment; filename={safe_filename}"}
+    )
+
+
 @router.get("/")
 def read_root():
     """Root endpoint for testing"""
@@ -356,7 +381,7 @@ def generate_image_internal(
         end_time = time.time()
         generation_time = end_time - start_time
 
-        # Save image with unique name
+        # Save image with unique name to default directory
         image_filename = save_image_with_unique_name(image)
 
         # Get system information
@@ -366,9 +391,16 @@ def generate_image_internal(
         # Get the actual LoRA status from the model manager
         actual_lora_info = bf16_model_manager.get_lora_info()
 
+        # Create download URL for the generated image
+        import os
+        filename = os.path.basename(image_filename)
+        download_url = f"/download/{filename}"
+
         return {
             "message": f"Generated {model_type_name} image for prompt: {prompt}",
             "image_url": image_filename,
+            "download_url": download_url,
+            "filename": filename,
             "generation_time": f"{generation_time:.2f}s",
             "vram_usage_gb": f"{vram_usage:.2f}GB",
             "system_memory_used_gb": f"{system_memory_used:.2f}GB",
