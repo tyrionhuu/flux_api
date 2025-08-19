@@ -3,7 +3,7 @@ Configuration settings for the bf16 FLUX API (Port 8001)
 """
 
 # Model Configuration - bf16 version
-BF16_MODEL_ID = "black-forest-labs/FLUX.1-dev"
+BF16_MODEL_ID = "black-forest-labs/FLUX.1-schnell"
 
 # Model Types
 MODEL_TYPE_BF16_GPU = "flux_bf16_gpu"
@@ -22,7 +22,7 @@ PLACEHOLDER_COLORS = {
 
 # API Configuration
 API_TITLE = "FLUX API (bf16)"
-API_DESCRIPTION = "High-performance image generation using FLUX.1-dev bf16 model"
+API_DESCRIPTION = "High-performance image generation using FLUX.1-schnell bf16 model"
 API_VERSION = "1.0.0"
 
 # Cache Configuration

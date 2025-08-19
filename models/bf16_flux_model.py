@@ -69,8 +69,8 @@ class BF16FluxModelManager(FluxModelManager):
                     current_device = torch.cuda.current_device()
                     logger.info(f"Device after force set: {current_device}")
 
-            # Load the standard FLUX.1-dev model in bf16 precision
-            logger.info("Loading BF16 FLUX.1-dev model...")
+            # Load the standard FLUX.1-schnell model in bf16 precision
+            logger.info("Loading BF16 FLUX.1-schnell model...")
 
             try:
                 # Create FluxPipeline with bf16 precision
@@ -107,14 +107,14 @@ class BF16FluxModelManager(FluxModelManager):
                 )
 
                 self.model_type = MODEL_TYPE_BF16_GPU
-                logger.info("BF16 FLUX.1-dev model loaded successfully!")
+                logger.info("BF16 FLUX.1-schnell model loaded successfully!")
 
             except Exception as bf16_error:
                 logger.error(
-                    f"Error loading BF16 FLUX.1-dev model: {bf16_error} (Type: {type(bf16_error).__name__})"
+                    f"Error loading BF16 FLUX.1-schnell model: {bf16_error} (Type: {type(bf16_error).__name__})"
                 )
                 raise RuntimeError(
-                    f"Failed to load BF16 FLUX.1-dev model: {bf16_error}."
+                    f"Failed to load BF16 FLUX.1-schnell model: {bf16_error}."
                 )
 
             self.model_loaded = True

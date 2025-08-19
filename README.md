@@ -48,27 +48,27 @@ AI image generation API with FP4 (quantized) and BF16 (full-precision) FLUX mode
 ## 🌐 API Endpoints
 
 Both services available at:
-- **FP4**: http://localhost:8000/docs
-- **BF16**: http://localhost:8001/docs
+- **FP4**: http://74.81.65.108:8000/docs
+- **BF16**: http://74.81.65.108:8001/docs
 
 ## 📝 Usage Examples
 
 ### Basic Image Generation
 ```bash
 # FP4 - Fast generation
-curl -X POST "http://localhost:8000/generate" \
+curl -X POST "http://74.81.65.108:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "A beautiful sunset over mountains"}'
 
 # BF16 - High quality  
-curl -X POST "http://localhost:8001/generate" \
+curl -X POST "http://74.81.65.108:8001/generate" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "A beautiful sunset over mountains"}'
 ```
 
 ### Advanced Parameters
 ```bash
-curl -X POST "http://localhost:8000/generate" \
+curl -X POST "http://74.81.65.108:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A beautiful landscape painting",
@@ -83,7 +83,7 @@ curl -X POST "http://localhost:8000/generate" \
 
 ### Custom LoRA
 ```bash
-curl -X POST "http://localhost:8001/generate" \
+curl -X POST "http://74.81.65.108:8001/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A beautiful landscape",
@@ -95,7 +95,7 @@ curl -X POST "http://localhost:8001/generate" \
 ### Download to Local Machine
 ```bash
 # Step 1: Generate image and get download URL
-response=$(curl -s -X POST "http://localhost:8000/generate" \
+response=$(curl -s -X POST "http://74.81.65.108:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "A majestic dragon"}')
 
@@ -104,19 +104,19 @@ download_url=$(echo $response | jq -r '.download_url')
 filename=$(echo $response | jq -r '.filename')
 
 # Step 3: Download to your local machine
-curl -o "$filename" "http://localhost:8000$download_url"
+curl -o "$filename" "http://74.81.65.108:8000$download_url"
 
 # Or download with custom name
-curl -o "my_dragon.png" "http://localhost:8000$download_url"
+curl -o "my_dragon.png" "http://74.81.65.108:8000$download_url"
 ```
 
 ### One-liner Download
 ```bash
 # Generate and download in one command
-curl -s -X POST "http://localhost:8000/generate" \
+curl -s -X POST "http://74.81.65.108:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "A space station"}' | \
-  jq -r '"curl -o \"" + .filename + "\" \"http://localhost:8000" + .download_url + "\""' | \
+  jq -r '"curl -o \"" + .filename + "\" \"http://74.81.65.108:8000" + .download_url + "\""' | \
   bash
 ```
 
@@ -155,12 +155,12 @@ Both services automatically load **Ghibli-style illustration LoRA** (`aleksa-cod
 
 ```bash
 # Check service status
-curl http://localhost:8000/model-status  # FP4
-curl http://localhost:8001/model-status  # BF16
+curl http://74.81.65.108:8000/model-status  # FP4
+curl http://74.81.65.108:8001/model-status  # BF16
 
 # Health checks
-curl http://localhost:8000/health        # FP4  
-curl http://localhost:8001/health        # BF16
+curl http://74.81.65.108:8000/health        # FP4  
+curl http://74.81.65.108:8001/health        # BF16
 
 # GPU status
 nvidia-smi
@@ -243,14 +243,14 @@ The API now supports downloading generated images directly to your local machine
 
 ```bash
 # Generate and get download info
-curl -X POST "http://localhost:8000/generate" \
+curl -X POST "http://74.81.65.108:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "A fantasy castle"}' > response.json
 
 # Download to local machine
 download_url=$(jq -r '.download_url' response.json)
 filename=$(jq -r '.filename' response.json)
-curl -o "$filename" "http://localhost:8000$download_url"
+curl -o "$filename" "http://74.81.65.108:8000$download_url"
 ```
 
 ### 🛡️ Security Features
@@ -269,7 +269,7 @@ for i in "${!prompts[@]}"; do
   echo "Generating: ${prompts[$i]}"
   
   # Generate image
-  response=$(curl -s -X POST "http://localhost:8000/generate" \
+  response=$(curl -s -X POST "http://74.81.65.108:8000/generate" \
     -H "Content-Type: application/json" \
     -d "{\"prompt\": \"${prompts[$i]}\", \"seed\": $((42 + i))}")
   
@@ -277,11 +277,11 @@ for i in "${!prompts[@]}"; do
   download_url=$(echo $response | jq -r '.download_url')
   filename=$(echo $response | jq -r '.filename')
   
-  curl -s -o "${prompts[$i],,}_$filename" "http://localhost:8000$download_url"
+  curl -s -o "${prompts[$i],,}_$filename" "http://74.81.65.108:8000$download_url"
   echo "Downloaded: ${prompts[$i],,}_$filename"
 done
 ```
 
 ---
 
-🎯 **Ready to generate? Start with `./start_api.sh -g 1` and visit http://localhost:8000/docs**
+🎯 **Ready to generate? Start with `./start_api.sh -g 1` and visit http://74.81.65.108:8000/docs**
