@@ -7,11 +7,11 @@ import time
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
-from models.flux_model import FluxModelManager
+from models.fp4_flux_model import FluxModelManager
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
 from utils.system_utils import get_system_memory
 from utils.queue_manager import QueueManager
-from config.settings import STATIC_IMAGES_DIR
+from config.fp4_settings import STATIC_IMAGES_DIR
 from api.models import GenerateRequest, GenerateResponse, ModelStatusResponse
 
 # Configure logging
@@ -20,14 +20,19 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter()
 
-# Global model manager instance - singleton pattern
+# Global model manager instance - singleton pattern with thread safety
+import threading
 _model_manager_instance = None
+_model_manager_lock = threading.Lock()
 
 
 def get_model_manager():
     global _model_manager_instance
     if _model_manager_instance is None:
-        _model_manager_instance = FluxModelManager()
+        with _model_manager_lock:
+            # Double-check pattern for thread safety
+            if _model_manager_instance is None:
+                _model_manager_instance = FluxModelManager()
     return _model_manager_instance
 
 
@@ -35,6 +40,19 @@ model_manager = get_model_manager()
 
 # Global queue manager instance
 queue_manager = QueueManager(max_concurrent=2, max_queue_size=100)
+
+
+@router.get("/debug-version")
+def debug_version():
+    """Debug endpoint to check code version"""
+    import time
+    return {
+        "status": "debug",
+        "service": "FLUX API",
+        "code_version": "enhanced_v2",
+        "timestamp": time.time(),
+        "thread_safe_model_check": True
+    }
 
 
 @router.get("/")
@@ -85,12 +103,24 @@ async def generate_image(request: GenerateRequest):
         lora_name = request.lora_name.strip() if request.lora_name else None
         lora_weight = request.lora_weight
 
-        # First, ensure the model is loaded
-        if not model_manager.is_loaded():
-            logger.info("Model not loaded, loading it first...")
-            if not model_manager.load_model():
-                raise HTTPException(status_code=500, detail="Failed to load FLUX model")
-            logger.info("Model loaded successfully")
+        # First, ensure the model is loaded with thread safety and force check
+        with _model_manager_lock:
+            # Force a more thorough check - sometimes the state gets inconsistent
+            model_actually_loaded = (
+                model_manager.is_loaded() and 
+                model_manager.get_pipeline() is not None and
+                hasattr(model_manager.get_pipeline(), 'transformer')
+            )
+            
+            if not model_actually_loaded:
+                logger.info("Model not properly loaded or pipeline unavailable, loading it first...")
+                # Check again if another thread loaded it while we were waiting
+                if not (model_manager.is_loaded() and model_manager.get_pipeline() is not None):
+                    if not model_manager.load_model():
+                        raise HTTPException(status_code=500, detail="Failed to load FLUX model")
+                    logger.info("Model loaded successfully")
+                else:
+                    logger.info("Model was loaded by another thread while waiting")
 
         # Now check if LoRA is already applied
         current_lora = model_manager.get_lora_info()
@@ -164,10 +194,10 @@ async def generate_image(request: GenerateRequest):
             "FLUX",
             lora_applied,
             lora_weight_applied,
-            request.num_inference_steps,
-            request.guidance_scale,
-            request.width,
-            request.height,
+            request.num_inference_steps or 25,
+            request.guidance_scale or 3.5,
+            request.width or 512,
+            request.height or 512,
             request.seed,
             request.negative_prompt,
         )
@@ -183,14 +213,27 @@ async def generate_image(request: GenerateRequest):
 def load_model():
     """Load the FLUX model"""
     try:
-        if model_manager.load_model():
-            logger.info("FLUX model loaded successfully")
-            return {"message": "FLUX model loaded successfully"}
-        else:
-            logger.error(
-                f"Failed to load FLUX model - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+        with _model_manager_lock:
+            # Enhanced check for proper model loading
+            model_actually_loaded = (
+                model_manager.is_loaded() and 
+                model_manager.get_pipeline() is not None and
+                hasattr(model_manager.get_pipeline(), 'transformer')
             )
-            raise HTTPException(status_code=500, detail="Failed to load FLUX model")
+            
+            if model_actually_loaded:
+                logger.info("FLUX model already properly loaded")
+                return {"message": "FLUX model already loaded"}
+            
+            logger.info("Loading FLUX model...")
+            if model_manager.load_model():
+                logger.info("FLUX model loaded successfully")
+                return {"message": "FLUX model loaded successfully"}
+            else:
+                logger.error(
+                    f"Failed to load FLUX model - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+                )
+                raise HTTPException(status_code=500, detail="Failed to load FLUX model")
     except Exception as e:
         logger.error(f"Exception during model loading: {e} (Type: {type(e).__name__})")
         raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
@@ -201,13 +244,24 @@ def get_model_status():
     """Get the current model status"""
     status = model_manager.get_model_status()
     system_memory_used, system_memory_total = get_system_memory()
-
+    
+    # Enhanced status with detailed model state
+    pipeline = model_manager.get_pipeline()
+    has_transformer = pipeline is not None and hasattr(pipeline, 'transformer')
+    
     status.update(
         {
             "system_memory_used_gb": f"{system_memory_used:.2f}GB",
             "system_memory_total_gb": f"{system_memory_total:.2f}GB",
             "lora_loaded": (model_manager.get_lora_info() or {}).get("name"),
             "lora_weight": (model_manager.get_lora_info() or {}).get("weight"),
+            "pipeline_loaded": pipeline is not None,
+            "has_transformer": has_transformer,
+            "model_actually_ready": (
+                model_manager.is_loaded() and 
+                pipeline is not None and 
+                has_transformer
+            )
         }
     )
 
@@ -315,10 +369,10 @@ async def submit_generation_request(request: GenerateRequest):
             prompt=request.prompt.strip(),
             lora_name=request.lora_name.strip() if request.lora_name else None,
             lora_weight=request.lora_weight,
-            num_inference_steps=request.num_inference_steps,
-            guidance_scale=request.guidance_scale,
-            width=request.width,
-            height=request.height,
+            num_inference_steps=request.num_inference_steps or 25,
+            guidance_scale=request.guidance_scale or 3.5,
+            width=request.width or 512,
+            height=request.height or 512,
             seed=request.seed,
             negative_prompt=request.negative_prompt,
         )

@@ -154,10 +154,10 @@ async def generate_image(request: GenerateRequest):
             "BF16_FLUX",
             lora_applied,
             lora_weight_applied,
-            request.num_inference_steps,
-            request.guidance_scale,
-            request.width,
-            request.height,
+            request.num_inference_steps or 25,
+            request.guidance_scale or 3.5,
+            request.width or 512,
+            request.height or 512,
             request.seed,
             request.negative_prompt,
         )
@@ -192,15 +192,21 @@ def load_model():
 def get_model_status():
     """Get the status of the BF16 FLUX model"""
     try:
+        # Get current LoRA info
+        lora_info = bf16_model_manager.get_lora_info()
+        
+        # Get system memory info
+        system_used_gb, system_total_gb = get_system_memory()
+        
         return ModelStatusResponse(
             model_loaded=bf16_model_manager.is_loaded(),
             model_type=bf16_model_manager.model_type,
-            device=(
-                str(bf16_model_manager.gpu_manager.selected_gpu)
-                if bf16_model_manager.gpu_manager.selected_gpu is not None
-                else "unknown"
-            ),
-            lora_info=bf16_model_manager.get_lora_info(),
+            selected_gpu=bf16_model_manager.gpu_manager.selected_gpu,
+            vram_usage_gb=f"{bf16_model_manager.gpu_manager.get_vram_usage():.2f}GB",
+            system_memory_used_gb=f"{system_used_gb:.2f}GB",
+            system_memory_total_gb=f"{system_total_gb:.2f}GB",
+            lora_loaded=lora_info.get("name") if lora_info else None,
+            lora_weight=lora_info.get("weight") if lora_info else None,
         )
     except Exception as e:
         logger.error(f"Exception during status check: {e} (Type: {type(e).__name__})")

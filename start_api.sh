@@ -107,8 +107,8 @@ wait_for_port() {
 }
 
 # Check if we're in the right directory
-if [ ! -f "main.py" ]; then
-    echo "❌ main.py not found in current directory!"
+if [ ! -f "main_fp4.py" ]; then
+    echo "❌ main_fp4.py not found in current directory!"
     echo "   Please run this script from the flux_api directory."
     exit 1
 fi
@@ -120,9 +120,9 @@ if [ ! -d "flux_env" ]; then
     exit 1
 fi
 
-# Check if start_service.py exists
-if [ ! -f "start_service.py" ]; then
-    echo "❌ start_service.py not found!"
+# Check if start_fp4_service.py exists
+if [ ! -f "start_fp4_service.py" ]; then
+    echo "❌ start_fp4_service.py not found!"
     echo "   Please ensure the service starter script exists."
     exit 1
 fi
@@ -153,4 +153,4 @@ else
   echo "🔧 No -g provided; using all visible GPUs"
 fi
 
-flux_env/bin/python start_service.py
+flux_env/bin/python start_fp4_service.py

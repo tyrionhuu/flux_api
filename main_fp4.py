@@ -5,8 +5,8 @@ Main FastAPI application for the FLUX API
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import router
-from config.settings import API_TITLE, API_DESCRIPTION, API_VERSION
+from api.fp4_routes import router
+from config.fp4_settings import API_TITLE, API_DESCRIPTION, API_VERSION
 
 # Configure logging
 logging.basicConfig(
@@ -16,8 +16,8 @@ logging.basicConfig(
 )
 
 # Configure specific loggers for better error visibility
-logging.getLogger("api.routes").setLevel(logging.INFO)
-logging.getLogger("models.flux_model").setLevel(logging.INFO)
+logging.getLogger("api.fp4_routes").setLevel(logging.INFO)
+logging.getLogger("models.fp4_flux_model").setLevel(logging.INFO)
 
 # Add a single enhanced console handler for better formatting
 console_handler = logging.StreamHandler()

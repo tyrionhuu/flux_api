@@ -10,8 +10,10 @@ from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from config.bf16_settings import (
     BF16_MODEL_ID,
     MODEL_TYPE_BF16_GPU,
+    DEFAULT_LORA_NAME,
+    DEFAULT_LORA_WEIGHT,
 )
-from models.flux_model import FluxModelManager
+from models.fp4_flux_model import FluxModelManager
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -123,6 +125,9 @@ class BF16FluxModelManager(FluxModelManager):
 
             # Perform CUDA Graph warm-up for better performance
             self._warmup_cuda_graph()
+            
+            # Apply default LoRA
+            self._apply_default_lora_bf16()
 
             return True
 
@@ -130,6 +135,45 @@ class BF16FluxModelManager(FluxModelManager):
             logger.error(
                 f"Error loading BF16 FLUX model: {e} (Type: {type(e).__name__})"
             )
+            return False
+
+    def _apply_default_lora_bf16(self):
+        """Apply the default LoRA after BF16 model loading"""
+        try:
+            if not self.pipe:
+                logger.warning("Pipeline not loaded, cannot apply default LoRA")
+                return False
+                
+            logger.info(f"Applying default LoRA to BF16 model: {DEFAULT_LORA_NAME} with weight {DEFAULT_LORA_WEIGHT}")
+            
+            # Load and apply LoRA using diffusers method
+            logger.info(f"   - Loading default LoRA weights from {DEFAULT_LORA_NAME}")
+            try:
+                # For BF16 model, we need to use just the repo name without /lora.safetensors
+                lora_repo = DEFAULT_LORA_NAME.replace("/lora.safetensors", "")
+                self.pipe.load_lora_weights(lora_repo)
+                logger.info(f"   - Default LoRA weights loaded successfully")
+            except Exception as load_error:
+                logger.warning(f"   - Failed to load default LoRA weights: {load_error}")
+                return False
+
+            # Set LoRA scale
+            logger.info(f"   - Setting default LoRA adapter weight to {DEFAULT_LORA_WEIGHT}")
+            try:
+                adapter_name = lora_repo.split("/")[-1] if "/" in lora_repo else lora_repo
+                self.pipe.set_adapters([adapter_name], adapter_weights=[DEFAULT_LORA_WEIGHT])
+                logger.info(f"   - Default LoRA adapter weight set successfully")
+            except Exception as adapter_error:
+                logger.warning(f"   - Failed to set default LoRA adapter weight: {adapter_error}")
+                return False
+
+            self.current_lora = DEFAULT_LORA_NAME
+            self.current_weight = DEFAULT_LORA_WEIGHT
+            logger.info(f"Default LoRA {DEFAULT_LORA_NAME} applied successfully to BF16 model with weight {DEFAULT_LORA_WEIGHT}")
+            return True
+
+        except Exception as e:
+            logger.warning(f"Failed to apply default LoRA to BF16 model: {e} - continuing without default LoRA")
             return False
 
     def generate_image(
