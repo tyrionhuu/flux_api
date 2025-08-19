@@ -262,7 +262,7 @@ def start_service():
             print("⚠️  CUDA_VISIBLE_DEVICES not set; default visible GPU will be used")
 
         process = subprocess.Popen(
-                            [str(flux_env_python), "main_fp4.py"],
+            [str(flux_env_python), "main_fp4.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

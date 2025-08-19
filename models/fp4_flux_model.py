@@ -39,7 +39,7 @@ class FluxModelManager:
             if self.model_loaded and self.pipe is not None:
                 logger.info("FLUX model already loaded, skipping reload")
                 return True
-                
+
             logger.info("Loading FLUX model...")
 
             # Check if CUDA is available
@@ -147,7 +147,7 @@ class FluxModelManager:
 
             # Perform CUDA Graph warm-up for better performance
             self._warmup_cuda_graph()
-            
+
             # Apply default LoRA
             self._apply_default_lora()
 
@@ -190,41 +190,57 @@ class FluxModelManager:
             if not self.pipe:
                 logger.warning("Pipeline not loaded, cannot apply default LoRA")
                 return False
-                
-            logger.info(f"Applying default LoRA: {DEFAULT_LORA_NAME} with weight {DEFAULT_LORA_WEIGHT}")
-            
+
+            logger.info(
+                f"Applying default LoRA: {DEFAULT_LORA_NAME} with weight {DEFAULT_LORA_WEIGHT}"
+            )
+
             # The LoRA methods are on the transformer, not the pipeline
             if hasattr(self.pipe, "transformer") and hasattr(
                 self.pipe.transformer, "update_lora_params"
             ):
                 # Load LoRA parameters
-                logger.info(f"   - Loading default LoRA parameters from {DEFAULT_LORA_NAME}")
+                logger.info(
+                    f"   - Loading default LoRA parameters from {DEFAULT_LORA_NAME}"
+                )
                 try:
                     self.pipe.transformer.update_lora_params(DEFAULT_LORA_NAME)
                     logger.info(f"   - Default LoRA parameters loaded successfully")
                 except Exception as load_error:
-                    logger.warning(f"   - Failed to load default LoRA parameters: {load_error}")
+                    logger.warning(
+                        f"   - Failed to load default LoRA parameters: {load_error}"
+                    )
                     return False
 
                 # Set LoRA strength
-                logger.info(f"   - Setting default LoRA strength to {DEFAULT_LORA_WEIGHT}")
+                logger.info(
+                    f"   - Setting default LoRA strength to {DEFAULT_LORA_WEIGHT}"
+                )
                 try:
                     self.pipe.transformer.set_lora_strength(DEFAULT_LORA_WEIGHT)
                     logger.info(f"   - Default LoRA strength set successfully")
                 except Exception as strength_error:
-                    logger.warning(f"   - Failed to set default LoRA strength: {strength_error}")
+                    logger.warning(
+                        f"   - Failed to set default LoRA strength: {strength_error}"
+                    )
                     return False
 
                 self.current_lora = DEFAULT_LORA_NAME
                 self.current_weight = DEFAULT_LORA_WEIGHT
-                logger.info(f"Default LoRA {DEFAULT_LORA_NAME} applied successfully with weight {DEFAULT_LORA_WEIGHT}")
+                logger.info(
+                    f"Default LoRA {DEFAULT_LORA_NAME} applied successfully with weight {DEFAULT_LORA_WEIGHT}"
+                )
                 return True
             else:
-                logger.warning("FluxPipeline transformer does not have LoRA support methods")
+                logger.warning(
+                    "FluxPipeline transformer does not have LoRA support methods"
+                )
                 return False
 
         except Exception as e:
-            logger.warning(f"Failed to apply default LoRA: {e} - continuing without default LoRA")
+            logger.warning(
+                f"Failed to apply default LoRA: {e} - continuing without default LoRA"
+            )
             return False
 
     # Removed _integrate_quantized_weights - now using Nunchaku pipeline directly

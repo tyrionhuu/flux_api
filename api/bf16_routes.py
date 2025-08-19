@@ -194,10 +194,10 @@ def get_model_status():
     try:
         # Get current LoRA info
         lora_info = bf16_model_manager.get_lora_info()
-        
+
         # Get system memory info
         system_used_gb, system_total_gb = get_system_memory()
-        
+
         return ModelStatusResponse(
             model_loaded=bf16_model_manager.is_loaded(),
             model_type=bf16_model_manager.model_type,

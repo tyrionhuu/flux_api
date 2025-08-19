@@ -22,6 +22,7 @@ router = APIRouter()
 
 # Global model manager instance - singleton pattern with thread safety
 import threading
+
 _model_manager_instance = None
 _model_manager_lock = threading.Lock()
 
@@ -46,12 +47,13 @@ queue_manager = QueueManager(max_concurrent=2, max_queue_size=100)
 def debug_version():
     """Debug endpoint to check code version"""
     import time
+
     return {
         "status": "debug",
         "service": "FLUX API",
         "code_version": "enhanced_v2",
         "timestamp": time.time(),
-        "thread_safe_model_check": True
+        "thread_safe_model_check": True,
     }
 
 
@@ -107,17 +109,24 @@ async def generate_image(request: GenerateRequest):
         with _model_manager_lock:
             # Force a more thorough check - sometimes the state gets inconsistent
             model_actually_loaded = (
-                model_manager.is_loaded() and 
-                model_manager.get_pipeline() is not None and
-                hasattr(model_manager.get_pipeline(), 'transformer')
+                model_manager.is_loaded()
+                and model_manager.get_pipeline() is not None
+                and hasattr(model_manager.get_pipeline(), "transformer")
             )
-            
+
             if not model_actually_loaded:
-                logger.info("Model not properly loaded or pipeline unavailable, loading it first...")
+                logger.info(
+                    "Model not properly loaded or pipeline unavailable, loading it first..."
+                )
                 # Check again if another thread loaded it while we were waiting
-                if not (model_manager.is_loaded() and model_manager.get_pipeline() is not None):
+                if not (
+                    model_manager.is_loaded()
+                    and model_manager.get_pipeline() is not None
+                ):
                     if not model_manager.load_model():
-                        raise HTTPException(status_code=500, detail="Failed to load FLUX model")
+                        raise HTTPException(
+                            status_code=500, detail="Failed to load FLUX model"
+                        )
                     logger.info("Model loaded successfully")
                 else:
                     logger.info("Model was loaded by another thread while waiting")
@@ -216,15 +225,15 @@ def load_model():
         with _model_manager_lock:
             # Enhanced check for proper model loading
             model_actually_loaded = (
-                model_manager.is_loaded() and 
-                model_manager.get_pipeline() is not None and
-                hasattr(model_manager.get_pipeline(), 'transformer')
+                model_manager.is_loaded()
+                and model_manager.get_pipeline() is not None
+                and hasattr(model_manager.get_pipeline(), "transformer")
             )
-            
+
             if model_actually_loaded:
                 logger.info("FLUX model already properly loaded")
                 return {"message": "FLUX model already loaded"}
-            
+
             logger.info("Loading FLUX model...")
             if model_manager.load_model():
                 logger.info("FLUX model loaded successfully")
@@ -244,11 +253,11 @@ def get_model_status():
     """Get the current model status"""
     status = model_manager.get_model_status()
     system_memory_used, system_memory_total = get_system_memory()
-    
+
     # Enhanced status with detailed model state
     pipeline = model_manager.get_pipeline()
-    has_transformer = pipeline is not None and hasattr(pipeline, 'transformer')
-    
+    has_transformer = pipeline is not None and hasattr(pipeline, "transformer")
+
     status.update(
         {
             "system_memory_used_gb": f"{system_memory_used:.2f}GB",
@@ -258,10 +267,8 @@ def get_model_status():
             "pipeline_loaded": pipeline is not None,
             "has_transformer": has_transformer,
             "model_actually_ready": (
-                model_manager.is_loaded() and 
-                pipeline is not None and 
-                has_transformer
-            )
+                model_manager.is_loaded() and pipeline is not None and has_transformer
+            ),
         }
     )
 

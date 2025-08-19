@@ -125,7 +125,7 @@ class BF16FluxModelManager(FluxModelManager):
 
             # Perform CUDA Graph warm-up for better performance
             self._warmup_cuda_graph()
-            
+
             # Apply default LoRA
             self._apply_default_lora_bf16()
 
@@ -143,9 +143,11 @@ class BF16FluxModelManager(FluxModelManager):
             if not self.pipe:
                 logger.warning("Pipeline not loaded, cannot apply default LoRA")
                 return False
-                
-            logger.info(f"Applying default LoRA to BF16 model: {DEFAULT_LORA_NAME} with weight {DEFAULT_LORA_WEIGHT}")
-            
+
+            logger.info(
+                f"Applying default LoRA to BF16 model: {DEFAULT_LORA_NAME} with weight {DEFAULT_LORA_WEIGHT}"
+            )
+
             # Load and apply LoRA using diffusers method
             logger.info(f"   - Loading default LoRA weights from {DEFAULT_LORA_NAME}")
             try:
@@ -154,26 +156,40 @@ class BF16FluxModelManager(FluxModelManager):
                 self.pipe.load_lora_weights(lora_repo)
                 logger.info(f"   - Default LoRA weights loaded successfully")
             except Exception as load_error:
-                logger.warning(f"   - Failed to load default LoRA weights: {load_error}")
+                logger.warning(
+                    f"   - Failed to load default LoRA weights: {load_error}"
+                )
                 return False
 
             # Set LoRA scale
-            logger.info(f"   - Setting default LoRA adapter weight to {DEFAULT_LORA_WEIGHT}")
+            logger.info(
+                f"   - Setting default LoRA adapter weight to {DEFAULT_LORA_WEIGHT}"
+            )
             try:
-                adapter_name = lora_repo.split("/")[-1] if "/" in lora_repo else lora_repo
-                self.pipe.set_adapters([adapter_name], adapter_weights=[DEFAULT_LORA_WEIGHT])
+                adapter_name = (
+                    lora_repo.split("/")[-1] if "/" in lora_repo else lora_repo
+                )
+                self.pipe.set_adapters(
+                    [adapter_name], adapter_weights=[DEFAULT_LORA_WEIGHT]
+                )
                 logger.info(f"   - Default LoRA adapter weight set successfully")
             except Exception as adapter_error:
-                logger.warning(f"   - Failed to set default LoRA adapter weight: {adapter_error}")
+                logger.warning(
+                    f"   - Failed to set default LoRA adapter weight: {adapter_error}"
+                )
                 return False
 
             self.current_lora = DEFAULT_LORA_NAME
             self.current_weight = DEFAULT_LORA_WEIGHT
-            logger.info(f"Default LoRA {DEFAULT_LORA_NAME} applied successfully to BF16 model with weight {DEFAULT_LORA_WEIGHT}")
+            logger.info(
+                f"Default LoRA {DEFAULT_LORA_NAME} applied successfully to BF16 model with weight {DEFAULT_LORA_WEIGHT}"
+            )
             return True
 
         except Exception as e:
-            logger.warning(f"Failed to apply default LoRA to BF16 model: {e} - continuing without default LoRA")
+            logger.warning(
+                f"Failed to apply default LoRA to BF16 model: {e} - continuing without default LoRA"
+            )
             return False
 
     def generate_image(
