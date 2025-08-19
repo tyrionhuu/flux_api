@@ -87,22 +87,29 @@ def download_image(filename: str):
     """Download a generated image file"""
     import os
     from pathlib import Path
-    
+
     # Security: only allow files from generated_images directory
     safe_filename = os.path.basename(filename)  # Remove any path traversal
     file_path = Path("generated_images") / safe_filename
-    
+
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")
-    
-    if not file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp']:
+
+    if not file_path.suffix.lower() in [
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".bmp",
+        ".tiff",
+        ".webp",
+    ]:
         raise HTTPException(status_code=400, detail="Invalid file type")
-    
+
     return FileResponse(
         file_path,
         media_type="application/octet-stream",
         filename=safe_filename,
-        headers={"Content-Disposition": f"attachment; filename={safe_filename}"}
+        headers={"Content-Disposition": f"attachment; filename={safe_filename}"},
     )
 
 
@@ -565,6 +572,7 @@ def generate_image_internal(
 
         # Create download URL for the generated image
         import os
+
         filename = os.path.basename(image_filename)
         download_url = f"/download/{filename}"
 
