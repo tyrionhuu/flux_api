@@ -5,8 +5,11 @@ Main FastAPI application for the BF16 FLUX API (Port 8001)
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from api.bf16_routes import router
 from config.bf16_settings import API_TITLE, API_DESCRIPTION, API_VERSION, BF16_API_PORT
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -67,6 +70,28 @@ app.add_middleware(
 # Include API routes
 app.include_router(router, prefix="")
 
+# Mount static files for frontend
+if os.path.exists("frontend/static"):
+    app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
+
+@app.get("/ui", response_class=HTMLResponse)
+async def serve_frontend():
+    """Serve the ComfyUI-style frontend"""
+    frontend_path = "frontend/templates/index.html"
+    if os.path.exists(frontend_path):
+        with open(frontend_path, "r") as f:
+            return f.read()
+    else:
+        return """
+        <html>
+            <head><title>BF16 FLUX API</title></head>
+            <body>
+                <h1>BF16 FLUX API - Frontend Not Available</h1>
+                <p>The frontend files are not found. Please check the frontend directory.</p>
+                <p><a href="/docs">Visit API Documentation</a></p>
+            </body>
+        </html>
+        """
 
 # Health check endpoint
 @app.get("/health")

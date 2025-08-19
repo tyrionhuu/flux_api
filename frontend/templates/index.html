@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLUX API - ComfyUI Style</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">
+                    <i class="fas fa-magic"></i>
+                    FLUX API
+                </h1>
+                <div class="service-selector">
+                    <button id="fp4-service" class="service-btn active" data-service="fp4" data-port="8000">
+                        <i class="fas fa-bolt"></i>
+                        FP4 (Fast)
+                    </button>
+                    <button id="bf16-service" class="service-btn" data-service="bf16" data-port="8001">
+                        <i class="fas fa-gem"></i>
+                        BF16 (Quality)
+                    </button>
+                </div>
+                <div class="status-indicator">
+                    <div id="service-status" class="status-dot"></div>
+                    <span id="status-text">Checking...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="workflow-container">
+                <!-- Left Panel - Parameters -->
+                <div class="panel left-panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-sliders-h"></i> Generation Parameters</h2>
+                    </div>
+                    
+                    <div class="parameter-group">
+                        <label for="prompt">Prompt</label>
+                        <textarea id="prompt" placeholder="Describe the image you want to generate..." rows="3">A beautiful landscape with mountains and a lake</textarea>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label for="negative-prompt">Negative Prompt</label>
+                        <textarea id="negative-prompt" placeholder="What to avoid in the image..." rows="2">blurry, low quality, distorted</textarea>
+                    </div>
+
+                    <div class="parameter-row">
+                        <div class="parameter-group">
+                            <label for="width">Width</label>
+                            <select id="width">
+                                <option value="512" selected>512</option>
+                                <option value="768">768</option>
+                                <option value="1024">1024</option>
+                            </select>
+                        </div>
+                        <div class="parameter-group">
+                            <label for="height">Height</label>
+                            <select id="height">
+                                <option value="512" selected>512</option>
+                                <option value="768">768</option>
+                                <option value="1024">1024</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label for="steps">Inference Steps: <span id="steps-value">25</span></label>
+                        <input type="range" id="steps" min="1" max="50" value="25" class="slider">
+                    </div>
+
+                    <div class="parameter-group">
+                        <label for="guidance">Guidance Scale: <span id="guidance-value">3.5</span></label>
+                        <input type="range" id="guidance" min="1" max="20" value="3.5" step="0.1" class="slider">
+                    </div>
+
+                    <div class="parameter-group">
+                        <label for="seed">Seed (optional)</label>
+                        <div class="seed-row">
+                            <input type="number" id="seed" placeholder="Random" min="0" max="4294967295">
+                            <button id="random-seed" class="icon-btn" title="Random seed">
+                                <i class="fas fa-dice"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- LoRA Section -->
+                    <div class="parameter-group">
+                        <label>LoRA Settings</label>
+                        <div class="lora-controls">
+                            <input type="text" id="lora-name" placeholder="HuggingFace repo ID (optional)">
+                            <div class="helper-text">Default LoRA: <code>aleksa-codes/flux-ghibsky-illustration</code></div>
+                            <div class="lora-weight">
+                                <label for="lora-weight">Weight: <span id="lora-weight-value">1.0</span></label>
+                                <input type="range" id="lora-weight" min="0" max="2" value="1.0" step="0.1" class="slider">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generation Button -->
+                    <button id="generate-btn" class="generate-btn">
+                        <i class="fas fa-play"></i>
+                        Generate Image
+                    </button>
+                </div>
+
+                <!-- Right Panel - Results -->
+                <div class="panel right-panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-images"></i> Generated Images</h2>
+                        <div class="panel-actions">
+                            <button id="clear-history" class="icon-btn" title="Clear history">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Generation Status -->
+                    <div id="generation-status" class="generation-status hidden">
+                        <div class="status-content">
+                            <div class="loading-spinner"></div>
+                            <span id="status-message">Generating image...</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                    </div>
+
+                    <!-- Image Gallery -->
+                    <div id="image-gallery" class="image-gallery">
+                        <div class="placeholder">
+                            <i class="fas fa-image"></i>
+                            <p>Generated images will appear here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Image Modal -->
+        <div id="image-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Generated Image</h3>
+                    <button id="close-modal" class="icon-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <img id="modal-image" src="" alt="Generated image">
+                    <div class="image-info">
+                        <div class="info-item">
+                            <label>Prompt:</label>
+                            <span id="modal-prompt"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Parameters:</label>
+                            <span id="modal-params"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Generation Time:</label>
+                            <span id="modal-time"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button id="download-image" class="btn primary">
+                        <i class="fas fa-download"></i>
+                        Download
+                    </button>
+                    <button id="copy-prompt" class="btn secondary">
+                        <i class="fas fa-copy"></i>
+                        Copy Prompt
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+

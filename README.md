@@ -45,11 +45,15 @@ AI image generation API with FP4 (quantized) and BF16 (full-precision) FLUX mode
 | **VRAM** | ~8-12 GB | ~16-24 GB |
 | **Best For** | Real-time, batch | Final production |
 
-## 🌐 API Endpoints
+## 🌐 Access Points
 
-Both services available at:
-- **FP4**: http://74.81.65.108:8000/docs
-- **BF16**: http://74.81.65.108:8001/docs
+### ComfyUI-Style Web Frontend
+- **FP4 Frontend**: http://74.81.65.108:8000/ui
+- **BF16 Frontend**: http://74.81.65.108:8001/ui
+
+### API Documentation
+- **FP4 API**: http://74.81.65.108:8000/docs
+- **BF16 API**: http://74.81.65.108:8001/docs
 
 ## 📝 Usage Examples
 
@@ -282,6 +286,41 @@ for i in "${!prompts[@]}"; do
 done
 ```
 
+## 🎨 ComfyUI Frontend Features
+
+### 🌟 What's Included
+- **Modern Dark Theme**: ComfyUI-inspired design with smooth animations
+- **Real-time Service Switching**: Toggle between FP4 and BF16 services instantly
+- **Interactive Parameters**: Visual sliders and inputs for all generation settings
+- **Live Image Gallery**: Generated images appear immediately with metadata
+- **Image Modal**: Click any image for full-size view with generation details
+- **Download Integration**: One-click download directly from the interface
+- **Responsive Design**: Works perfectly on desktop, tablet, and mobile
+- **Keyboard Shortcuts**: 
+  - `Ctrl/Cmd + Enter`: Generate image
+  - `Ctrl/Cmd + R`: Random seed
+  - `Escape`: Close modal
+
+### 🚀 Quick Start with Frontend
+1. **Open the interface**: Visit http://74.81.65.108:8000/ui
+2. **Choose your service**: FP4 (fast) or BF16 (quality)
+3. **Enter your prompt**: Describe what you want to generate
+4. **Adjust parameters**: Use sliders for steps, guidance, etc.
+5. **Generate**: Click the generate button and watch your image appear!
+6. **Download**: Click any image to view full-size and download
+
+### 🎛️ Frontend Controls
+- **Service Toggle**: Switch between FP4/BF16 without page reload
+- **Parameter Sliders**: Real-time value updates as you adjust
+- **Seed Management**: Random seed generator with manual input option
+- **LoRA Support**: Full LoRA name and weight control
+- **Aspect Ratios**: Quick presets for common image sizes
+- **Generation History**: Persistent gallery with local storage
+- **Error Handling**: Clear feedback for any issues
+
 ---
 
-🎯 **Ready to generate? Start with `./start_api.sh -g 1` and visit http://74.81.65.108:8000/docs**
+🎯 **Ready to generate?** 
+- **Web Interface**: Visit http://74.81.65.108:8000/ui for the ComfyUI experience
+- **API Access**: Visit http://74.81.65.108:8000/docs for programmatic access
+- **Quick Start**: `./start_api.sh -g 1` to launch the service
