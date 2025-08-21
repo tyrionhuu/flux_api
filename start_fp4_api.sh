@@ -117,12 +117,7 @@ if [ ! -f "main_fp4.py" ]; then
     exit 1
 fi
 
-# Check if flux_env exists
-if [ ! -d "flux_env" ]; then
-    echo "❌ flux_env virtual environment not found!"
-    echo "   Please ensure the virtual environment is set up correctly."
-    exit 1
-fi
+
 
 # Check if start_fp4_service.py exists
 if [ ! -f "start_fp4_service.py" ]; then
@@ -146,9 +141,6 @@ fi
 
 echo "🚀 Starting FLUX API Service..."
 
-# Activate virtual environment and start the service
-source flux_env/bin/activate
-
 # Assign GPU visibility only if -g provided; otherwise leave all GPUs visible
 if [ -n "$GPU_ID" ]; then
   export CUDA_VISIBLE_DEVICES="$GPU_ID"
@@ -161,4 +153,4 @@ fi
 export FP4_API_PORT="$PORT"
 echo "🔧 Using FP4_API_PORT=${FP4_API_PORT}"
 
-flux_env/bin/python start_fp4_service.py
+python start_fp4_service.py

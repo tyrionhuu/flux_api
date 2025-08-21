@@ -13,21 +13,7 @@ import psutil
 from pathlib import Path
 
 
-def check_flux_env():
-    """Check if flux_env virtual environment exists and is accessible"""
-    flux_env_path = Path("flux_env")
-    if not flux_env_path.exists():
-        print("❌ flux_env virtual environment not found!")
-        print("   Please ensure the virtual environment is set up correctly.")
-        return False
-
-    python_path = flux_env_path / "bin" / "python"
-    if not python_path.exists():
-        print("❌ Python executable not found in flux_env!")
-        return False
-
-    print("✅ flux_env virtual environment found")
-    return True
+ 
 
 
 def cleanup_port(port: int = 8000):
@@ -180,32 +166,7 @@ def wait_for_port_free(port: int = 8000, max_wait: int = 30) -> bool:
     return False
 
 
-def check_dependencies():
-    """Check if required dependencies are available"""
-    try:
-        import torch
 
-        print(f"✅ PyTorch {torch.__version__} available")
-
-        if torch.cuda.is_available():
-            print(f"✅ CUDA available: {torch.version.cuda}")  # type: ignore
-            print(f"✅ GPU count: {torch.cuda.device_count()}")
-            for i in range(torch.cuda.device_count()):
-                gpu_name = torch.cuda.get_device_name(i)
-                gpu_memory = torch.cuda.get_device_properties(i).total_memory / 1024**3
-                print(f"   GPU {i}: {gpu_name} ({gpu_memory:.1f} GB)")
-        else:
-            print("⚠️  CUDA not available - GPU acceleration disabled")
-
-        import fastapi
-
-        print(f"✅ FastAPI {fastapi.__version__} available")
-
-        return True
-    except ImportError as e:
-        print(f"❌ Missing dependency: {e}")
-        print("   Please activate flux_env and install requirements")
-        return False
 
 
 def start_service():
@@ -252,8 +213,9 @@ def start_service():
         print("   ❌ Port 8000 is not available, cannot start service")
         return False
 
-    # Get the path to the flux_env Python executable
+    # Resolve Python executable: prefer flux_env if present, else current python
     flux_env_python = Path("flux_env/bin/python")
+    python_exec = str(flux_env_python) if flux_env_python.exists() else sys.executable
 
     # Start the service
     try:
@@ -268,7 +230,7 @@ def start_service():
             print("⚠️  CUDA_VISIBLE_DEVICES not set; default visible GPU will be used")
 
         process = subprocess.Popen(
-            [str(flux_env_python), "main_fp4.py"],
+            [python_exec, "main_fp4.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -315,13 +277,9 @@ def main():
         print("   Please run this script from the flux_api directory.")
         sys.exit(1)
 
-    # Check flux_env
-    if not check_flux_env():
-        sys.exit(1)
+    # Skip venv checks; assume environment is already activated
 
-    # Check dependencies
-    if not check_dependencies():
-        sys.exit(1)
+
 
     # Start the service
     start_service()
