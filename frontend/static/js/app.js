@@ -71,9 +71,6 @@ class FluxAPI {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     this.generateImage();
-                } else if (e.key === 'r') {
-                    e.preventDefault();
-                    this.randomSeed();
                 }
             }
             if (e.key === 'Escape') {
@@ -552,6 +549,5 @@ document.addEventListener('DOMContentLoaded', () => {
 console.log(`
 🎨 FLUX API Frontend Shortcuts:
 Ctrl/Cmd + Enter: Generate image
-Ctrl/Cmd + R: Random seed
 Escape: Close modal
 `);

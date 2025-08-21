@@ -859,3 +859,45 @@ body {
     box-shadow: none;
 }
 
+/* User Guide Styling */
+.user-guide {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #f8f7f3;
+    border: 1px solid #e8e6de;
+    border-radius: 8px;
+}
+
+.user-guide h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.user-guide h3 i {
+    color: #3182ce;
+    font-size: 0.8rem;
+}
+
+.guide-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.guide-item {
+    font-size: 0.8rem;
+    color: #4a5568;
+    line-height: 1.4;
+}
+
+.guide-item strong {
+    color: #2d3748;
+    font-weight: 600;
+}
+
+
