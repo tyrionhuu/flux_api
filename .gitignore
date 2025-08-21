@@ -5,5 +5,5 @@
 /outputs
 *.log
 /model_cache
-
+/.venv
 /tmp*
