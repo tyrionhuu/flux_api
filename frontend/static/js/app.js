@@ -174,6 +174,12 @@ class FluxAPI {
     }
 
     addLoraEntry(name = '', weight = 1.0) {
+        // Check maximum LoRA limit
+        if (this.loraEntries.length >= 3) {
+            console.warn('Maximum of 3 LoRAs allowed');
+            return;
+        }
+
         const loraList = document.getElementById('lora-list');
         const loraEntry = document.createElement('div');
         loraEntry.className = 'lora-entry';
@@ -209,6 +215,26 @@ class FluxAPI {
         
         loraList.appendChild(loraEntry);
         this.loraEntries.push(loraEntry);
+        
+        // Update Add LoRA button state
+        this.updateAddLoraButtonState();
+    }
+
+    updateAddLoraButtonState() {
+        const addLoraBtn = document.getElementById('add-lora');
+        if (addLoraBtn) {
+            if (this.loraEntries.length >= 3) {
+                addLoraBtn.disabled = true;
+                addLoraBtn.title = 'Maximum of 3 LoRAs reached';
+                addLoraBtn.style.opacity = '0.5';
+                addLoraBtn.style.cursor = 'not-allowed';
+            } else {
+                addLoraBtn.disabled = false;
+                addLoraBtn.title = 'Add LoRA';
+                addLoraBtn.style.opacity = '1';
+                addLoraBtn.style.cursor = 'pointer';
+            }
+        }
     }
 
     getDragAfterElement(container, y) {
@@ -233,6 +259,9 @@ class FluxAPI {
         // Ensure the array matches DOM after removal
         const loraList = document.getElementById('lora-list');
         this.loraEntries = Array.from(loraList.children);
+        
+        // Update Add LoRA button state after removal
+        this.updateAddLoraButtonState();
     }
 
     getLoraConfigs() {
