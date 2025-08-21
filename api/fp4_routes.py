@@ -234,12 +234,9 @@ async def generate_image(request: GenerateRequest):
             "FLUX",
             lora_applied,
             lora_weight_applied,
-            request.num_inference_steps or 25,
-            request.guidance_scale or 3.5,
             request.width or 512,
             request.height or 512,
             request.seed,
-            request.negative_prompt,
         )
         return result
     except Exception as e:
@@ -407,12 +404,12 @@ async def submit_generation_request(request: GenerateRequest):
             prompt=request.prompt.strip(),
             lora_name=request.lora_name.strip() if request.lora_name else None,
             lora_weight=request.lora_weight,
-            num_inference_steps=request.num_inference_steps or 25,
-            guidance_scale=request.guidance_scale or 3.5,
+            num_inference_steps=10,  # Fixed value
+            guidance_scale=4.0,  # Fixed value
             width=request.width or 512,
             height=request.height or 512,
             seed=request.seed,
-            negative_prompt=request.negative_prompt,
+            negative_prompt=None,  # No negative prompt
         )
 
         return {
@@ -503,12 +500,9 @@ def generate_image_internal(
     model_type_name: str = "FLUX",
     lora_applied: Optional[str] = None,
     lora_weight: Optional[float] = None,
-    num_inference_steps: int = 25,
-    guidance_scale: float = 3.5,
     width: int = 512,
     height: int = 512,
     seed: Optional[int] = None,
-    negative_prompt: Optional[str] = None,
 ):
     """Internal function to generate images - used by both endpoints"""
     # Append "Use GHIBLISTYLE" to the start of the user prompt
@@ -548,12 +542,12 @@ def generate_image_internal(
         # Generate the image
         result = model_manager.generate_image(
             enhanced_prompt,
-            num_inference_steps,
-            guidance_scale,
+            10,  # Fixed num_inference_steps
+            4.0,  # Fixed guidance_scale
             width,
             height,
             seed,
-            negative_prompt,
+            None,  # No negative prompt
         )
 
         image = extract_image_from_result(result)
@@ -584,15 +578,8 @@ def generate_image_internal(
             "download_url": download_url,
             "filename": filename,
             "generation_time": f"{generation_time:.2f}s",
-            "vram_usage_gb": f"{vram_usage:.2f}GB",
-            "system_memory_used_gb": f"{system_memory_used:.2f}GB",
-            "system_memory_total_gb": f"{system_memory_total:.2f}GB",
-            "model_type": model_manager.model_type,
             "lora_applied": actual_lora_info.get("name") if actual_lora_info else None,
             "lora_weight": actual_lora_info.get("weight") if actual_lora_info else None,
-            # Generation parameters used
-            "num_inference_steps": num_inference_steps,
-            "guidance_scale": guidance_scale,
             "width": width,
             "height": height,
             "seed": seed,

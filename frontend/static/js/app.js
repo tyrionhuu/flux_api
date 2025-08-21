@@ -199,8 +199,6 @@ class FluxAPI {
     getGenerationParams() {
         const params = {
             prompt: document.getElementById('prompt').value.trim(),
-            num_inference_steps: 10,  // Fixed value, hidden from user
-            guidance_scale: 4.0,      // Fixed value, hidden from user
             width: parseInt(document.getElementById('width').value),
             height: parseInt(document.getElementById('height').value)
         };

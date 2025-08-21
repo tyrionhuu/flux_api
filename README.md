@@ -91,7 +91,7 @@ curl -X POST "http://74.81.65.108:8001/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A beautiful landscape",
-    "lora_name": "another-user/custom-lora",
+    "lora_name": "https://huggingface.co/aleksa-codes/flux-ghibsky-illustration",
     "lora_weight": 0.8
   }'
 ```
@@ -128,7 +128,7 @@ curl -s -X POST "http://74.81.65.108:8000/generate" \
 
 ## 🎨 Default LoRA
 
-Both services automatically load **Ghibli-style illustration LoRA** (`aleksa-codes/flux-ghibsky-illustration`) with weight `1.0`:
+Both services automatically load **Ghibli-style illustration LoRA** (`/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors`) with weight `1.0`:
 
 - ✅ **No LoRA specified**: Uses default LoRA
 - ✅ **Custom LoRA**: Override with `lora_name` parameter  

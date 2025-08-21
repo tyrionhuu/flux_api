@@ -37,12 +37,11 @@ class QueueRequest:
     error: Optional[str]
     priority: int = 0  # Higher number = higher priority
     # Generation parameters
-    num_inference_steps: int = 25
-    guidance_scale: float = 3.5
+    num_inference_steps: int = 10  # Fixed value
+    guidance_scale: float = 4.0  # Fixed value
     width: int = 512
     height: int = 512
     seed: Optional[int] = None
-    negative_prompt: Optional[str] = None
 
 
 class QueueManager:
@@ -89,12 +88,11 @@ class QueueManager:
         lora_name: Optional[str] = None,
         lora_weight: float = 1.0,
         priority: int = 0,
-        num_inference_steps: int = 25,
-        guidance_scale: float = 3.5,
+        num_inference_steps: int = 10,  # Fixed value
+        guidance_scale: float = 4.0,  # Fixed value
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,
-        negative_prompt: Optional[str] = None,
     ) -> str:
         """Submit a new request to the queue"""
         if self.queue.qsize() >= self.max_queue_size:
@@ -118,7 +116,6 @@ class QueueManager:
             width=width,
             height=height,
             seed=seed,
-            negative_prompt=negative_prompt,
         )
 
         await self.queue.put((priority, request))
