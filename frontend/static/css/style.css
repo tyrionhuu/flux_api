@@ -788,19 +788,35 @@ body {
     grid-template-columns: auto 1fr auto auto;
     gap: 0.5rem;
     align-items: center;
-    padding: 0.5rem 0.5rem;
+    padding: 0.5rem;
     background: #faf9f6;
     border: 1px solid #ebe9e2;
     border-radius: 8px;
+    margin-bottom: 0.5rem;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .drag-handle {
     color: #9aa0a6;
     cursor: grab;
     padding: 0 0.25rem;
+    flex-shrink: 0;
 }
 .drag-handle:active {
     cursor: grabbing;
+}
+
+.lora-entry input.lora-name {
+    font-size: 0.85rem;
+    min-width: 0; /* Allow shrinking */
+}
+
+.lora-entry input.lora-weight {
+    width: 72px;
+    font-size: 0.85rem;
+    text-align: center;
+    flex-shrink: 0;
 }
 
 .lora-entry .remove-lora {
@@ -809,19 +825,23 @@ body {
     border: 1px solid #f1d6d6;
     border-radius: 6px;
     padding: 0.35rem 0.5rem;
+    flex-shrink: 0;
+    width: auto;
+    min-width: 32px;
 }
+
 .lora-entry .remove-lora:hover {
     background: #fdecec;
 }
 
-/* Inputs: slightly smaller for minimal look */
-.lora-entry input.lora-name {
-    font-size: 0.85rem;
+/* Ensure the container doesn't overflow */
+.lora-container {
+    max-width: 100%;
+    overflow: hidden;
 }
-.lora-entry input.lora-weight {
-    width: 72px;
-    font-size: 0.85rem;
-    text-align: center;
+
+.lora-list {
+    max-width: 100%;
 }
 
 /* Generate button simplified but elegant */
