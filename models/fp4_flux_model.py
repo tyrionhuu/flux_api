@@ -369,7 +369,11 @@ class FluxModelManager:
         return self.pipe
 
     def apply_lora(self, lora_name: str, weight: float = 1.0) -> bool:
-        """Apply LoRA to the FluxPipeline using Nunchaku transformer methods"""
+        """Apply LoRA to the FluxPipeline using Nunchaku transformer methods.
+
+        Supports both Hugging Face repo IDs (e.g., "user/repo") and local
+        file paths to a .safetensors LoRA checkpoint.
+        """
         if not self.model_loaded or self.pipe is None:
             logger.error(
                 f"Cannot apply LoRA {lora_name}: Model not loaded or pipeline not available"
@@ -383,14 +387,26 @@ class FluxModelManager:
             if hasattr(self.pipe, "transformer") and hasattr(
                 self.pipe.transformer, "update_lora_params"
             ):
-                # Load LoRA parameters from HuggingFace repository
-                logger.info(
-                    f"   - Loading LoRA parameters from {lora_name}/lora.safetensors"
+                # Decide how to load: local path vs HF repo
+                is_local_path = (
+                    lora_name.startswith("/")
+                    or lora_name.startswith("./")
+                    or lora_name.endswith(".safetensors")
                 )
+
                 try:
-                    self.pipe.transformer.update_lora_params(
-                        f"{lora_name}/lora.safetensors"
-                    )
+                    if is_local_path:
+                        logger.info(
+                            f"   - Loading LoRA parameters from local path: {lora_name}"
+                        )
+                        self.pipe.transformer.update_lora_params(lora_name)
+                    else:
+                        logger.info(
+                            f"   - Loading LoRA parameters from repo: {lora_name}/lora.safetensors"
+                        )
+                        self.pipe.transformer.update_lora_params(
+                            f"{lora_name}/lora.safetensors"
+                        )
                     logger.info(f"   - LoRA parameters loaded successfully")
                 except Exception as load_error:
                     logger.error(f"   - Failed to load LoRA parameters: {load_error}")

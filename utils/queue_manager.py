@@ -27,15 +27,17 @@ class QueueRequest:
 
     id: str
     prompt: str
-    lora_name: Optional[str]
-    lora_weight: float
     status: RequestStatus
     created_at: float
-    started_at: Optional[float]
-    completed_at: Optional[float]
-    result: Optional[Any]
-    error: Optional[str]
+    started_at: Optional[float] = None
+    completed_at: Optional[float] = None
+    result: Optional[Any] = None
+    error: Optional[str] = None
     priority: int = 0  # Higher number = higher priority
+    # LoRA configuration
+    lora_name: Optional[str] = None  # For backward compatibility
+    lora_weight: float = 1.0  # For backward compatibility
+    loras: Optional[list[dict]] = None  # New multiple LoRA support
     # Generation parameters
     num_inference_steps: int = 10  # Fixed value
     guidance_scale: float = 4.0  # Fixed value
@@ -87,6 +89,7 @@ class QueueManager:
         prompt: str,
         lora_name: Optional[str] = None,
         lora_weight: float = 1.0,
+        loras: Optional[list[dict]] = None,  # New multiple LoRA support
         priority: int = 0,
         num_inference_steps: int = 10,  # Fixed value
         guidance_scale: float = 4.0,  # Fixed value
@@ -102,14 +105,11 @@ class QueueManager:
         request = QueueRequest(
             id=request_id,
             prompt=prompt,
-            lora_name=lora_name,
-            lora_weight=lora_weight,
             status=RequestStatus.PENDING,
             created_at=time.time(),
-            started_at=None,
-            completed_at=None,
-            result=None,
-            error=None,
+            lora_name=lora_name,
+            lora_weight=lora_weight,
+            loras=loras,
             priority=priority,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,

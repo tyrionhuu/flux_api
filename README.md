@@ -70,29 +70,58 @@ curl -X POST "http://74.81.65.108:8001/generate" \
   -d '{"prompt": "A beautiful sunset over mountains"}'
 ```
 
-### Advanced Parameters
+### Custom Size and Seed
 ```bash
 curl -X POST "http://74.81.65.108:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A beautiful landscape painting",
-    "num_inference_steps": 30,
-    "guidance_scale": 4.0,
     "width": 768,
     "height": 768,
-    "seed": 42,
-    "negative_prompt": "blurry, low quality"
+    "seed": 42
   }'
 ```
 
-### Custom LoRA
+Notes:
+- Inference steps and guidance are fixed server-side to steps=10 and guidance=4.0 for consistency and speed.
+- Negative prompt is disabled.
+
+### Custom LoRA (single)
 ```bash
 curl -X POST "http://74.81.65.108:8001/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A beautiful landscape",
-    "lora_name": "https://huggingface.co/aleksa-codes/flux-ghibsky-illustration",
+    # Hugging Face repo ID
+    "lora_name": "aleksa-codes/flux-ghibsky-illustration",
     "lora_weight": 0.8
+  }'
+```
+
+You can also use a local LoRA checkpoint path (absolute path to .safetensors):
+```bash
+curl -X POST "http://74.81.65.108:8000/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "A cozy ghibli village",
+    "lora_name": "/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors",
+    "lora_weight": 1.0
+  }'
+```
+
+### Multiple LoRAs
+Provide an ordered list; each entry has a name and weight. Repo IDs and/or local .safetensors paths are supported.
+```bash
+curl -X POST "http://74.81.65.108:8000/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "A futuristic ghibli-style city",
+    "loras": [
+      {"name": "aleksa-codes/flux-ghibsky-illustration", "weight": 0.8},
+      {"name": "/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors", "weight": 0.6}
+    ],
+    "width": 768,
+    "height": 512
   }'
 ```
 
@@ -128,9 +157,9 @@ curl -s -X POST "http://74.81.65.108:8000/generate" \
 
 ## 🎨 Default LoRA
 
-Both services automatically load **Ghibli-style illustration LoRA** (`/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors`) with weight `1.0`:
+Both services automatically load and enforce **Ghibli-style illustration LoRA** (`/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors`) with weight `1.0` when none is specified:
 
-- ✅ **No LoRA specified**: Uses default LoRA
+- ✅ **No LoRA specified**: Default LoRA is applied on every request
 - ✅ **Custom LoRA**: Override with `lora_name` parameter  
 - ✅ **Weight 0.0**: Disable LoRA influence
 
@@ -138,15 +167,13 @@ Both services automatically load **Ghibli-style illustration LoRA** (`/data/ping
 
 ### Core Parameters
 - `prompt` **(required)**: Text description
-- `num_inference_steps` (1-100): Quality vs speed (default: 25)
-- `guidance_scale` (0.0-20.0): Prompt adherence (default: 3.5)
 - `width`/`height` (256-1024): Image dimensions (default: 512)
 - `seed` (optional): Reproducible results
-- `negative_prompt` (optional): What to avoid
+- Steps and guidance are fixed server-side to 10 and 4.0 respectively
 
 ### LoRA Parameters  
-- `lora_name` (optional): HuggingFace repo ID
-- `lora_weight` (0.0-2.0): LoRA strength (default: 1.0)
+- Preferred: `loras` (optional): list of `{ name, weight }` entries; `name` can be a HF repo ID (e.g., `user/repo`) or an absolute path to a `.safetensors` file
+- Legacy: `lora_name` (optional) and `lora_weight` (0.0-2.0) for single LoRA
 
 
 
@@ -311,9 +338,9 @@ done
 
 ### 🎛️ Frontend Controls
 - **Service Toggle**: Switch between FP4/BF16 without page reload
-- **Parameter Sliders**: Real-time value updates as you adjust
+- **Parameter Sliders**: Width/height; steps (10) and guidance (4.0) are fixed
 - **Seed Management**: Random seed generator with manual input option
-- **LoRA Support**: Full LoRA name and weight control
+- **LoRA Support**: Single or multiple LoRAs with weights
 - **Aspect Ratios**: Quick presets for common image sizes
 - **Generation History**: Persistent gallery with local storage
 - **Error Handling**: Clear feedback for any issues

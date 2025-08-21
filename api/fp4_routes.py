@@ -11,7 +11,7 @@ from models.fp4_flux_model import FluxModelManager
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
 from utils.system_utils import get_system_memory
 from utils.queue_manager import QueueManager
-from config.fp4_settings import STATIC_IMAGES_DIR
+from config.fp4_settings import STATIC_IMAGES_DIR, DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
 from api.models import GenerateRequest, GenerateResponse, ModelStatusResponse
 
 # Configure logging
@@ -115,26 +115,45 @@ def download_image(filename: str):
 
 @router.post("/generate")
 async def generate_image(request: GenerateRequest):
-    """Generate image using FLUX model with optional LoRA support - lora_name should be a Hugging Face repo ID"""
+    """Generate image using FLUX model with optional LoRA support - supports multiple LoRAs"""
     try:
         # Validate request parameters
         if not request.prompt or request.prompt.strip() == "":
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
-        if request.lora_name and not request.lora_name.strip():
-            raise HTTPException(
-                status_code=400, detail="LoRA name cannot be empty if provided"
-            )
+        # Handle multiple LoRA support
+        loras_to_apply = []
+        
+        # Check for new multiple LoRA format first
+        if request.loras:
+            for lora_config in request.loras:
+                if not lora_config.name or not lora_config.name.strip():
+                    raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
+                if lora_config.weight < 0 or lora_config.weight > 2.0:
+                    raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
+                loras_to_apply.append({
+                    "name": lora_config.name.strip(),
+                    "weight": lora_config.weight
+                })
+        # Legacy support for single LoRA
+        elif request.lora_name:
+            if not request.lora_name.strip():
+                raise HTTPException(status_code=400, detail="LoRA name cannot be empty if provided")
+            if request.lora_weight is None or request.lora_weight < 0 or request.lora_weight > 2.0:
+                raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
+            loras_to_apply.append({
+                "name": request.lora_name.strip(),
+                "weight": request.lora_weight
+            })
 
-        if request.lora_weight < 0 or request.lora_weight > 2.0:
-            raise HTTPException(
-                status_code=400, detail="LoRA weight must be between 0 and 2.0"
-            )
+        # If no LoRA specified, force default LoRA
+        if not loras_to_apply:
+            loras_to_apply = [
+                {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
+            ]
 
         # Clean up input
         prompt = request.prompt.strip()
-        lora_name = request.lora_name.strip() if request.lora_name else None
-        lora_weight = request.lora_weight
 
         # First, ensure the model is loaded with thread safety and force check
         with _model_manager_lock:
@@ -162,72 +181,59 @@ async def generate_image(request: GenerateRequest):
                 else:
                     logger.info("Model was loaded by another thread while waiting")
 
-        # Now check if LoRA is already applied
+        # Now check if LoRAs are already applied
         current_lora = model_manager.get_lora_info()
         lora_applied = None
         lora_weight_applied = None
 
-        if lora_name:
-            # Validate LoRA name format (should be a valid Hugging Face repo ID)
-            if not lora_name or "/" not in lora_name:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Invalid LoRA name format. Must be a Hugging Face repository ID (e.g., 'username/model-name')",
-                )
-
-            # Only apply LoRA if it's different from the current one
-            if (
-                not current_lora
-                or current_lora.get("name") != lora_name
-                or current_lora.get("weight") != lora_weight
-            ):
-                logger.info(f"Applying new LoRA: {lora_name} with weight {lora_weight}")
-                try:
-                    if model_manager.apply_lora(lora_name, lora_weight):
-                        lora_applied = lora_name
-                        lora_weight_applied = lora_weight
-                        logger.info(
-                            f"LoRA {lora_name} applied successfully with weight {lora_weight}"
-                        )
-                    else:
-                        logger.error(
-                            f"LoRA application failed: {lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
-                        )
-                        raise HTTPException(
-                            status_code=500,
-                            detail=f"Failed to apply LoRA {lora_name}. Please check if the LoRA exists and is compatible.",
-                        )
-                except Exception as lora_error:
-                    logger.error(
-                        f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})"
-                    )
-                    if "not found" in str(lora_error).lower() or "404" in str(
-                        lora_error
-                    ):
+        if loras_to_apply:
+            # Apply multiple LoRAs in sequence
+            logger.info(f"Applying {len(loras_to_apply)} LoRAs to loaded model")
+            try:
+                for lora_config in loras_to_apply:
+                    # Validate LoRA name format (should be a valid Hugging Face repo ID)
+                    if not lora_config["name"] or "/" not in lora_config["name"]:
                         raise HTTPException(
                             status_code=400,
-                            detail=f"LoRA {lora_name} not found. Please check the repository ID.",
+                            detail=f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name')",
                         )
-                    else:
+                    
+                    if not model_manager.apply_lora(lora_config["name"], lora_config["weight"]):
+                        logger.error(f"LoRA application failed: {lora_config['name']} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is None}")
                         raise HTTPException(
                             status_code=500,
-                            detail=f"Failed to apply LoRA {lora_name}: {str(lora_error)}",
+                            detail=f"Failed to apply LoRA {lora_config['name']}. Please check if the LoRA exists and is compatible.",
                         )
-            else:
-                # Use the already applied LoRA
-                lora_applied = current_lora.get("name")
-                lora_weight = current_lora.get("weight")
-                logger.info(
-                    f"Using already applied LoRA: {lora_applied} with weight {lora_weight}"
+                    else:
+                        logger.info(f"LoRA {lora_config['name']} applied successfully with weight {lora_config['weight']}")
+                
+                # Use the last applied LoRA info for response
+                current_lora = model_manager.get_lora_info()
+                if current_lora:
+                    lora_applied = current_lora.get("name")
+                    lora_weight_applied = current_lora.get("weight")
+                    logger.info(f"All LoRAs applied successfully. Current LoRA: {lora_applied} with weight {lora_weight_applied}")
+            except Exception as lora_error:
+                logger.error(
+                    f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})"
                 )
+                if "not found" in str(lora_error).lower() or "404" in str(
+                    lora_error
+                ):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"One or more LoRAs not found. Please check the repository IDs.",
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to apply LoRAs: {str(lora_error)}",
+                    )
         else:
-            # No LoRA specified, check if one is currently applied
+            # Should not occur because we always set default, but keep a safe fallback
             if current_lora:
                 lora_applied = current_lora.get("name")
-                lora_weight = current_lora.get("weight")
-                logger.info(
-                    f"Using currently applied LoRA: {lora_applied} with weight {lora_weight}"
-                )
+                lora_weight_applied = current_lora.get("weight")
 
         result = generate_image_internal(
             prompt,
@@ -394,7 +400,7 @@ async def submit_generation_request(request: GenerateRequest):
                 status_code=400, detail="LoRA name cannot be empty if provided"
             )
 
-        if request.lora_weight < 0 or request.lora_weight > 2.0:
+        if request.lora_weight is not None and (request.lora_weight < 0 or request.lora_weight > 2.0):
             raise HTTPException(
                 status_code=400, detail="LoRA weight must be between 0 and 2.0"
             )
@@ -402,14 +408,14 @@ async def submit_generation_request(request: GenerateRequest):
         # Submit to queue
         request_id = await queue_manager.submit_request(
             prompt=request.prompt.strip(),
-            lora_name=request.lora_name.strip() if request.lora_name else None,
-            lora_weight=request.lora_weight,
+            lora_name=request.loras[0].name if request.loras and len(request.loras) > 0 else None,
+            lora_weight=request.loras[0].weight if request.loras and len(request.loras) > 0 else 1.0,
+            loras=[{"name": lora.name, "weight": lora.weight} for lora in request.loras] if request.loras else None,
             num_inference_steps=10,  # Fixed value
             guidance_scale=4.0,  # Fixed value
             width=request.width or 512,
             height=request.height or 512,
             seed=request.seed,
-            negative_prompt=None,  # No negative prompt
         )
 
         return {
@@ -450,7 +456,6 @@ async def get_request_status(request_id: str):
             "width": request.width,
             "height": request.height,
             "seed": request.seed,
-            "negative_prompt": request.negative_prompt,
         }
 
     except HTTPException:
@@ -513,18 +518,34 @@ def generate_image_internal(
     if not model_manager.is_loaded():
         raise HTTPException(status_code=500, detail="Model not loaded")
 
-    # Apply LoRA if specified and not already applied
-    if lora_applied and not model_manager.get_lora_info():
-        logger.info(f"Applying LoRA {lora_applied} to loaded model")
-        try:
-            if not model_manager.apply_lora(lora_applied, lora_weight or 1.0):
-                logger.error(f"Failed to apply LoRA {lora_applied} to loaded model")
-            else:
-                logger.info(f"LoRA {lora_applied} applied successfully to loaded model")
-        except Exception as lora_error:
-            logger.error(
-                f"Exception during LoRA application to loaded model: {lora_error} (Type: {type(lora_error).__name__})"
+    # Apply LoRA if specified and different from the currently applied one
+    if lora_applied:
+        current_info = model_manager.get_lora_info()
+        should_apply = (
+            not current_info
+            or current_info.get("name") != lora_applied
+            or (
+                lora_weight is not None
+                and current_info.get("weight") != lora_weight
             )
+        )
+        if should_apply:
+            logger.info(
+                f"Applying LoRA {lora_applied} (weight={lora_weight or 1.0}) to loaded model"
+            )
+            try:
+                if not model_manager.apply_lora(lora_applied, lora_weight or 1.0):
+                    logger.error(
+                        f"Failed to apply LoRA {lora_applied} to loaded model"
+                    )
+                else:
+                    logger.info(
+                        f"LoRA {lora_applied} applied successfully to loaded model"
+                    )
+            except Exception as lora_error:
+                logger.error(
+                    f"Exception during LoRA application to loaded model: {lora_error} (Type: {type(lora_error).__name__})"
+                )
 
     try:
         logger.info(f"Generating {model_type_name} image for prompt: {prompt}")
