@@ -213,19 +213,25 @@ def start_service():
     print("\n🚀 Starting FLUX API Service...")
     print("=" * 50)
 
+    # Determine target port from environment (fallback to 8000)
+    try:
+        target_port = int(os.environ.get("FP4_API_PORT", "8000"))
+    except ValueError:
+        target_port = 8000
+
     # Clean up port before starting
-    if not cleanup_port(8000):
+    if not cleanup_port(target_port):
         print("   ⚠️  Port cleanup incomplete, but continuing...")
 
     # Final port verification
     print("🔍 Final port verification...")
     try:
         result = subprocess.run(
-            ["lsof", "-ti", f":8000"], capture_output=True, text=True, timeout=5
+            ["lsof", "-ti", f":{target_port}"], capture_output=True, text=True, timeout=5
         )
 
         if result.returncode == 0 and result.stdout.strip():
-            print(f"   ❌ Port 8000 still in use by: {result.stdout.strip()}")
+            print(f"   ❌ Port {target_port} still in use by: {result.stdout.strip()}")
             print("   🚫 Attempting final cleanup...")
             pids = result.stdout.strip().split("\n")
             for pid in pids:
@@ -237,12 +243,12 @@ def start_service():
                         pass
             time.sleep(2)
         else:
-            print("   ✅ Port 8000 is confirmed free")
+            print(f"   ✅ Port {target_port} is confirmed free")
     except Exception as e:
         print(f"   ⚠️  Final verification failed: {e}")
 
     # Wait for port to be truly available
-    if not wait_for_port_free(8000, max_wait=30):
+    if not wait_for_port_free(target_port, max_wait=30):
         print("   ❌ Port 8000 is not available, cannot start service")
         return False
 
@@ -271,9 +277,9 @@ def start_service():
         )
 
         print(f"✅ Service started with PID: {process.pid}")
-        print("📍 API URL: http://localhost:8000")
-        print("🔍 Health check: http://localhost:8000/health")
-        print("📚 API docs: http://localhost:8000/docs")
+        print(f"📍 API URL: http://localhost:{target_port}")
+        print(f"🔍 Health check: http://localhost:{target_port}/health")
+        print(f"📚 API docs: http://localhost:{target_port}/docs")
         print("\n📋 Service logs:")
         print("-" * 50)
 

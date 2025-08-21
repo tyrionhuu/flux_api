@@ -41,4 +41,6 @@ MIN_LORA_WEIGHT = 0.0
 MAX_LORA_WEIGHT = 2.0
 
 # Port Configuration
-BF16_API_PORT = 8001
+# Allows override via environment variable BF16_API_PORT
+import os
+BF16_API_PORT = int(os.environ.get("BF16_API_PORT", "8001"))

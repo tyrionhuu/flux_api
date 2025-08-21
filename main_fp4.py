@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from api.fp4_routes import router
-from config.fp4_settings import API_TITLE, API_DESCRIPTION, API_VERSION
+from config.fp4_settings import API_TITLE, API_DESCRIPTION, API_VERSION, FP4_API_PORT
 import os
 
 # Configure logging
@@ -103,4 +103,4 @@ def health_check():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=FP4_API_PORT)

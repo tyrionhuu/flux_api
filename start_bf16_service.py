@@ -213,19 +213,25 @@ def start_service():
     print("\n🚀 Starting BF16 FLUX API Service...")
     print("=" * 50)
 
+    # Determine target port from environment (fallback to 8001)
+    try:
+        target_port = int(os.environ.get("BF16_API_PORT", "8001"))
+    except ValueError:
+        target_port = 8001
+
     # Clean up port before starting
-    if not cleanup_port(8001):
+    if not cleanup_port(target_port):
         print("   ⚠️  Port cleanup incomplete, but continuing...")
 
     # Final port verification
     print("🔍 Final port verification...")
     try:
         result = subprocess.run(
-            ["lsof", "-ti", f":8001"], capture_output=True, text=True, timeout=5
+            ["lsof", "-ti", f":{target_port}"], capture_output=True, text=True, timeout=5
         )
 
         if result.returncode == 0 and result.stdout.strip():
-            print(f"   ❌ Port 8001 still in use by: {result.stdout.strip()}")
+            print(f"   ❌ Port {target_port} still in use by: {result.stdout.strip()}")
             print("   🚫 Attempting final cleanup...")
             pids = result.stdout.strip().split("\n")
             for pid in pids:
@@ -237,12 +243,12 @@ def start_service():
                         pass
             time.sleep(2)
         else:
-            print("   ✅ Port 8001 is confirmed free")
+            print(f"   ✅ Port {target_port} is confirmed free")
     except Exception as e:
         print(f"   ⚠️  Final verification failed: {e}")
 
     # Wait for port to be truly available
-    if not wait_for_port_free(8001, max_wait=30):
+    if not wait_for_port_free(target_port, max_wait=30):
         print("   ❌ Port 8001 is not available, cannot start service")
         return False
 
@@ -274,9 +280,9 @@ def start_service():
         )
 
         print(f"✅ BF16 service started with PID: {process.pid}")
-        print("📍 BF16 API URL: http://localhost:8001")
-        print("🔍 Health check: http://localhost:8001/health")
-        print("📚 API docs: http://localhost:8001/docs")
+        print(f"📍 BF16 API URL: http://localhost:{target_port}")
+        print(f"🔍 Health check: http://localhost:{target_port}/health")
+        print(f"📚 API docs: http://localhost:{target_port}/docs")
         print("\n📋 Service logs:")
         print("-" * 50)
 
