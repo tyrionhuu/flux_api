@@ -1,8 +1,8 @@
 // FLUX API ComfyUI Frontend
 class FluxAPI {
     constructor() {
-        // Build base host without an existing port to avoid patterns like :8000:8001
-        this.hostBase = window.location.protocol + '//' + window.location.hostname;
+        // Use current origin (protocol + host + port) so UI works on any served port
+        this.hostBase = window.location.origin;
         this.isGenerating = false;
         
         this.init();
@@ -167,8 +167,8 @@ class FluxAPI {
             
 
             
-            // Only generate on FP4 model - BF16 disabled
-            const response = await fetch(`${this.hostBase}:8000/generate`, {
+            // Only generate on FP4 model - BF16 disabled; use current origin/port
+            const response = await fetch(`${this.hostBase}/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(params)
@@ -228,7 +228,7 @@ class FluxAPI {
         const singleItem = document.createElement('div');
         singleItem.className = 'comparison-item';
         
-        const imageUrl = `${this.hostBase}:8000${result.download_url}`;
+        const imageUrl = `${this.hostBase}${result.download_url}`;
         
         singleItem.innerHTML = `
             <div class="comparison-images">
