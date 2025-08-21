@@ -301,6 +301,8 @@ class FluxModelManager:
                     "prompt": prompt,
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": guidance_scale,
+                    "width": width,
+                    "height": height,
                 }
 
                 # Add negative prompt if provided
@@ -326,6 +328,8 @@ class FluxModelManager:
                         "prompt": prompt,
                         "num_inference_steps": fallback_steps,
                         "guidance_scale": fallback_guidance,
+                        "width": width,
+                        "height": height,
                     }
 
                     if negative_prompt:

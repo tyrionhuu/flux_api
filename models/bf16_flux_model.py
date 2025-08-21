@@ -127,7 +127,12 @@ class BF16FluxModelManager(FluxModelManager):
             self._warmup_cuda_graph()
 
             # Apply default LoRA
-            self._apply_default_lora_bf16()
+            lora_success = self._apply_default_lora_bf16()
+            if not lora_success:
+                logger.warning("Failed to apply default LoRA, but model will continue without it")
+                # Reset LoRA state to indicate no LoRA is loaded
+                self.current_lora = None
+                self.current_weight = 0.0  # Use 0.0 instead of None for float type
 
             return True
 
@@ -148,36 +153,36 @@ class BF16FluxModelManager(FluxModelManager):
                 f"Applying default LoRA to BF16 model: {DEFAULT_LORA_NAME} with weight {DEFAULT_LORA_WEIGHT}"
             )
 
-            # Load and apply LoRA using diffusers method
+            # Load and apply LoRA using diffusers method - following the correct pattern
             logger.info(f"   - Loading default LoRA weights from {DEFAULT_LORA_NAME}")
             try:
                 # For BF16 model, we need to use just the repo name without /lora.safetensors
                 lora_repo = DEFAULT_LORA_NAME.replace("/lora.safetensors", "")
-                self.pipe.load_lora_weights(lora_repo)
+                logger.info(f"   - Loading LoRA from repo: {lora_repo}")
+                
+                # Use the correct method as shown in the example
+                self.pipe.load_lora_weights(lora_repo, weight_name='lora.safetensors')
                 logger.info(f"   - Default LoRA weights loaded successfully")
             except Exception as load_error:
                 logger.warning(
                     f"   - Failed to load default LoRA weights: {load_error}"
                 )
-                return False
+                # Try alternative method for BF16 model
+                try:
+                    logger.info(f"   - Trying alternative LoRA loading method...")
+                    # Try without weight_name first
+                    self.pipe.load_lora_weights(lora_repo)
+                    logger.info(f"   - Alternative LoRA loading without weight_name successful")
+                except Exception as alt_error:
+                    logger.warning(
+                        f"   - Alternative LoRA loading also failed: {alt_error}"
+                    )
+                    return False
 
-            # Set LoRA scale
-            logger.info(
-                f"   - Setting default LoRA adapter weight to {DEFAULT_LORA_WEIGHT}"
-            )
-            try:
-                adapter_name = (
-                    lora_repo.split("/")[-1] if "/" in lora_repo else lora_repo
-                )
-                self.pipe.set_adapters(
-                    [adapter_name], adapter_weights=[DEFAULT_LORA_WEIGHT]
-                )
-                logger.info(f"   - Default LoRA adapter weight set successfully")
-            except Exception as adapter_error:
-                logger.warning(
-                    f"   - Failed to set default LoRA adapter weight: {adapter_error}"
-                )
-                return False
+                        # For BF16 model, load_lora_weights should handle the weight automatically
+            # The weight_name='lora.safetensors' should set the correct weight
+            logger.info(f"   - LoRA weight should be automatically set by load_lora_weights")
+            logger.info(f"   - Using default weight: {DEFAULT_LORA_WEIGHT}")
 
             self.current_lora = DEFAULT_LORA_NAME
             self.current_weight = DEFAULT_LORA_WEIGHT
@@ -190,6 +195,9 @@ class BF16FluxModelManager(FluxModelManager):
             logger.warning(
                 f"Failed to apply default LoRA to BF16 model: {e} - continuing without default LoRA"
             )
+            # Reset LoRA state on failure
+            self.current_lora = None
+            self.current_weight = 0.0
             return False
 
     def generate_image(
@@ -248,6 +256,8 @@ class BF16FluxModelManager(FluxModelManager):
                     "prompt": prompt,
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": guidance_scale,
+                    "width": width,
+                    "height": height,
                 }
 
                 # Add negative prompt if provided
@@ -273,6 +283,8 @@ class BF16FluxModelManager(FluxModelManager):
                         "prompt": prompt,
                         "num_inference_steps": fallback_steps,
                         "guidance_scale": fallback_guidance,
+                        "width": width,
+                        "height": height,
                     }
 
                     if negative_prompt:

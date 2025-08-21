@@ -38,7 +38,7 @@ STATIC_IMAGES_DIR = "static"
 
 # LoRA Configuration
 DEFAULT_LORA_NAME = (
-    "aleksa-codes/flux-ghibsky-illustration/lora.safetensors"  # Default LoRA to apply
+    "/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors"  # Default LoRA to apply
 )
 DEFAULT_LORA_WEIGHT = 1.0
 MIN_LORA_WEIGHT = 0.0

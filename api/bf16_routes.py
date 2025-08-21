@@ -335,7 +335,9 @@ def generate_image_internal(
     negative_prompt: Optional[str] = None,
 ):
     """Internal function to generate images for BF16 model - adapted from original"""
-    logger.info(f"Starting BF16 image generation for prompt: {prompt}")
+    # Append "Use GHIBLISTYLE" to the start of the user prompt
+    enhanced_prompt = f"Use GHIBLISTYLE, {prompt}"
+    logger.info(f"Starting BF16 image generation for prompt: {enhanced_prompt}")
 
     # Model should already be loaded at this point
     if not bf16_model_manager.is_loaded():
@@ -373,7 +375,7 @@ def generate_image_internal(
 
         # Generate the image
         result = bf16_model_manager.generate_image(
-            prompt,
+            enhanced_prompt,
             num_inference_steps,
             guidance_scale,
             width,
@@ -405,7 +407,7 @@ def generate_image_internal(
         download_url = f"/download/{filename}"
 
         return {
-            "message": f"Generated {model_type_name} image for prompt: {prompt}",
+            "message": f"Generated {model_type_name} image for prompt: {enhanced_prompt}",
             "image_url": image_filename,
             "download_url": download_url,
             "filename": filename,
