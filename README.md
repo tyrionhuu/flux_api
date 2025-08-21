@@ -104,7 +104,7 @@ curl -X POST "http://74.81.65.108:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A cozy ghibli village",
-    "lora_name": "/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors",
+    "lora_name": "/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors",
     "lora_weight": 1.0
   }'
 ```
@@ -118,7 +118,7 @@ curl -X POST "http://74.81.65.108:8000/generate" \
     "prompt": "A futuristic ghibli-style city",
     "loras": [
       {"name": "aleksa-codes/flux-ghibsky-illustration", "weight": 0.8},
-      {"name": "/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors", "weight": 0.6}
+      {"name": "/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors", "weight": 0.6}
     ],
     "width": 768,
     "height": 512
@@ -157,7 +157,7 @@ curl -s -X POST "http://74.81.65.108:8000/generate" \
 
 ## 🎨 Default LoRA
 
-Both services automatically load and enforce **Ghibli-style illustration LoRA** (`/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors`) with weight `1.0` when none is specified:
+Both services automatically load and enforce **Ghibli-style illustration LoRA** (`/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors`) with weight `1.0` when none is specified:
 
 - ✅ **No LoRA specified**: Default LoRA is applied on every request
 - ✅ **Custom LoRA**: Override with `lora_name` parameter  

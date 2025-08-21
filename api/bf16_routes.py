@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from models.bf16_flux_model import BF16FluxModelManager
 from api.models import GenerateRequest, GenerateResponse, ModelStatusResponse
-from config.fp4_settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
+from config.bf16_settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
 from utils.system_utils import get_system_memory
 import time
@@ -93,18 +93,22 @@ async def generate_image(request: GenerateRequest):
 
         # Handle multiple LoRA support
         loras_to_apply = []
+        remove_all_loras = False
         
         # Check for new multiple LoRA format first
-        if request.loras:
-            for lora_config in request.loras:
-                if not lora_config.name or not lora_config.name.strip():
-                    raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
-                if lora_config.weight < 0 or lora_config.weight > 2.0:
-                    raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
-                loras_to_apply.append({
-                    "name": lora_config.name.strip(),
-                    "weight": lora_config.weight
-                })
+        if request.loras is not None:
+            if len(request.loras) == 0:
+                remove_all_loras = True
+            else:
+                for lora_config in request.loras:
+                    if not lora_config.name or not lora_config.name.strip():
+                        raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
+                    if lora_config.weight < 0 or lora_config.weight > 2.0:
+                        raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
+                    loras_to_apply.append({
+                        "name": lora_config.name.strip(),
+                        "weight": lora_config.weight
+                    })
         # Legacy support for single LoRA
         elif request.lora_name:
             if not request.lora_name.strip():
@@ -116,8 +120,8 @@ async def generate_image(request: GenerateRequest):
                 "weight": request.lora_weight
             })
 
-        # If no LoRA specified, force default LoRA
-        if not loras_to_apply:
+        # Apply default only when loras is None and no legacy field
+        if not loras_to_apply and not remove_all_loras and request.loras is None and not request.lora_name:
             loras_to_apply = [
                 {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
             ]
@@ -182,8 +186,14 @@ async def generate_image(request: GenerateRequest):
                         status_code=500,
                         detail=f"Failed to apply LoRAs to BF16 model: {str(lora_error)}",
                     )
+        elif remove_all_loras:
+            if bf16_model_manager.get_lora_info():
+                logger.info("Removing all LoRAs from BF16 model as requested by client (empty list)")
+                bf16_model_manager.remove_lora()
+                current_lora = None
+                lora_applied = None
+                lora_weight_applied = None
         else:
-            # Should not occur because we always set default, but keep a safe fallback
             if current_lora:
                 lora_applied = current_lora.get("name")
                 lora_weight_applied = current_lora.get("weight")

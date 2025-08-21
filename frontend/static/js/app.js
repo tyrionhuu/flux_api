@@ -4,12 +4,14 @@ class FluxAPI {
         // Use current origin (protocol + host + port) so UI works on any served port
         this.hostBase = window.location.origin;
         this.isGenerating = false;
+        this.loraEntries = [];
         
         this.init();
     }
 
     init() {
         this.setupEventListeners();
+        this.addLoraEntry('/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors', 1.0);
         
         // Ensure DOM is fully loaded before setting up sliders
         setTimeout(() => {
@@ -24,11 +26,33 @@ class FluxAPI {
         // Random seed button
         document.getElementById('random-seed').addEventListener('click', () => this.randomSeed());
         
+        // LoRA controls
+        document.getElementById('add-lora').addEventListener('click', () => this.addLoraEntry());
 
+        // Drag-and-drop reordering for LoRA list
+        const loraList = document.getElementById('lora-list');
+        loraList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = this.getDragAfterElement(loraList, e.clientY);
+            const dragging = document.querySelector('.lora-entry.dragging');
+            if (!dragging) return;
+            if (afterElement == null) {
+                loraList.appendChild(dragging);
+            } else {
+                loraList.insertBefore(dragging, afterElement);
+            }
+        });
+        loraList.addEventListener('drop', () => {
+            // Re-sync internal order with DOM order
+            this.loraEntries = Array.from(loraList.children);
+        });
 
-        // Clear history
-        document.getElementById('clear-history').addEventListener('click', () => this.clearHistory());
-
+        // Clear history (optional element)
+        const clearHistoryBtn = document.getElementById('clear-history');
+        if (clearHistoryBtn) {
+            clearHistoryBtn.addEventListener('click', () => this.clearHistory());
+        }
+        
         // Modal controls
         document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
         document.getElementById('download-image').addEventListener('click', () => this.downloadCurrentImage());
@@ -149,6 +173,80 @@ class FluxAPI {
         seedInput.value = Math.floor(Math.random() * 4294967295);
     }
 
+    addLoraEntry(name = '', weight = 1.0) {
+        const loraList = document.getElementById('lora-list');
+        const loraEntry = document.createElement('div');
+        loraEntry.className = 'lora-entry';
+        loraEntry.setAttribute('draggable', 'true');
+        loraEntry.innerHTML = `
+            <span class="drag-handle" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
+            <input type="text" placeholder="username/model-name or /path/to/lora.safetensors" class="lora-name">
+            <input type="number" placeholder="1.0" min="0.0" max="2.0" step="0.1" value="1.0" class="lora-weight">
+            <button class="remove-lora" title="Remove LoRA">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        // Set initial values if provided
+        const nameInput = loraEntry.querySelector('.lora-name');
+        const weightInput = loraEntry.querySelector('.lora-weight');
+        if (name) nameInput.value = name;
+        if (typeof weight === 'number') weightInput.value = String(weight);
+        
+        // Remove functionality
+        const removeBtn = loraEntry.querySelector('.remove-lora');
+        removeBtn.addEventListener('click', () => this.removeLoraEntry(loraEntry));
+
+        // Drag events
+        loraEntry.addEventListener('dragstart', () => {
+            loraEntry.classList.add('dragging');
+        });
+        loraEntry.addEventListener('dragend', () => {
+            loraEntry.classList.remove('dragging');
+            // Re-sync array with DOM order
+            this.loraEntries = Array.from(loraList.children);
+        });
+        
+        loraList.appendChild(loraEntry);
+        this.loraEntries.push(loraEntry);
+    }
+
+    getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.lora-entry:not(.dragging)')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+    }
+
+    removeLoraEntry(loraEntry) {
+        const index = this.loraEntries.indexOf(loraEntry);
+        if (index > -1) {
+            this.loraEntries.splice(index, 1);
+        }
+        loraEntry.remove();
+        // Ensure the array matches DOM after removal
+        const loraList = document.getElementById('lora-list');
+        this.loraEntries = Array.from(loraList.children);
+    }
+
+    getLoraConfigs() {
+        const configs = [];
+        for (const entry of this.loraEntries) {
+            const name = entry.querySelector('.lora-name').value.trim();
+            const weight = parseFloat(entry.querySelector('.lora-weight').value);
+            if (name && !isNaN(weight)) {
+                configs.push({ name, weight });
+            }
+        }
+        return configs;
+    }
+
     async generateImage() {
         if (this.isGenerating) return;
 
@@ -203,7 +301,8 @@ class FluxAPI {
             height: parseInt(document.getElementById('height').value)
         };
         
-
+        // Always include LoRA configurations (empty list means remove any applied LoRA)
+        params.loras = this.getLoraConfigs();
 
         // Ensure both models use the same seed
         const seed = document.getElementById('seed').value;

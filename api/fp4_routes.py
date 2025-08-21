@@ -123,18 +123,23 @@ async def generate_image(request: GenerateRequest):
 
         # Handle multiple LoRA support
         loras_to_apply = []
+        remove_all_loras = False
         
         # Check for new multiple LoRA format first
-        if request.loras:
-            for lora_config in request.loras:
-                if not lora_config.name or not lora_config.name.strip():
-                    raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
-                if lora_config.weight < 0 or lora_config.weight > 2.0:
-                    raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
-                loras_to_apply.append({
-                    "name": lora_config.name.strip(),
-                    "weight": lora_config.weight
-                })
+        if request.loras is not None:
+            if len(request.loras) == 0:
+                # Explicitly requested to use NO LoRA
+                remove_all_loras = True
+            else:
+                for lora_config in request.loras:
+                    if not lora_config.name or not lora_config.name.strip():
+                        raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
+                    if lora_config.weight < 0 or lora_config.weight > 2.0:
+                        raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
+                    loras_to_apply.append({
+                        "name": lora_config.name.strip(),
+                        "weight": lora_config.weight
+                    })
         # Legacy support for single LoRA
         elif request.lora_name:
             if not request.lora_name.strip():
@@ -146,8 +151,8 @@ async def generate_image(request: GenerateRequest):
                 "weight": request.lora_weight
             })
 
-        # If no LoRA specified, force default LoRA
-        if not loras_to_apply:
+        # Apply default LoRA only when client did not send loras at all (None) and no legacy fields
+        if not loras_to_apply and not remove_all_loras and request.loras is None and not request.lora_name:
             loras_to_apply = [
                 {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
             ]
@@ -229,8 +234,16 @@ async def generate_image(request: GenerateRequest):
                         status_code=500,
                         detail=f"Failed to apply LoRAs: {str(lora_error)}",
                     )
+        elif remove_all_loras:
+            # Explicit removal requested
+            if model_manager.get_lora_info():
+                logger.info("Removing all LoRAs as requested by client (empty list)")
+                model_manager.remove_lora()
+                current_lora = None
+                lora_applied = None
+                lora_weight_applied = None
         else:
-            # Should not occur because we always set default, but keep a safe fallback
+            # No-op
             if current_lora:
                 lora_applied = current_lora.get("name")
                 lora_weight_applied = current_lora.get("weight")
