@@ -74,6 +74,7 @@ app.include_router(router, prefix="")
 if os.path.exists("frontend/static"):
     app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 
+
 @app.get("/ui", response_class=HTMLResponse)
 async def serve_frontend():
     """Serve the ComfyUI-style frontend"""
@@ -92,6 +93,7 @@ async def serve_frontend():
             </body>
         </html>
         """
+
 
 # Health check endpoint
 @app.get("/health")

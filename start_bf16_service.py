@@ -13,9 +13,6 @@ import psutil
 from pathlib import Path
 
 
-
-
-
 def cleanup_port(port: int = 8001):
     """Clean up processes using the specified port"""
     print(f"🧹 Checking port {port} for existing processes...")
@@ -166,9 +163,6 @@ def wait_for_port_free(port: int = 8001, max_wait: int = 30) -> bool:
     return False
 
 
-
-
-
 def start_service():
     """Start the BF16 FLUX API service"""
     print("\n🚀 Starting BF16 FLUX API Service...")
@@ -188,7 +182,10 @@ def start_service():
     print("🔍 Final port verification...")
     try:
         result = subprocess.run(
-            ["lsof", "-ti", f":{target_port}"], capture_output=True, text=True, timeout=5
+            ["lsof", "-ti", f":{target_port}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
 
         if result.returncode == 0 and result.stdout.strip():
@@ -279,10 +276,6 @@ def main():
         print("❌ main_bf16.py not found in current directory!")
         print("   Please run this script from the flux_api directory.")
         sys.exit(1)
-
-
-
-
 
     # Start the service
     start_service()

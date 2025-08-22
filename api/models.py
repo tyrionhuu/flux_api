@@ -8,8 +8,10 @@ from typing import Optional
 
 class LoRAConfig(BaseModel):
     """Model for individual LoRA configuration"""
+
     name: str = Field(..., description="Hugging Face repository ID or local path")
     weight: float = Field(1.0, ge=0.0, le=2.0, description="LoRA weight (0.0 to 2.0)")
+
 
 class GenerateRequest(BaseModel):
     """Request model for image generation with optional LoRA parameters"""
@@ -27,7 +29,9 @@ class GenerateRequest(BaseModel):
     )
     lora_weight: Optional[float] = Field(
         None,
-        ge=0.0, le=2.0, description="[DEPRECATED] Single LoRA weight. Use 'loras' list instead for multiple LoRA support.",
+        ge=0.0,
+        le=2.0,
+        description="[DEPRECATED] Single LoRA weight. Use 'loras' list instead for multiple LoRA support.",
     )
     width: Optional[int] = Field(
         512, ge=256, le=1024, description="Image width in pixels (256-1024)"

@@ -13,9 +13,6 @@ import psutil
 from pathlib import Path
 
 
- 
-
-
 def cleanup_port(port: int = 8000):
     """Clean up processes using the specified port"""
     print(f"🧹 Checking port {port} for existing processes...")
@@ -166,9 +163,6 @@ def wait_for_port_free(port: int = 8000, max_wait: int = 30) -> bool:
     return False
 
 
-
-
-
 def start_service():
     """Start the FLUX API service"""
     print("\n🚀 Starting FLUX API Service...")
@@ -188,7 +182,10 @@ def start_service():
     print("🔍 Final port verification...")
     try:
         result = subprocess.run(
-            ["lsof", "-ti", f":{target_port}"], capture_output=True, text=True, timeout=5
+            ["lsof", "-ti", f":{target_port}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
 
         if result.returncode == 0 and result.stdout.strip():
@@ -278,8 +275,6 @@ def main():
         sys.exit(1)
 
     # Skip venv checks; assume environment is already activated
-
-
 
     # Start the service
     start_service()

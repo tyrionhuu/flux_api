@@ -129,7 +129,9 @@ class BF16FluxModelManager(FluxModelManager):
             # Apply default LoRA
             lora_success = self._apply_default_lora_bf16()
             if not lora_success:
-                logger.warning("Failed to apply default LoRA, but model will continue without it")
+                logger.warning(
+                    "Failed to apply default LoRA, but model will continue without it"
+                )
                 # Reset LoRA state to indicate no LoRA is loaded
                 self.current_lora = None
                 self.current_weight = 0.0  # Use 0.0 instead of None for float type
@@ -159,9 +161,9 @@ class BF16FluxModelManager(FluxModelManager):
                 # For BF16 model, we need to use just the repo name without /lora.safetensors
                 lora_repo = DEFAULT_LORA_NAME.replace("/lora.safetensors", "")
                 logger.info(f"   - Loading LoRA from repo: {lora_repo}")
-                
+
                 # Use the correct method as shown in the example
-                self.pipe.load_lora_weights(lora_repo, weight_name='lora.safetensors')
+                self.pipe.load_lora_weights(lora_repo, weight_name="lora.safetensors")
                 logger.info(f"   - Default LoRA weights loaded successfully")
             except Exception as load_error:
                 logger.warning(
@@ -172,16 +174,20 @@ class BF16FluxModelManager(FluxModelManager):
                     logger.info(f"   - Trying alternative LoRA loading method...")
                     # Try without weight_name first
                     self.pipe.load_lora_weights(lora_repo)
-                    logger.info(f"   - Alternative LoRA loading without weight_name successful")
+                    logger.info(
+                        f"   - Alternative LoRA loading without weight_name successful"
+                    )
                 except Exception as alt_error:
                     logger.warning(
                         f"   - Alternative LoRA loading also failed: {alt_error}"
                     )
                     return False
 
-                        # For BF16 model, load_lora_weights should handle the weight automatically
+                    # For BF16 model, load_lora_weights should handle the weight automatically
             # The weight_name='lora.safetensors' should set the correct weight
-            logger.info(f"   - LoRA weight should be automatically set by load_lora_weights")
+            logger.info(
+                f"   - LoRA weight should be automatically set by load_lora_weights"
+            )
             logger.info(f"   - Using default weight: {DEFAULT_LORA_WEIGHT}")
 
             self.current_lora = DEFAULT_LORA_NAME
@@ -329,13 +335,13 @@ class BF16FluxModelManager(FluxModelManager):
             # and set their weights simultaneously
             lora_names = []
             lora_weights = []
-            
+
             for i, lora_config in enumerate(lora_configs):
                 lora_name = lora_config["name"]
                 weight = lora_config["weight"]
-                
+
                 logger.info(f"   - Loading LoRA {i+1}/{len(lora_configs)}: {lora_name}")
-                
+
                 try:
                     # Load LoRA weights - this should accumulate rather than replace
                     self.pipe.load_lora_weights(lora_name)
@@ -348,20 +354,24 @@ class BF16FluxModelManager(FluxModelManager):
 
             # Set all LoRA adapters with their respective weights simultaneously
             if lora_names:
-                logger.info(f"   - Setting {len(lora_names)} LoRA adapters with weights: {lora_weights}")
+                logger.info(
+                    f"   - Setting {len(lora_names)} LoRA adapters with weights: {lora_weights}"
+                )
                 try:
                     # This should properly combine multiple LoRAs
                     self.pipe.set_adapters(lora_names, adapter_weights=lora_weights)
                     logger.info(f"   - Multiple LoRA adapters set successfully")
-                    
+
                     # Update state to reflect multiple LoRAs
                     self.current_lora = lora_names
                     self.current_weight = sum(lora_weights)
-                    
-                    logger.info(f"All {len(lora_names)} LoRAs applied successfully to BF16 model")
+
+                    logger.info(
+                        f"All {len(lora_names)} LoRAs applied successfully to BF16 model"
+                    )
                     for name, weight in zip(lora_names, lora_weights):
                         logger.info(f"   - {name}: weight {weight}")
-                    
+
                     return True
                 except Exception as adapter_error:
                     logger.error(f"   - Failed to set LoRA adapters: {adapter_error}")
@@ -401,7 +411,7 @@ class BF16FluxModelManager(FluxModelManager):
         """Get current LoRA information for BF16 model"""
         if not self.current_lora:
             return None
-            
+
         if isinstance(self.current_lora, str):
             return {
                 "name": self.current_lora,
