@@ -28,6 +28,18 @@ class FluxAPI {
         
         // LoRA controls
         document.getElementById('add-lora').addEventListener('click', () => this.addLoraEntry());
+        
+        // Apply LoRA button
+        const applyLoraBtn = document.getElementById('apply-lora-btn');
+        console.log('Apply LoRA button found:', applyLoraBtn);
+        if (applyLoraBtn) {
+            applyLoraBtn.addEventListener('click', () => {
+                console.log('Apply LoRA button clicked!');
+                this.showApiCommand();
+            });
+        } else {
+            console.error('Apply LoRA button not found!');
+        }
 
         // Drag-and-drop reordering for LoRA list
         const loraList = document.getElementById('lora-list');
@@ -56,7 +68,7 @@ class FluxAPI {
         // Modal controls
         document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
         document.getElementById('download-image').addEventListener('click', () => this.downloadCurrentImage());
-        document.getElementById('copy-prompt').addEventListener('click', () => this.copyCurrentPrompt());
+        document.getElementById('copy-command').addEventListener('click', () => this.copyApiCommand());
 
         // Close modal on backdrop click
         document.getElementById('image-modal').addEventListener('click', (e) => {
@@ -64,6 +76,8 @@ class FluxAPI {
                 this.closeModal();
             }
         });
+        
+
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -461,6 +475,50 @@ class FluxAPI {
         this.currentModalData = null;
     }
 
+
+
+    showApiCommand() {
+        const commandSection = document.getElementById('api-command-section');
+        const commandElement = document.getElementById('api-command');
+        
+        // Get current LoRA configuration
+        const loras = this.getLoraConfigs();
+        const prompt = document.getElementById('prompt').value;
+        const width = document.getElementById('width').value;
+        const height = document.getElementById('height').value;
+        const seed = document.getElementById('seed').value;
+        
+        // Build the one-liner download command
+        let command = `curl -s -X POST "${window.location.origin}/generate" -H "Content-Type: application/json" -d '{"prompt": "${prompt}", "width": ${width}, "height": ${height}`;
+        
+        if (seed) {
+            command += `, "seed": ${seed}`;
+        }
+        
+        if (loras && loras.length > 0) {
+            command += `, "loras": [`;
+            loras.forEach((lora, index) => {
+                command += `{"name": "${lora.name}", "weight": ${lora.weight}}`;
+                if (index < loras.length - 1) command += `, `;
+            });
+            command += `]`;
+        }
+        
+        command += `}' | jq -r '.download_url' | xargs -I {} curl -o "generated_image.png" "${window.location.origin}{}"`;
+        
+        commandElement.textContent = command;
+        commandSection.classList.remove('hidden');
+    }
+
+    copyApiCommand() {
+        const commandElement = document.getElementById('api-command');
+        navigator.clipboard.writeText(commandElement.textContent).then(() => {
+            this.showSuccess('API command copied to clipboard!');
+        }).catch(() => {
+            this.showError('Failed to copy API command');
+        });
+    }
+
     async downloadCurrentImage() {
         if (!this.currentModalData) return;
 
@@ -482,15 +540,7 @@ class FluxAPI {
         }
     }
 
-    copyCurrentPrompt() {
-        if (!this.currentModalData) return;
 
-        navigator.clipboard.writeText(this.currentModalData.params.prompt).then(() => {
-            this.showSuccess('Prompt copied to clipboard!');
-        }).catch(() => {
-            this.showError('Failed to copy prompt');
-        });
-    }
 
     clearHistory() {
         if (confirm('Clear all generated images?')) {

@@ -381,6 +381,35 @@ class FluxModelManager:
         """Get the loaded FluxPipeline with Nunchaku transformer"""
         return self.pipe
 
+    def _is_ready_with_lora(self) -> bool:
+        """Quick readiness check for LoRA-capable pipeline."""
+        if not self.model_loaded or self.pipe is None:
+            logger.error("Cannot apply LoRAs: Model not loaded or pipeline not available")
+            return False
+        if not (hasattr(self.pipe, "transformer") and hasattr(self.pipe.transformer, "update_lora_params")):
+            logger.error("FluxPipeline transformer does not have LoRA support methods")
+            return False
+        return True
+
+    def _apply_lora_to_transformer(self, lora_source: str, weight: float) -> bool:
+        """Apply a LoRA (local path or repo id) and set its strength."""
+        try:
+            if not self._is_ready_with_lora():
+                return False
+            # Normalize repo id to direct safetensors path if needed
+            src = lora_source
+            if not (src.startswith("/") or src.startswith("./") or src.endswith(".safetensors")):
+                src = f"{src}/lora.safetensors"
+            logger.info(f"   - Loading LoRA parameters from: {src}")
+            self.pipe.transformer.update_lora_params(src)
+            logger.info(f"   - Setting LoRA strength to {weight}")
+            self.pipe.transformer.set_lora_strength(weight)
+            logger.info("   - LoRA applied successfully")
+            return True
+        except Exception as e:
+            logger.error(f"   - Failed to apply LoRA: {e}")
+            return False
+
     def apply_lora(self, lora_name: str, lora_weight: float = 1.0) -> bool:
         """Apply a single LoRA to the pipeline - for backward compatibility"""
         return self.apply_multiple_loras([{"name": lora_name, "weight": lora_weight}])
@@ -388,10 +417,7 @@ class FluxModelManager:
     def apply_multiple_loras(self, lora_configs: list) -> bool:
         """Apply multiple LoRAs simultaneously to the pipeline by combining them"""
         try:
-            if not self.model_loaded or self.pipe is None:
-                logger.error(
-                    "Cannot apply LoRAs: Model not loaded or pipeline not available"
-                )
+            if not self._is_ready_with_lora():
                 return False
 
             if not lora_configs:
@@ -400,25 +426,14 @@ class FluxModelManager:
 
             logger.info(f"Applying {len(lora_configs)} LoRAs to FLUX pipeline...")
 
-            # Check if the pipeline supports LoRA
-            if not hasattr(self.pipe, "transformer") or not hasattr(
-                self.pipe.transformer, "update_lora_params"
-            ):
-                logger.error(
-                    "FluxPipeline transformer does not have LoRA support methods"
-                )
-                return False
-
             if len(lora_configs) == 1:
                 # Single LoRA - apply directly
                 lora_config = lora_configs[0]
                 lora_name = lora_config["name"]
                 weight = lora_config["weight"]
 
-                logger.info(
-                    f"   - Applying single LoRA: {lora_name} with weight {weight}"
-                )
-                return self._apply_single_lora(lora_name, weight)
+                logger.info(f"   - Applying single LoRA: {lora_name} with weight {weight}")
+                return self._apply_lora_to_transformer(lora_name, weight)
 
             else:
                 # Multiple LoRAs - merge them into a single LoRA
@@ -438,7 +453,7 @@ class FluxModelManager:
                     )
 
                     # Apply the merged LoRA
-                    success = self._apply_single_lora(merged_lora_path, combined_weight)
+                    success = self._apply_lora_to_transformer(merged_lora_path, combined_weight)
 
                     if success:
                         # Store info about all LoRAs for reference
@@ -481,7 +496,7 @@ class FluxModelManager:
                     )
 
                     # Apply the primary LoRA with combined weight
-                    success = self._apply_single_lora(primary_name, combined_weight)
+                    success = self._apply_lora_to_transformer(primary_name, combined_weight)
 
                     if success:
                         # Store info about all LoRAs for reference
@@ -507,52 +522,8 @@ class FluxModelManager:
 
     def _apply_single_lora(self, lora_name: str, weight: float) -> bool:
         """Internal method to apply a single LoRA - extracted for reuse"""
-        try:
-            if not self.pipe:
-                logger.error("Pipeline not available")
-                return False
-
-            logger.info(f"   - Loading LoRA: {lora_name} with weight {weight}")
-
-            # Decide how to load: local path vs HF repo
-            is_local_path = (
-                lora_name.startswith("/")
-                or lora_name.startswith("./")
-                or lora_name.endswith(".safetensors")
-            )
-
-            try:
-                if is_local_path:
-                    logger.info(
-                        f"   - Loading LoRA parameters from local path: {lora_name}"
-                    )
-                    self.pipe.transformer.update_lora_params(lora_name)
-                else:
-                    logger.info(
-                        f"   - Loading LoRA parameters from repo: {lora_name}/lora.safetensors"
-                    )
-                    self.pipe.transformer.update_lora_params(
-                        f"{lora_name}/lora.safetensors"
-                    )
-                logger.info(f"   - LoRA parameters loaded successfully")
-            except Exception as load_error:
-                logger.error(f"   - Failed to load LoRA parameters: {load_error}")
-                return False
-
-            # Set LoRA strength
-            logger.info(f"   - Setting LoRA strength to {weight}")
-            try:
-                self.pipe.transformer.set_lora_strength(weight)
-                logger.info(f"   - LoRA strength set successfully")
-            except Exception as strength_error:
-                logger.error(f"   - Failed to set LoRA strength: {strength_error}")
-                return False
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error applying single LoRA: {e} (Type: {type(e).__name__})")
-            return False
+        # Backward-compatibility wrapper
+        return self._apply_lora_to_transformer(lora_name, weight)
 
     def remove_lora(self) -> bool:
         """Remove currently applied LoRA(s) from the pipeline"""

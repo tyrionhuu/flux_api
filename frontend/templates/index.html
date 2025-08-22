@@ -45,6 +45,25 @@
                         <div class="helper-text">
                             Enter Hugging Face repo ID (e.g., <code>username/model</code>) or a local path
                         </div>
+                        <button id="apply-lora-btn" class="btn btn-primary">
+                            <i class="fas fa-magic"></i> Apply LoRA
+                        </button>
+                        
+                        <!-- API Command Display -->
+                        <div id="api-command-section" class="api-command-section hidden">
+                            <div class="api-command-header">
+                                <h4><i class="fas fa-terminal"></i> API Command</h4>
+                                <button id="copy-command" class="btn btn-secondary copy-btn">
+                                    <i class="fas fa-copy"></i> Copy
+                                </button>
+                            </div>
+                            <div class="api-command-container">
+                                <code id="api-command" class="api-command"></code>
+                            </div>
+                            <div class="api-info">
+                                <p><strong>Note:</strong> This command will generate an image and save it as "generated_image.png" in your current directory.</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="parameter-group">
@@ -177,16 +196,14 @@
                         <i class="fas fa-download"></i>
                         Download
                     </button>
-                    <button id="copy-prompt" class="btn secondary">
-                        <i class="fas fa-copy"></i>
-                        Copy Prompt
-                    </button>
                 </div>
             </div>
         </div>
+
+
     </div>
 
-    <script src="/static/js/app.js?v=3"></script>
+    <script src="/static/js/app.js?v=8"></script>
 </body>
 </html>
 
