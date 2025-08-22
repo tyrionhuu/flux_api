@@ -730,6 +730,192 @@ textarea {
     gap: 0.75rem;
 }
 
+.lora-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.lora-buttons .btn {
+    flex: 1;
+    min-width: 120px;
+}
+
+/* Uploaded LoRA styling */
+.lora-entry.uploaded-lora {
+    background: #f0f9ff;
+    border-color: #3b82f6;
+}
+
+.lora-entry.uploaded-lora .lora-name {
+    background: #eff6ff;
+    color: #1e40af;
+    font-weight: 500;
+}
+
+.lora-entry.uploaded-lora .lora-name::placeholder {
+    color: #93c5fd;
+}
+
+/* Notification system */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    min-width: 300px;
+    max-width: 500px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    border-left: 4px solid;
+}
+
+.notification.notification-show {
+    transform: translateX(0);
+}
+
+.notification.notification-success {
+    border-left-color: #10b981;
+}
+
+.notification.notification-error {
+    border-left-color: #ef4444;
+}
+
+.notification.notification-info {
+    border-left-color: #3b82f6;
+}
+
+.notification-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+}
+
+.notification-content i:first-child {
+    flex-shrink: 0;
+    font-size: 18px;
+}
+
+.notification-success .notification-content i:first-child {
+    color: #10b981;
+}
+
+.notification-error .notification-content i:first-child {
+    color: #ef4444;
+}
+
+.notification-info .notification-content i:first-child {
+    color: #3b82f6;
+}
+
+.notification-message {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #374151;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: #9ca3af;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.notification-close:hover {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.notification-close i {
+    font-size: 12px;
+}
+
+/* Upload Progress Indicator */
+.upload-progress {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    z-index: 10000;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    padding: 24px;
+    min-width: 320px;
+    max-width: 400px;
+    opacity: 0;
+    transition: all 0.3s ease;
+    border: 1px solid #e5e7eb;
+}
+
+.upload-progress.upload-progress-show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.upload-progress.upload-progress-complete {
+    transform: translate(-50%, -50%) scale(1.05);
+    opacity: 0;
+}
+
+.upload-progress-content {
+    text-align: center;
+}
+
+.upload-progress-icon {
+    margin-bottom: 16px;
+}
+
+.upload-progress-icon i {
+    font-size: 48px;
+    color: #3b82f6;
+}
+
+.upload-progress-text {
+    margin-bottom: 20px;
+}
+
+.upload-filename {
+    font-weight: 600;
+    font-size: 16px;
+    color: #1f2937;
+    margin-bottom: 4px;
+    word-break: break-word;
+}
+
+.upload-status {
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.upload-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.upload-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
 .lora-list {
     display: flex;
     flex-direction: column;

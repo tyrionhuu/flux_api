@@ -5,7 +5,7 @@ API routes for the FLUX API
 import logging
 import time
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.responses import FileResponse
 from models.fp4_flux_model import FluxModelManager
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
@@ -217,10 +217,27 @@ async def generate_image(request: GenerateRequest):
             try:
                 # Validate all LoRA names first
                 for lora_config in loras_to_apply:
-                    if not lora_config["name"] or "/" not in lora_config["name"]:
+                    if not lora_config["name"]:
                         raise HTTPException(
                             status_code=400,
-                            detail=f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name')",
+                            detail="LoRA name cannot be empty"
+                        )
+                    
+                    # Allow uploaded file paths (uploads/lora_files/...)
+                    if lora_config["name"].startswith("uploaded_lora_"):
+                        # This is an uploaded file, validate it exists
+                        import os
+                        upload_path = f"uploads/lora_files/{lora_config['name']}"
+                        if not os.path.exists(upload_path):
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Uploaded LoRA file not found: {lora_config['name']}"
+                            )
+                    elif "/" not in lora_config["name"]:
+                        # Must be a Hugging Face repository ID or local path
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name'), local path, or uploaded file path"
                         )
 
                 # Apply all LoRAs at once using the new method
@@ -658,4 +675,63 @@ def generate_image_internal(
         raise HTTPException(
             status_code=500,
             detail=f"{model_type_name} image generation failed: {str(e)}",
+        )
+
+
+@router.post("/upload-lora")
+async def upload_lora_file(file: UploadFile = File(...)):
+    """Upload a LoRA file to the server"""
+    import os
+    import shutil
+    from pathlib import Path
+    
+    # Check file type
+    allowed_extensions = ['.safetensors', '.bin', '.pt', '.pth']
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+    
+    file_extension = Path(file.filename).suffix.lower()
+    
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
+        )
+    
+    # Check file size (max 500MB)
+    max_size = 500 * 1024 * 1024  # 500MB
+    if not file.size or file.size > max_size:
+        raise HTTPException(
+            status_code=400, 
+            detail="File too large. Maximum size is 500MB."
+        )
+    
+    try:
+        # Create uploads directory if it doesn't exist
+        uploads_dir = Path("uploads/lora_files")
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename
+        timestamp = int(time.time())
+        safe_filename = f"uploaded_lora_{timestamp}{file_extension}"
+        file_path = uploads_dir / safe_filename
+        
+        # Save the uploaded file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        logger.info(f"LoRA file uploaded successfully: {file_path}")
+        
+        return {
+            "message": "LoRA file uploaded successfully",
+            "filename": safe_filename,
+            "file_path": str(file_path),
+            "size": file.size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error uploading LoRA file: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload LoRA file: {str(e)}"
         )

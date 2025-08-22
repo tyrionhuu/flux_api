@@ -460,16 +460,14 @@ class FluxModelManager:
             # Get the transformer safely
             transformer = self._get_pipe_transformer()
             
-            # Normalize repo id to direct safetensors path if needed
-            src = lora_source
-            if not (
-                src.startswith("/")
-                or src.startswith("./")
-                or src.endswith(".safetensors")
-            ):
-                src = f"{src}/lora.safetensors"
-            logger.info(f"   - Loading LoRA parameters from: {src}")
-            transformer.update_lora_params(src)
+            # Get the actual file path (this handles uploaded files, local files, and HF downloads)
+            lora_path = self._get_lora_path(lora_source)
+            if not lora_path:
+                logger.error(f"   - Could not resolve path for LoRA: {lora_source}")
+                return False
+            
+            logger.info(f"   - Loading LoRA parameters from: {lora_path}")
+            transformer.update_lora_params(lora_path)
             logger.info(f"   - Setting LoRA strength to {weight}")
             transformer.set_lora_strength(weight)
             logger.info("   - LoRA applied successfully")
@@ -706,6 +704,16 @@ class FluxModelManager:
     def _get_lora_path(self, lora_name: str) -> Optional[str]:
         """Get the full path to a LoRA file, downloading from HF if needed"""
         try:
+            # Check if it's an uploaded file
+            if lora_name.startswith("uploaded_lora_"):
+                upload_path = f"uploads/lora_files/{lora_name}"
+                if os.path.exists(upload_path):
+                    logger.info(f"   - Found uploaded LoRA file: {upload_path}")
+                    return upload_path
+                else:
+                    logger.error(f"   - Uploaded LoRA file not found: {upload_path}")
+                    return None
+
             # Check if it's a local path
             if os.path.exists(lora_name):
                 return lora_name

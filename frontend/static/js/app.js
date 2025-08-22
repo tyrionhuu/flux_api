@@ -29,6 +29,10 @@ class FluxAPI {
         // LoRA controls
         document.getElementById('add-lora').addEventListener('click', () => this.addLoraEntry());
         
+        // LoRA file upload
+        document.getElementById('upload-lora').addEventListener('click', () => this.triggerFileUpload());
+        document.getElementById('lora-file-input').addEventListener('change', (e) => this.handleFileUpload(e));
+        
         // Apply LoRA button
         const applyLoraBtn = document.getElementById('apply-lora-btn');
         console.log('Apply LoRA button found:', applyLoraBtn);
@@ -184,7 +188,7 @@ class FluxAPI {
         seedInput.value = Math.floor(Math.random() * 4294967295);
     }
 
-    addLoraEntry(name = '', weight = 1.0) {
+    addLoraEntry(name = '', weight = 1.0, isUploaded = false) {
         // Check maximum LoRA limit
         if (this.loraEntries.length >= 3) {
             console.warn('Maximum of 3 LoRAs allowed');
@@ -195,9 +199,15 @@ class FluxAPI {
         const loraEntry = document.createElement('div');
         loraEntry.className = 'lora-entry';
         loraEntry.setAttribute('draggable', 'true');
+        
+        // Add special class for uploaded files
+        if (isUploaded) {
+            loraEntry.classList.add('uploaded-lora');
+        }
+        
         loraEntry.innerHTML = `
             <span class="drag-handle" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
-            <input type="text" placeholder="username/model-name or /path/to/lora.safetensors" class="lora-name">
+            <input type="text" placeholder="username/model-name or /path/to/lora.safetensors" class="lora-name" ${isUploaded ? 'readonly' : ''}>
             <input type="number" placeholder="1.0" min="0.0" max="2.0" step="0.1" value="1.0" class="lora-weight">
             <button class="remove-lora" title="Remove LoRA">
                 <i class="fas fa-times"></i>
@@ -266,6 +276,15 @@ class FluxAPI {
         if (index > -1) {
             this.loraEntries.splice(index, 1);
         }
+        
+        // Clean up uploaded file data if this was an uploaded LoRA
+        if (loraEntry.classList.contains('uploaded-lora')) {
+            const nameInput = loraEntry.querySelector('.lora-name');
+            if (nameInput && this.uploadedFiles) {
+                this.uploadedFiles.delete(nameInput.value);
+            }
+        }
+        
         loraEntry.remove();
         // Ensure the array matches DOM after removal
         const loraList = document.getElementById('lora-list');
@@ -281,7 +300,14 @@ class FluxAPI {
             const name = entry.querySelector('.lora-name').value.trim();
             const weight = parseFloat(entry.querySelector('.lora-weight').value);
             if (name && !isNaN(weight)) {
-                configs.push({ name, weight });
+                // Check if this is an uploaded file
+                const isUploaded = entry.classList.contains('uploaded-lora');
+                configs.push({ 
+                    name, 
+                    weight, 
+                    isUploaded,
+                    file: isUploaded && this.uploadedFiles ? this.uploadedFiles.get(name) : null
+                });
             }
         }
         return configs;
@@ -579,6 +605,183 @@ class FluxAPI {
 
     showError(message) {
         console.error('❌ Error:', message);
+        this.showNotification(message, 'error');
+    }
+
+    showSuccess(message) {
+        console.log('✅ Success:', message);
+        this.showNotification(message, 'success');
+    }
+
+    showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+                <span class="notification-message">${message}</span>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+
+        // Add to page
+        document.body.appendChild(notification);
+
+        // Auto-remove after 5 seconds for success, 10 seconds for errors
+        const timeout = type === 'error' ? 10000 : 5000;
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, timeout);
+
+        // Add slide-in animation
+        setTimeout(() => {
+            notification.classList.add('notification-show');
+        }, 100);
+    }
+
+    showUploadProgress(filename) {
+        // Create upload progress indicator
+        const progressContainer = document.createElement('div');
+        progressContainer.id = 'upload-progress';
+        progressContainer.className = 'upload-progress';
+        progressContainer.innerHTML = `
+            <div class="upload-progress-content">
+                <div class="upload-progress-icon">
+                    <i class="fas fa-cloud-upload-alt fa-spin"></i>
+                </div>
+                <div class="upload-progress-text">
+                    <div class="upload-filename">${filename}</div>
+                    <div class="upload-status">Uploading...</div>
+                </div>
+                <div class="upload-progress-bar">
+                    <div class="upload-progress-fill"></div>
+                </div>
+            </div>
+        `;
+
+        // Add to page
+        document.body.appendChild(progressContainer);
+
+        // Add slide-in animation
+        setTimeout(() => {
+            progressContainer.classList.add('upload-progress-show');
+        }, 100);
+
+        // Animate progress bar
+        const progressFill = progressContainer.querySelector('.upload-progress-fill');
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90; // Don't go to 100% until actually complete
+            progressFill.style.width = progress + '%';
+        }, 200);
+
+        // Store interval for cleanup
+        this.uploadProgressInterval = progressInterval;
+        
+        // Stop the spinning icon after a short delay
+        setTimeout(() => {
+            const icon = progressContainer.querySelector('.upload-progress-icon i');
+            if (icon) {
+                icon.classList.remove('fa-spin');
+            }
+        }, 1000);
+    }
+
+    hideUploadProgress() {
+        const progressContainer = document.getElementById('upload-progress');
+        if (progressContainer) {
+            // Complete the progress bar
+            const progressFill = progressContainer.querySelector('.upload-progress-fill');
+            if (progressFill) {
+                progressFill.style.width = '100%';
+            }
+
+            // Add completion animation
+            progressContainer.classList.add('upload-progress-complete');
+
+            // Remove after animation
+            setTimeout(() => {
+                if (progressContainer.parentElement) {
+                    progressContainer.remove();
+                }
+            }, 500);
+
+            // Clear progress interval
+            if (this.uploadProgressInterval) {
+                clearInterval(this.uploadProgressInterval);
+                this.uploadProgressInterval = null;
+            }
+        }
+    }
+
+    triggerFileUpload() {
+        // Trigger the hidden file input
+        document.getElementById('lora-file-input').click();
+    }
+
+    async handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Check file type
+        const allowedTypes = ['.safetensors', '.bin', '.pt', '.pth'];
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+        
+        if (!allowedTypes.includes(fileExtension)) {
+            this.showError(`Invalid file type. Please upload a LoRA file (${allowedTypes.join(', ')})`);
+            return;
+        }
+
+        // Check file size (max 500MB)
+        const maxSize = 500 * 1024 * 1024; // 500MB
+        if (file.size > maxSize) {
+            this.showError('File too large. Maximum size is 500MB.');
+            return;
+        }
+
+        try {
+            // Show upload progress indicator
+            this.showUploadProgress(file.name);
+            
+            // Upload the file to the server first
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch(`${this.hostBase}/upload-lora`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Upload failed');
+            }
+            
+            const uploadResult = await response.json();
+            const filename = uploadResult.filename;
+            
+            // Hide upload progress
+            this.hideUploadProgress();
+            
+            // Add the uploaded file to the LoRA list with the server filename
+            this.addLoraEntry(filename, 1.0, true); // true indicates it's an uploaded file
+            
+            this.showSuccess(`LoRA file "${file.name}" uploaded successfully!`);
+            
+            // Reset the file input
+            event.target.value = '';
+            
+        } catch (error) {
+            // Hide upload progress on error
+            this.hideUploadProgress();
+            this.showError(`Failed to upload file: ${error.message}`);
+        }
     }
 
 
