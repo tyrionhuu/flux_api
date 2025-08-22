@@ -410,6 +410,46 @@ class FluxModelManager:
         if not hasattr(self.pipe, "transformer"):
             raise RuntimeError("Pipeline does not have transformer")
         return self.pipe.transformer
+    
+    def _parse_hf_input(self, lora_input: str) -> tuple[str, str]:
+        """Parse Hugging Face input to extract repo_id and filename.
+        
+        Args:
+            lora_input: Can be:
+                - Full URL: https://huggingface.co/username/repo/blob/main/filename.safetensors
+                - Repo path: username/repo
+                - Repo path with file: username/repo/filename.safetensors
+                
+        Returns:
+            Tuple of (repo_id, filename) where filename may be empty string if not specified
+        """
+        # Remove protocol and domain if present
+        if lora_input.startswith("https://huggingface.co/"):
+            lora_input = lora_input[23:]  # Remove "https://huggingface.co/"
+        elif lora_input.startswith("http://huggingface.co/"):
+            lora_input = lora_input[22:]  # Remove "http://huggingface.co/"
+        
+        # Remove /blob/main/ if present
+        if "/blob/main/" in lora_input:
+            lora_input = lora_input.replace("/blob/main/", "/")
+        
+        # Split by '/' to get components
+        parts = lora_input.split("/")
+        
+        if len(parts) >= 3:
+            # Format: username/repo/filename
+            repo_id = f"{parts[0]}/{parts[1]}"
+            filename = parts[2]
+        elif len(parts) == 2:
+            # Format: username/repo
+            repo_id = lora_input
+            filename = ""
+        else:
+            # Single part or invalid format
+            repo_id = lora_input
+            filename = ""
+        
+        return repo_id, filename
 
     def _apply_lora_to_transformer(self, lora_source: str, weight: float) -> bool:
         """Apply a LoRA (local path or repo id) and set its strength."""
@@ -457,19 +497,11 @@ class FluxModelManager:
             if len(lora_configs) == 1:
                 # Single LoRA - apply directly
                 lora_config = lora_configs[0]
-                lora_name = lora_config["name"]
-                weight = lora_config["weight"]
-
-                logger.info(
-                    f"   - Applying single LoRA: {lora_name} with weight {weight}"
-                )
-                return self._apply_lora_to_transformer(lora_name, weight)
+                return self._apply_lora_to_transformer(lora_config["name"], lora_config["weight"])
 
             else:
                 # Multiple LoRAs - merge them into a single LoRA
-                logger.info(
-                    f"   - Multiple LoRAs detected, attempting to merge them..."
-                )
+                logger.info(f"   - Merging {len(lora_configs)} LoRAs...")
 
                 # Try to merge the LoRAs
                 merged_lora_path = self._merge_loras(lora_configs)
@@ -478,14 +510,8 @@ class FluxModelManager:
                     # Calculate combined weight (sum of all weights)
                     combined_weight = sum(lora["weight"] for lora in lora_configs)
 
-                    logger.info(
-                        f"   - LoRAs merged successfully, applying merged LoRA with weight {combined_weight}"
-                    )
-
                     # Apply the merged LoRA
-                    success = self._apply_lora_to_transformer(
-                        merged_lora_path, combined_weight
-                    )
+                    success = self._apply_lora_to_transformer(merged_lora_path, combined_weight)
 
                     if success:
                         # Store info about all LoRAs for reference
@@ -497,14 +523,7 @@ class FluxModelManager:
                             self._temp_lora_paths = []
                         self._temp_lora_paths.append(merged_lora_path)
 
-                        logger.info(f"Merged LoRA applied successfully")
-                        logger.info(f"Combined {len(lora_configs)} LoRAs:")
-                        for i, lora in enumerate(lora_configs):
-                            logger.info(
-                                f"   - {i+1}. {lora['name']}: weight {lora['weight']}"
-                            )
-                        logger.info(f"   - Final combined weight: {combined_weight}")
-
+                        logger.info(f"   - Merged LoRA applied successfully (weight: {combined_weight})")
                         return True
                     else:
                         # Clean up on failure
@@ -515,35 +534,19 @@ class FluxModelManager:
                         return False
                 else:
                     # Fallback: use the first LoRA with combined weight
-                    logger.warning(
-                        f"   - LoRA merging failed, falling back to first LoRA with combined weight"
-                    )
+                    logger.warning(f"   - LoRA merging failed, using fallback approach")
 
                     primary_lora = lora_configs[0]
-                    primary_name = primary_lora["name"]
                     combined_weight = sum(lora["weight"] for lora in lora_configs)
 
-                    logger.info(
-                        f"   - Using primary LoRA: {primary_name} with combined weight {combined_weight}"
-                    )
-
                     # Apply the primary LoRA with combined weight
-                    success = self._apply_lora_to_transformer(
-                        primary_name, combined_weight
-                    )
+                    success = self._apply_lora_to_transformer(primary_lora["name"], combined_weight)
 
                     if success:
                         # Store info about all LoRAs for reference
                         self.current_lora = lora_configs
                         self.current_weight = combined_weight
-
-                        logger.info(
-                            f"Primary LoRA applied with combined weight successfully"
-                        )
-                        logger.info(
-                            f"Note: This is a fallback approach. For best results, use LoRA merging tools."
-                        )
-
+                        logger.info(f"   - Fallback LoRA applied (weight: {combined_weight})")
                         return True
                     else:
                         return False
@@ -562,9 +565,7 @@ class FluxModelManager:
     def remove_lora(self) -> bool:
         """Remove currently applied LoRA(s) from the pipeline"""
         if not self.model_loaded or self.pipe is None:
-            logger.error(
-                f"Cannot remove LoRA: Model not loaded or pipeline not available"
-            )
+            logger.error(f"Cannot remove LoRA: Model not loaded or pipeline not available")
             return False
 
         try:
@@ -572,21 +573,15 @@ class FluxModelManager:
                 logger.info("No LoRA currently applied")
                 return True
 
-            logger.info(f"Removing LoRA(s): {self.current_lora}")
+            logger.info(f"Removing LoRA(s)...")
 
             # Use Nunchaku transformer's built-in method to remove LoRA
-            if hasattr(self.pipe, "transformer") and hasattr(
-                self.pipe.transformer, "set_lora_strength"
-            ):
-                logger.info(f"   - Setting LoRA strength to 0 to disable")
-                try:
-                    transformer = self._get_pipe_transformer()
-                    transformer.set_lora_strength(0)  # Set strength to 0 to disable
-                except RuntimeError:
-                    logger.warning("Pipeline transformer not available")
-                    return False
-            else:
-                logger.warning(f"Transformer does not have set_lora_strength method")
+            try:
+                transformer = self._get_pipe_transformer()
+                transformer.set_lora_strength(0)  # Set strength to 0 to disable
+            except RuntimeError:
+                logger.warning("Pipeline transformer not available")
+                return False
 
             # Clean up temporary LoRA files
             self._cleanup_temp_loras()
@@ -598,7 +593,7 @@ class FluxModelManager:
             logger.info(f"LoRA(s) removed successfully")
             return True
         except Exception as e:
-            logger.error(f"Error removing LoRA: {e} (Type: {type(e).__name__})")
+            logger.error(f"Error removing LoRA: {e}")
             return False
 
     def get_lora_info(self) -> Optional[dict]:
@@ -641,52 +636,33 @@ class FluxModelManager:
                     lora_name = lora_config["name"]
                     weight = lora_config["weight"]
 
-                    logger.info(
-                        f"   - Loading LoRA {i+1}: {lora_name} with weight {weight}"
-                    )
+                    logger.info(f"   - Loading LoRA {i+1}: {lora_name} (weight: {weight})")
 
                     lora_path = self._get_lora_path(lora_name)
                     if not lora_path:
-                        logger.error(
-                            f"   - Could not resolve path for LoRA: {lora_name}"
-                        )
+                        logger.error(f"   - Could not resolve path for LoRA: {lora_name}")
                         return None
 
-                    # Load the LoRA weights (prefer safetensors; fallback to torch.load for legacy)
+                    # Load the LoRA weights
                     try:
-                        logger.info(f"   - Attempting to load LoRA from: {lora_path}")
-                        logger.info(f"   - File exists: {os.path.exists(lora_path)}")
-                        logger.info(
-                            f"   - File size: {os.path.getsize(lora_path) if os.path.exists(lora_path) else 'N/A'}"
-                        )
-
                         if lora_path.endswith(".safetensors"):
                             lora_data = safe_load_file(lora_path)
                         else:
-                            # Load with weights_only=False for LoRA files (safe in this context)
-                            lora_data = torch.load(
-                                lora_path, map_location="cpu", weights_only=False
-                            )
+                            lora_data = torch.load(lora_path, map_location="cpu", weights_only=False)
                         lora_data_list.append(lora_data)
                         lora_weights_list.append(weight)
                         logger.info(f"   - LoRA {i+1} loaded successfully")
                     except Exception as load_error:
                         logger.error(f"   - Failed to load LoRA {i+1}: {load_error}")
-                        logger.error(f"   - File path: {lora_path}")
-                        logger.error(f"   - File exists: {os.path.exists(lora_path)}")
-                        if os.path.exists(lora_path):
-                            logger.error(
-                                f"   - File size: {os.path.getsize(lora_path)}"
-                            )
                         return None
 
                 # Merge the LoRA weights
-                logger.info(f"   - Merging LoRA tensors...")
-
                 # Build union of all keys across LoRAs
                 all_keys = set()
                 for data_dict in lora_data_list:
                     all_keys.update(data_dict.keys())
+                
+                logger.info(f"   - Merging {len(all_keys)} tensor keys...")
 
                 merged_lora = {}
                 for key in all_keys:
@@ -709,14 +685,10 @@ class FluxModelManager:
                             )
 
                     merged_lora[key] = merged_tensor
-                    logger.debug(f"   - Merged tensor for key: {key}")
 
-                # Save the merged LoRA using safetensors
-                logger.info(f"   - Saving merged LoRA (safetensors)...")
+                # Save the merged LoRA
                 safe_save_file(merged_lora, merged_lora_path)
-
-                logger.info(f"   - Merged LoRA saved to: {merged_lora_path}")
-                logger.info(f"   - Successfully merged {len(lora_configs)} LoRAs")
+                logger.info(f"   - Merged LoRA saved: {merged_lora_path}")
 
                 return merged_lora_path
 
@@ -744,56 +716,95 @@ class FluxModelManager:
                 if os.path.exists(abs_path):
                     return abs_path
 
-            # Check if it's a Hugging Face repo - try to download it
+            # Check if it's a Hugging Face URL or repo - try to download it
             if "/" in lora_name and not os.path.exists(lora_name):
-                logger.info(f"   - Downloading LoRA from Hugging Face: {lora_name}")
+                # Parse the input to extract repo_id and filename
+                repo_id, filename = self._parse_hf_input(lora_name)
+                logger.info(f"   - Parsed input: repo_id='{repo_id}', filename='{filename}'")
 
                 try:
                     # Create a temporary directory for the downloaded LoRA
                     temp_dir = tempfile.mkdtemp(prefix="hf_lora_")
 
                     # Use huggingface_hub to download the LoRA
-                    from huggingface_hub import hf_hub_download
+                    from huggingface_hub import hf_hub_download, list_repo_files
 
                     logger.info(f"   - Downloading to temp dir: {temp_dir}")
 
-                    # Download the LoRA file
-                    downloaded_path = hf_hub_download(
-                        repo_id=lora_name,
-                        filename="lora.safetensors",
-                        cache_dir=temp_dir,
-                    )
+                    # Initialize downloaded_path variable
+                    downloaded_path = None
+                    
+                    # If we have a specific filename, try to download it directly
+                    if filename:
+                        try:
+                            downloaded_path = hf_hub_download(
+                                repo_id=repo_id,
+                                filename=filename,
+                                cache_dir=temp_dir,
+                            )
+                            logger.info(f"   - Downloaded: {filename}")
+                        except Exception as specific_error:
+                            logger.warning(f"   - Failed to download {filename}, falling back to auto-detection")
+                            filename = None
+                    
+                    # If no specific filename or it failed, auto-detect the file
+                    if not filename or downloaded_path is None:
+                        try:
+                            repo_files = list_repo_files(repo_id)
+                            
+                            # Look for common LoRA file patterns
+                            lora_filename = None
+                            for file in repo_files:
+                                if (file.endswith('.safetensors') or file.endswith('.bin')) and any(
+                                    pattern in file.lower() for pattern in ['lora', 'adapter', 'model', 'weights', 'super-realism']
+                                ):
+                                    lora_filename = file
+                                    break
+                            
+                            # If no specific LoRA file found, try common names
+                            if not lora_filename:
+                                common_names = ['lora.safetensors', 'model.safetensors', 'pytorch_lora_weights.safetensors', 'adapter_model.safetensors']
+                                for name in common_names:
+                                    if name in repo_files:
+                                        lora_filename = name
+                                        break
+                            
+                            if not lora_filename:
+                                logger.error(f"   - No suitable LoRA file found in repository")
+                                return None
+                                
+                            # Download the auto-detected file
+                            downloaded_path = hf_hub_download(
+                                repo_id=repo_id,
+                                filename=lora_filename,
+                                cache_dir=temp_dir,
+                            )
+                            logger.info(f"   - Downloaded: {lora_filename}")
+                                
+                        except Exception as list_error:
+                            logger.warning(f"   - Could not list repo files, using fallback")
+                            # Final fallback to common filename
+                            try:
+                                downloaded_path = hf_hub_download(
+                                    repo_id=repo_id,
+                                    filename="lora.safetensors",
+                                    cache_dir=temp_dir,
+                                )
+                                logger.info(f"   - Downloaded: lora.safetensors (fallback)")
+                            except Exception as fallback_error:
+                                logger.error(f"   - All download attempts failed: {fallback_error}")
+                                raise fallback_error
 
-                    logger.info(f"   - hf_hub_download returned: {downloaded_path}")
-
-                    # Verify the downloaded file exists
-                    if not os.path.exists(downloaded_path):
-                        logger.error(
-                            f"   - Downloaded file not found: {downloaded_path}"
-                        )
+                    # Verify the downloaded file
+                    if not os.path.exists(downloaded_path) or not os.path.isfile(downloaded_path):
+                        logger.error(f"   - Downloaded file not found or invalid")
                         return None
 
-                    # Verify it's actually a file (not a directory)
-                    if not os.path.isfile(downloaded_path):
-                        logger.error(
-                            f"   - Downloaded path is not a file: {downloaded_path}"
-                        )
+                    if os.path.getsize(downloaded_path) == 0:
+                        logger.error(f"   - Downloaded file is empty")
                         return None
 
-                    # Verify the file has content
-                    file_size = os.path.getsize(downloaded_path)
-                    if file_size == 0:
-                        logger.error(
-                            f"   - Downloaded file is empty: {downloaded_path}"
-                        )
-                        return None
-
-                    logger.info(f"   - Downloaded file size: {file_size} bytes")
-
-                    # Use the actual path returned by hf_hub_download
                     lora_path = downloaded_path
-
-                    logger.info(f"   - LoRA downloaded successfully to: {lora_path}")
 
                     # Track for cleanup
                     if not hasattr(self, "_temp_lora_paths"):
