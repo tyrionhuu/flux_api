@@ -7,7 +7,7 @@ import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from models.bf16_flux_model import BF16FluxModelManager
-from api.models import GenerateRequest, GenerateResponse, ModelStatusResponse
+from api.models import GenerateRequest, ModelStatusResponse
 from config.bf16_settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
 from utils.system_utils import get_system_memory

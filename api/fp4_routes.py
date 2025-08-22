@@ -5,7 +5,7 @@ API routes for the FLUX API
 import logging
 import time
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from models.fp4_flux_model import FluxModelManager
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
@@ -16,7 +16,7 @@ from config.fp4_settings import (
     DEFAULT_LORA_NAME,
     DEFAULT_LORA_WEIGHT,
 )
-from api.models import GenerateRequest, GenerateResponse, ModelStatusResponse
+from api.models import GenerateRequest
 
 # Configure logging
 logger = logging.getLogger(__name__)

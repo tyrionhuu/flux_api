@@ -6,7 +6,7 @@ This extends the base FluxModelManager to avoid code duplication.
 import logging
 import os
 import torch
-from typing import Optional, Any, Union
+from typing import Optional, Any
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from config.bf16_settings import (
     BF16_MODEL_ID,
