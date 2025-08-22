@@ -645,15 +645,12 @@ class FluxAPI {
     }
 
     showUploadProgress(filename) {
-        // Create upload progress indicator
+        // Create minimal upload progress indicator
         const progressContainer = document.createElement('div');
         progressContainer.id = 'upload-progress';
         progressContainer.className = 'upload-progress';
         progressContainer.innerHTML = `
             <div class="upload-progress-content">
-                <div class="upload-progress-icon">
-                    <i class="fas fa-cloud-upload-alt fa-spin"></i>
-                </div>
                 <div class="upload-progress-text">
                     <div class="upload-filename">${filename}</div>
                     <div class="upload-status">Uploading...</div>
@@ -683,14 +680,6 @@ class FluxAPI {
 
         // Store interval for cleanup
         this.uploadProgressInterval = progressInterval;
-        
-        // Stop the spinning icon after a short delay
-        setTimeout(() => {
-            const icon = progressContainer.querySelector('.upload-progress-icon i');
-            if (icon) {
-                icon.classList.remove('fa-spin');
-            }
-        }, 1000);
     }
 
     hideUploadProgress() {
