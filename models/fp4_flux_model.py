@@ -384,9 +384,14 @@ class FluxModelManager:
     def _is_ready_with_lora(self) -> bool:
         """Quick readiness check for LoRA-capable pipeline."""
         if not self.model_loaded or self.pipe is None:
-            logger.error("Cannot apply LoRAs: Model not loaded or pipeline not available")
+            logger.error(
+                "Cannot apply LoRAs: Model not loaded or pipeline not available"
+            )
             return False
-        if not (hasattr(self.pipe, "transformer") and hasattr(self.pipe.transformer, "update_lora_params")):
+        if not (
+            hasattr(self.pipe, "transformer")
+            and hasattr(self.pipe.transformer, "update_lora_params")
+        ):
             logger.error("FluxPipeline transformer does not have LoRA support methods")
             return False
         return True
@@ -398,7 +403,11 @@ class FluxModelManager:
                 return False
             # Normalize repo id to direct safetensors path if needed
             src = lora_source
-            if not (src.startswith("/") or src.startswith("./") or src.endswith(".safetensors")):
+            if not (
+                src.startswith("/")
+                or src.startswith("./")
+                or src.endswith(".safetensors")
+            ):
                 src = f"{src}/lora.safetensors"
             logger.info(f"   - Loading LoRA parameters from: {src}")
             self.pipe.transformer.update_lora_params(src)
@@ -432,7 +441,9 @@ class FluxModelManager:
                 lora_name = lora_config["name"]
                 weight = lora_config["weight"]
 
-                logger.info(f"   - Applying single LoRA: {lora_name} with weight {weight}")
+                logger.info(
+                    f"   - Applying single LoRA: {lora_name} with weight {weight}"
+                )
                 return self._apply_lora_to_transformer(lora_name, weight)
 
             else:
@@ -453,7 +464,9 @@ class FluxModelManager:
                     )
 
                     # Apply the merged LoRA
-                    success = self._apply_lora_to_transformer(merged_lora_path, combined_weight)
+                    success = self._apply_lora_to_transformer(
+                        merged_lora_path, combined_weight
+                    )
 
                     if success:
                         # Store info about all LoRAs for reference
@@ -496,7 +509,9 @@ class FluxModelManager:
                     )
 
                     # Apply the primary LoRA with combined weight
-                    success = self._apply_lora_to_transformer(primary_name, combined_weight)
+                    success = self._apply_lora_to_transformer(
+                        primary_name, combined_weight
+                    )
 
                     if success:
                         # Store info about all LoRAs for reference
