@@ -212,12 +212,19 @@ class FluxModelManager:
             if hasattr(self.pipe, "transformer") and hasattr(
                 self.pipe.transformer, "update_lora_params"
             ):
+                # Get the transformer safely
+                try:
+                    transformer = self._get_pipe_transformer()
+                except RuntimeError:
+                    logger.warning("Pipeline transformer not available")
+                    return False
+                
                 # Load LoRA parameters
                 logger.info(
                     f"   - Loading default LoRA parameters from {DEFAULT_LORA_NAME}"
                 )
                 try:
-                    self.pipe.transformer.update_lora_params(DEFAULT_LORA_NAME)
+                    transformer.update_lora_params(DEFAULT_LORA_NAME)
                     logger.info(f"   - Default LoRA parameters loaded successfully")
                 except Exception as load_error:
                     logger.warning(
@@ -230,7 +237,7 @@ class FluxModelManager:
                     f"   - Setting default LoRA strength to {DEFAULT_LORA_WEIGHT}"
                 )
                 try:
-                    self.pipe.transformer.set_lora_strength(DEFAULT_LORA_WEIGHT)
+                    transformer.set_lora_strength(DEFAULT_LORA_WEIGHT)
                     logger.info(f"   - Default LoRA strength set successfully")
                 except Exception as strength_error:
                     logger.warning(
@@ -395,12 +402,24 @@ class FluxModelManager:
             logger.error("FluxPipeline transformer does not have LoRA support methods")
             return False
         return True
+    
+    def _get_pipe_transformer(self):
+        """Get the transformer from the pipeline with type safety."""
+        if self.pipe is None:
+            raise RuntimeError("Pipeline not loaded")
+        if not hasattr(self.pipe, "transformer"):
+            raise RuntimeError("Pipeline does not have transformer")
+        return self.pipe.transformer
 
     def _apply_lora_to_transformer(self, lora_source: str, weight: float) -> bool:
         """Apply a LoRA (local path or repo id) and set its strength."""
         try:
             if not self._is_ready_with_lora():
                 return False
+            
+            # Get the transformer safely
+            transformer = self._get_pipe_transformer()
+            
             # Normalize repo id to direct safetensors path if needed
             src = lora_source
             if not (
@@ -410,9 +429,9 @@ class FluxModelManager:
             ):
                 src = f"{src}/lora.safetensors"
             logger.info(f"   - Loading LoRA parameters from: {src}")
-            self.pipe.transformer.update_lora_params(src)
+            transformer.update_lora_params(src)
             logger.info(f"   - Setting LoRA strength to {weight}")
-            self.pipe.transformer.set_lora_strength(weight)
+            transformer.set_lora_strength(weight)
             logger.info("   - LoRA applied successfully")
             return True
         except Exception as e:
@@ -560,9 +579,12 @@ class FluxModelManager:
                 self.pipe.transformer, "set_lora_strength"
             ):
                 logger.info(f"   - Setting LoRA strength to 0 to disable")
-                self.pipe.transformer.set_lora_strength(
-                    0
-                )  # Set strength to 0 to disable
+                try:
+                    transformer = self._get_pipe_transformer()
+                    transformer.set_lora_strength(0)  # Set strength to 0 to disable
+                except RuntimeError:
+                    logger.warning("Pipeline transformer not available")
+                    return False
             else:
                 logger.warning(f"Transformer does not have set_lora_strength method")
 
