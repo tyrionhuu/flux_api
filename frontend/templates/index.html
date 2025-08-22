@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eigen AI Flux API - ComfyUI Style</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <link rel="stylesheet" href="/static/css/style.css?v=3">
+    <!-- For development, you can also use: ?v=<%= Date.now() %> or ?v=3 -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -106,7 +107,7 @@
                         <h3><i class="fas fa-info-circle"></i> Quick Guide</h3>
                         <div class="guide-content">
                             <div class="guide-item">
-                                <strong>LoRAs:</strong> Drag to reorder (order matters), max 3 layers
+                                <strong>LoRAs:</strong> Max 3 layers. Multiple LoRAs are automatically merged and combined for optimal results.
                             </div>
                             <div class="guide-item">
                                 <strong>Prompt:</strong> Be descriptive, e.g., "A serene mountain landscape at sunset"
@@ -185,7 +186,7 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=2"></script>
+    <script src="/static/js/app.js?v=3"></script>
 </body>
 </html>
 

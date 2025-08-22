@@ -5,7 +5,7 @@ This extends the base FluxModelManager to avoid code duplication.
 
 import logging
 import torch
-from typing import Optional, Any
+from typing import Optional, Any, Union
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from config.bf16_settings import (
     BF16_MODEL_ID,
@@ -309,31 +309,69 @@ class BF16FluxModelManager(FluxModelManager):
             raise RuntimeError(f"Failed to generate BF16 image: {e}")
 
     def apply_lora(self, lora_name: str, lora_weight: float = 1.0) -> bool:
-        """Apply LoRA to the BF16 model"""
+        """Apply a single LoRA to the BF16 model - for backward compatibility"""
+        return self.apply_multiple_loras([{"name": lora_name, "weight": lora_weight}])
+
+    def apply_multiple_loras(self, lora_configs: list) -> bool:
+        """Apply multiple LoRAs simultaneously to the BF16 model"""
         try:
             if not self.model_loaded or self.pipe is None:
-                logger.error("Model not loaded, cannot apply LoRA")
+                logger.error("Model not loaded, cannot apply LoRAs")
                 return False
 
-            logger.info(
-                f"Applying LoRA {lora_name} with weight {lora_weight} to BF16 model..."
-            )
+            if not lora_configs:
+                logger.info("No LoRAs to apply")
+                return True
 
-            # Load and apply LoRA
-            self.pipe.load_lora_weights(lora_name)
+            logger.info(f"Applying {len(lora_configs)} LoRAs to BF16 model...")
 
-            # Set LoRA scale
-            self.pipe.set_adapters([lora_name], adapter_weights=[lora_weight])
+            # For BF16 model with diffusers, we can load multiple LoRAs
+            # and set their weights simultaneously
+            lora_names = []
+            lora_weights = []
+            
+            for i, lora_config in enumerate(lora_configs):
+                lora_name = lora_config["name"]
+                weight = lora_config["weight"]
+                
+                logger.info(f"   - Loading LoRA {i+1}/{len(lora_configs)}: {lora_name}")
+                
+                try:
+                    # Load LoRA weights - this should accumulate rather than replace
+                    self.pipe.load_lora_weights(lora_name)
+                    lora_names.append(lora_name)
+                    lora_weights.append(weight)
+                    logger.info(f"   - LoRA {lora_name} loaded successfully")
+                except Exception as load_error:
+                    logger.error(f"   - Failed to load LoRA {lora_name}: {load_error}")
+                    return False
 
-            # Update state
-            self.current_lora = lora_name
-            self.current_weight = lora_weight
-
-            logger.info(f"LoRA {lora_name} applied successfully to BF16 model")
-            return True
+            # Set all LoRA adapters with their respective weights simultaneously
+            if lora_names:
+                logger.info(f"   - Setting {len(lora_names)} LoRA adapters with weights: {lora_weights}")
+                try:
+                    # This should properly combine multiple LoRAs
+                    self.pipe.set_adapters(lora_names, adapter_weights=lora_weights)
+                    logger.info(f"   - Multiple LoRA adapters set successfully")
+                    
+                    # Update state to reflect multiple LoRAs
+                    self.current_lora = lora_names
+                    self.current_weight = sum(lora_weights)
+                    
+                    logger.info(f"All {len(lora_names)} LoRAs applied successfully to BF16 model")
+                    for name, weight in zip(lora_names, lora_weights):
+                        logger.info(f"   - {name}: weight {weight}")
+                    
+                    return True
+                except Exception as adapter_error:
+                    logger.error(f"   - Failed to set LoRA adapters: {adapter_error}")
+                    return False
+            else:
+                logger.warning("No LoRAs were successfully loaded")
+                return False
 
         except Exception as e:
-            logger.error(f"Failed to apply LoRA to BF16 model: {e}")
+            logger.error(f"Failed to apply multiple LoRAs to BF16 model: {e}")
             return False
 
     def remove_lora(self) -> bool:
@@ -361,9 +399,18 @@ class BF16FluxModelManager(FluxModelManager):
 
     def get_lora_info(self) -> Optional[dict]:
         """Get current LoRA information for BF16 model"""
-        if self.current_lora:
+        if not self.current_lora:
+            return None
+            
+        if isinstance(self.current_lora, str):
             return {
                 "name": self.current_lora,
+                "weight": self.current_weight,
+                "model_type": "bf16",
+            }
+        elif isinstance(self.current_lora, list):
+            return {
+                "name": [lora for lora in self.current_lora],
                 "weight": self.current_weight,
                 "model_type": "bf16",
             }

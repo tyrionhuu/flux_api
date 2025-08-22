@@ -144,32 +144,33 @@ async def generate_image(request: GenerateRequest):
         lora_weight_applied = None
 
         if loras_to_apply:
-            # Apply multiple LoRAs in sequence
+            # Apply multiple LoRAs simultaneously
             logger.info(f"Applying {len(loras_to_apply)} LoRAs to loaded BF16 model")
             try:
+                # Validate all LoRA names first
                 for lora_config in loras_to_apply:
-                    # Validate LoRA name format (should be a valid Hugging Face repo ID)
                     if not lora_config["name"] or "/" not in lora_config["name"]:
                         raise HTTPException(
                             status_code=400,
                             detail=f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name')",
                         )
-                    
-                    if not bf16_model_manager.apply_lora(lora_config["name"], lora_config["weight"]):
-                        logger.error(f"LoRA application failed: {lora_config['name']} - Model: {bf16_model_manager.is_loaded()}, Pipeline: {bf16_model_manager.get_pipeline() is None}")
-                        raise HTTPException(
-                            status_code=500,
-                            detail=f"Failed to apply LoRA {lora_config['name']}. Please check if the LoRA exists and is compatible.",
-                        )
-                    else:
-                        logger.info(f"LoRA {lora_config['name']} applied successfully with weight {lora_config['weight']}")
                 
-                # Use the last applied LoRA info for response
+                # Apply all LoRAs at once using the new method
+                if not bf16_model_manager.apply_multiple_loras(loras_to_apply):
+                    logger.error(f"Multiple LoRA application failed - Model: {bf16_model_manager.is_loaded()}, Pipeline: {bf16_model_manager.get_pipeline() is None}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to apply LoRAs. Please check if the LoRAs exist and are compatible.",
+                    )
+                else:
+                    logger.info(f"All {len(loras_to_apply)} LoRAs applied successfully")
+                
+                # Get the updated LoRA info
                 current_lora = bf16_model_manager.get_lora_info()
                 if current_lora:
                     lora_applied = current_lora.get("name")
                     lora_weight_applied = current_lora.get("weight")
-                    logger.info(f"All LoRAs applied successfully to BF16 model. Current LoRA: {lora_applied} with weight {lora_weight_applied}")
+                    logger.info(f"Multiple LoRAs applied successfully to BF16 model. Current LoRAs: {lora_applied} with total weight {lora_weight_applied}")
             except Exception as lora_error:
                 logger.error(
                     f"Exception during LoRA application to BF16 model: {lora_error} (Type: {type(lora_error).__name__})"
