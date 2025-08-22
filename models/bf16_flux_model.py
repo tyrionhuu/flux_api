@@ -112,7 +112,9 @@ class BF16FluxModelManager(FluxModelManager):
 
             except Exception as bf16_error:
                 logger.error(f"Error loading BF16 FLUX.1-schnell model: {bf16_error}")
-                raise RuntimeError(f"Failed to load BF16 FLUX.1-schnell model: {bf16_error}.")
+                raise RuntimeError(
+                    f"Failed to load BF16 FLUX.1-schnell model: {bf16_error}."
+                )
 
             self.model_loaded = True
             # Reset LoRA state when loading a new model
@@ -153,7 +155,9 @@ class BF16FluxModelManager(FluxModelManager):
                 self.pipe.load_lora_weights(lora_repo, weight_name="lora.safetensors")
                 logger.info(f"   - Default LoRA loaded successfully")
             except Exception as load_error:
-                logger.warning(f"   - Failed to load default LoRA, trying alternative method...")
+                logger.warning(
+                    f"   - Failed to load default LoRA, trying alternative method..."
+                )
                 try:
                     self.pipe.load_lora_weights(lora_repo)
                     logger.info(f"   - Alternative LoRA loading successful")
@@ -205,7 +209,9 @@ class BF16FluxModelManager(FluxModelManager):
                 logger.info("Generating on cuda:0 (single GPU)")
             except Exception as gpu_error:
                 logger.error(f"GPU error during device selection: {gpu_error}")
-                raise RuntimeError(f"GPU error: {gpu_error}. GPU required for image generation.")
+                raise RuntimeError(
+                    f"GPU error: {gpu_error}. GPU required for image generation."
+                )
 
         # Generate the image using the FluxPipeline
         try:
@@ -266,7 +272,9 @@ class BF16FluxModelManager(FluxModelManager):
                     return result
                 else:
                     # Re-raise if it's not a memory error
-                    logger.error(f"Non-memory error during BF16 image generation: {memory_error}")
+                    logger.error(
+                        f"Non-memory error during BF16 image generation: {memory_error}"
+                    )
                     raise memory_error
 
         except Exception as e:
@@ -306,7 +314,7 @@ class BF16FluxModelManager(FluxModelManager):
                     if "/" in lora_name and not os.path.exists(lora_name):
                         # This is a Hugging Face input, parse it
                         repo_id, filename = self._parse_hf_input(lora_name)
-                        
+
                         if filename:
                             # We have a specific filename, use it
                             self.pipe.load_lora_weights(repo_id, weight_name=filename)
@@ -316,7 +324,7 @@ class BF16FluxModelManager(FluxModelManager):
                     else:
                         # Local file or simple repo name
                         self.pipe.load_lora_weights(lora_name)
-                    
+
                     lora_names.append(lora_name)
                     lora_weights.append(weight)
                     logger.info(f"   - LoRA {i+1} loaded successfully")
@@ -335,7 +343,9 @@ class BF16FluxModelManager(FluxModelManager):
                     self.current_lora = lora_names
                     self.current_weight = sum(lora_weights)
 
-                    logger.info(f"   - All {len(lora_names)} LoRAs applied successfully")
+                    logger.info(
+                        f"   - All {len(lora_names)} LoRAs applied successfully"
+                    )
                     return True
                 except Exception as adapter_error:
                     logger.error(f"   - Failed to set LoRA adapters: {adapter_error}")
