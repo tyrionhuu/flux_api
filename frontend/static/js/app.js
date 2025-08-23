@@ -422,7 +422,7 @@ class FluxAPI {
                     <img src="${imageUrl}" alt="Generated image" loading="lazy" style="max-width: 100%; height: auto;">
                     <div class="image-meta">
                         <div class="details">
-                            <span>${params.width}×${params.height}</span>
+                            <span>${result.width || params.width}×${result.height || params.height}</span>
                             <span>${result.generation_time || 'N/A'}</span>
                         </div>
                     </div>
@@ -461,7 +461,7 @@ class FluxAPI {
                             <img src="${fp4ImageUrl}" alt="Generated image" loading="lazy">
                             <div class="image-meta">
                                 <div class="details">
-                                    <span>${params.width}×${params.height}</span>
+                                    <span>${fp4Result.width || params.width}×${fp4Result.height || params.height}</span>
                                     <span>${fp4Result.generation_time || 'N/A'}</span>
                                 </div>
                             </div>
@@ -470,7 +470,7 @@ class FluxAPI {
                             <img src="${bf16ImageUrl}" alt="Generated image" loading="lazy">
                             <div class="image-meta">
                                 <div class="details">
-                                    <span>${params.width}×${params.height}</span>
+                                    <span>${bf16Result.width || params.width}×${bf16Result.height || params.height}</span>
                                     <span>${bf16Result.generation_time || 'N/A'}</span>
                                 </div>
                             </div>
@@ -508,7 +508,7 @@ class FluxAPI {
 
         modalImage.src = imageUrl;
         modalPrompt.textContent = params.prompt;
-        modalParams.textContent = `${params.width}×${params.height}`;
+        modalParams.textContent = `${result.width || params.width}×${result.height || params.height}`;
         modalTime.textContent = result.generation_time || 'N/A';
 
         // Store current image data for download/copy
