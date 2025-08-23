@@ -690,44 +690,40 @@ class FluxAPI {
             progressContainer.classList.add('upload-progress-show');
         }, 100);
 
-        // Animate progress bar
-        const progressFill = progressContainer.querySelector('.upload-progress-fill');
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90; // Don't go to 100% until actually complete
-            progressFill.style.width = progress + '%';
-        }, 200);
+        // Store container reference for progress updates
+        this.uploadProgressContainer = progressContainer;
+        this.uploadProgressFill = progressContainer.querySelector('.upload-progress-fill');
+    }
 
-        // Store interval for cleanup
-        this.uploadProgressInterval = progressInterval;
+    updateUploadProgress(percent) {
+        if (this.uploadProgressFill) {
+            this.uploadProgressFill.style.width = percent + '%';
+            
+            // Also update the status text with percentage
+            const statusElement = this.uploadProgressContainer?.querySelector('.upload-status');
+            if (statusElement) {
+                statusElement.textContent = `Uploading... ${Math.round(percent)}%`;
+            }
+        }
     }
 
     hideUploadProgress() {
         const progressContainer = document.getElementById('upload-progress');
         if (progressContainer) {
-            // Complete the progress bar
-            const progressFill = progressContainer.querySelector('.upload-progress-fill');
-            if (progressFill) {
-                progressFill.style.width = '100%';
-            }
-
-            // Add completion animation
+            // Show completion briefly
             progressContainer.classList.add('upload-progress-complete');
-
+            
             // Remove after animation
             setTimeout(() => {
                 if (progressContainer.parentElement) {
                     progressContainer.remove();
                 }
             }, 500);
-
-            // Clear progress interval
-            if (this.uploadProgressInterval) {
-                clearInterval(this.uploadProgressInterval);
-                this.uploadProgressInterval = null;
-            }
         }
+
+        // Clear references
+        this.uploadProgressContainer = null;
+        this.uploadProgressFill = null;
     }
 
     triggerFileUpload() {
@@ -759,39 +755,82 @@ class FluxAPI {
             // Show upload progress indicator
             this.showUploadProgress(file.name);
             
-            // Upload the file to the server first
-            const formData = new FormData();
-            formData.append('file', file);
+            // Upload the file using XMLHttpRequest for progress tracking
+            const uploadResult = await this.uploadFileWithProgress(file);
             
-            const response = await fetch(`${this.hostBase}/upload-lora`, {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Upload failed');
+            // Show completion briefly
+            this.updateUploadProgress(100);
+            const statusElement = this.uploadProgressContainer?.querySelector('.upload-status');
+            if (statusElement) {
+                statusElement.textContent = 'Complete!';
             }
             
-            const uploadResult = await response.json();
-            const filename = uploadResult.filename;
-            
-            // Hide upload progress
-            this.hideUploadProgress();
-            
-            // Add the uploaded file to the LoRA list with the server filename
-            this.addLoraEntry(filename, 1.0, true); // true indicates it's an uploaded file
-            
-            this.showSuccess(`LoRA file "${file.name}" uploaded successfully!`);
-            
-            // Reset the file input
-            event.target.value = '';
+            // Wait a moment to show completion, then hide
+            setTimeout(() => {
+                this.hideUploadProgress();
+                
+                // Add the uploaded file to the LoRA list with the server filename
+                this.addLoraEntry(uploadResult.filename, 1.0, true); // true indicates it's an uploaded file
+                
+                this.showSuccess(`LoRA file "${file.name}" uploaded successfully!`);
+                
+                // Reset the file input
+                event.target.value = '';
+            }, 500);
             
         } catch (error) {
             // Hide upload progress on error
             this.hideUploadProgress();
             this.showError(`Failed to upload file: ${error.message}`);
         }
+    }
+
+    uploadFileWithProgress(file) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            
+            // Track upload progress
+            xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                    const percentComplete = (event.loaded / event.total) * 100;
+                    this.updateUploadProgress(percentComplete);
+                }
+            });
+            
+            // Handle completion
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        resolve(response);
+                    } catch (e) {
+                        reject(new Error('Invalid response format'));
+                    }
+                } else {
+                    reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+            });
+            
+            // Handle errors
+            xhr.addEventListener('error', () => {
+                reject(new Error('Network error during upload'));
+            });
+            
+            // Handle abort
+            xhr.addEventListener('abort', () => {
+                reject(new Error('Upload was cancelled'));
+            });
+            
+            // Open and send the request
+            xhr.open('POST', `${this.hostBase}/upload-lora`);
+            xhr.send(this.createFormData(file));
+        });
+    }
+
+    createFormData(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        return formData;
     }
 
 
