@@ -451,6 +451,79 @@ class FluxModelManager:
 
         return repo_id, filename
 
+    def _check_lora_compatibility(self, lora_path: str) -> bool:
+        """Check if a LoRA file is compatible with FLUX models"""
+        try:
+            # Check if file exists
+            if not os.path.exists(lora_path):
+                logger.error(f"   - LoRA file not found: {lora_path}")
+                return False
+
+            # Check file size (basic validation)
+            file_size = os.path.getsize(lora_path)
+            if file_size < 1024:  # Less than 1KB
+                logger.error(
+                    f"   - LoRA file too small ({file_size} bytes), likely corrupted"
+                )
+                return False
+
+            # Check file extension
+            if not lora_path.endswith((".safetensors", ".bin", ".pt", ".pth")):
+                logger.error(
+                    f"   - Unsupported file format: {os.path.splitext(lora_path)[1]}"
+                )
+                return False
+
+            # Basic compatibility check - try to load the file
+            try:
+                if lora_path.endswith(".safetensors"):
+                    from safetensors import safe_open
+
+                    with safe_open(lora_path, framework="pt") as f:
+                        lora_weights = {key: f.get_tensor(key) for key in f.keys()}
+                else:
+                    lora_weights = torch.load(
+                        lora_path, map_location="cpu", weights_only=True
+                    )
+
+                # Check if it's a dictionary and not empty
+                if not isinstance(lora_weights, dict) or not lora_weights:
+                    logger.error(
+                        f"   - LoRA file does not contain valid weight dictionary"
+                    )
+                    return False
+
+                # Check for FLUX-compatible LoRA keys
+                has_compatible_keys = False
+                expected_patterns = ["lora", "adapter", "model", "weights"]
+                for key in lora_weights.keys():
+                    key_lower = key.lower()
+                    for pattern in expected_patterns:
+                        if pattern in key_lower:
+                            has_compatible_keys = True
+                            break
+                    if has_compatible_keys:
+                        break
+
+                if not has_compatible_keys:
+                    logger.error(
+                        f"   - LoRA file does not appear to be compatible with FLUX models"
+                    )
+                    return False
+
+                logger.info(f"   - LoRA compatibility check passed")
+                return True
+
+            except Exception as load_error:
+                logger.error(
+                    f"   - Failed to load LoRA file for compatibility check: {str(load_error)}"
+                )
+                return False
+
+        except Exception as e:
+            logger.error(f"   - LoRA compatibility check failed: {str(e)}")
+            return False
+
     def _apply_lora_to_transformer(self, lora_source: str, weight: float) -> bool:
         """Apply a LoRA (local path or repo id) and set its strength."""
         try:
@@ -464,6 +537,11 @@ class FluxModelManager:
             lora_path = self._get_lora_path(lora_source)
             if not lora_path:
                 logger.error(f"   - Could not resolve path for LoRA: {lora_source}")
+                return False
+
+            # Check LoRA compatibility before applying
+            if not self._check_lora_compatibility(lora_path):
+                logger.error(f"   - LoRA compatibility check failed: {lora_source}")
                 return False
 
             logger.info(f"   - Loading LoRA parameters from: {lora_path}")

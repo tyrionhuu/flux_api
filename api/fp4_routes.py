@@ -296,6 +296,8 @@ async def generate_image(request: GenerateRequest):
             request.width or 512,
             request.height or 512,
             request.seed,
+            request.upscale or False,
+            request.upscale_factor or 2,
         )
         return result
     except Exception as e:
@@ -575,6 +577,8 @@ def generate_image_internal(
     width: int = 512,
     height: int = 512,
     seed: Optional[int] = None,
+    upscale: bool = False,
+    upscale_factor: int = 2,
 ):
     """Internal function to generate images - used by both endpoints"""
     # Append "Use GHIBLISTYLE" to the start of the user prompt
@@ -639,8 +643,23 @@ def generate_image_internal(
         end_time = time.time()
         generation_time = end_time - start_time
 
-        # Save image with unique name to default directory
-        image_filename = save_image_with_unique_name(image)
+        # Apply upscaling if requested
+        try:
+            from models.upscaler import apply_upscaling
+
+            image_filename, upscaled_image_path, final_width, final_height = (
+                apply_upscaling(
+                    image, upscale, upscale_factor, save_image_with_unique_name
+                )
+            )
+        except Exception as upscale_error:
+            logger.error(f"Upscaling failed with error: {upscale_error}")
+            # Fall back to saving original image without upscaling
+            image_filename = save_image_with_unique_name(image)
+            final_width = width
+            final_height = height
+            upscaled_image_path = None
+            logger.info(f"Falling back to original image: {image_filename}")
 
         # Get system information
         vram_usage = model_manager.gpu_manager.get_vram_usage()
@@ -663,8 +682,8 @@ def generate_image_internal(
             "generation_time": f"{generation_time:.2f}s",
             "lora_applied": actual_lora_info.get("name") if actual_lora_info else None,
             "lora_weight": actual_lora_info.get("weight") if actual_lora_info else None,
-            "width": width,
-            "height": height,
+            "width": final_width,
+            "height": final_height,
             "seed": seed,
         }
 
@@ -698,11 +717,11 @@ async def upload_lora_file(file: UploadFile = File(...)):
             detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}",
         )
 
-    # Check file size (max 500MB)
-    max_size = 500 * 1024 * 1024  # 500MB
+    # Check file size (max 1GB)
+    max_size = 1024 * 1024 * 1024  # 1GB
     if not file.size or file.size > max_size:
         raise HTTPException(
-            status_code=400, detail="File too large. Maximum size is 500MB."
+            status_code=400, detail="File too large. Maximum size is 1GB."
         )
 
     try:

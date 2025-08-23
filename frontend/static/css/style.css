@@ -761,6 +761,63 @@ textarea {
     color: #93c5fd;
 }
 
+/* Upscaler UI */
+.upscaler-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.upscaler-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.upscaler-option input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #3b82f6;
+    cursor: pointer;
+}
+
+.upscaler-option label {
+    font-weight: 500;
+    color: #374151;
+    cursor: pointer;
+}
+
+.upscale-factor-container {
+    margin-left: 1.5rem;
+    padding: 0.75rem;
+    background: #f9fafb;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+}
+
+.upscale-factor-container label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.upscale-factor-container select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background: white;
+    font-size: 0.875rem;
+    color: #374151;
+}
+
+.upscale-factor-container select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
 /* Notification system */
 .notification {
     position: fixed;

@@ -68,6 +68,17 @@ class FluxAPI {
         if (clearHistoryBtn) {
             clearHistoryBtn.addEventListener('click', () => this.clearHistory());
         }
+
+        // Upscaler checkbox
+        const upscaleCheckbox = document.getElementById('upscale');
+        if (upscaleCheckbox) {
+            upscaleCheckbox.addEventListener('change', (e) => {
+                const upscaleFactorContainer = document.getElementById('upscale-factor-container');
+                if (upscaleFactorContainer) {
+                    upscaleFactorContainer.style.display = e.target.checked ? 'block' : 'none';
+                }
+            });
+        }
         
         // Modal controls
         document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
@@ -377,6 +388,16 @@ class FluxAPI {
         } else {
             // Generate a random seed if none specified, so both models use the same one
             params.seed = Math.floor(Math.random() * 4294967295);
+        }
+
+        // Add upscaler parameters
+        const upscaleCheckbox = document.getElementById('upscale');
+        if (upscaleCheckbox && upscaleCheckbox.checked) {
+            params.upscale = true;
+            const upscaleFactor = document.getElementById('upscale-factor');
+            if (upscaleFactor) {
+                params.upscale_factor = parseInt(upscaleFactor.value);
+            }
         }
 
         return params;
@@ -727,10 +748,10 @@ class FluxAPI {
             return;
         }
 
-        // Check file size (max 500MB)
-        const maxSize = 500 * 1024 * 1024; // 500MB
+        // Check file size (max 1GB)
+        const maxSize = 1024 * 1024 * 1024; // 1GB
         if (file.size > maxSize) {
-            this.showError('File too large. Maximum size is 500MB.');
+            this.showError('File too large. Maximum size is 1GB.');
             return;
         }
 

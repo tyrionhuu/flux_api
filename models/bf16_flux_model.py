@@ -179,6 +179,44 @@ class BF16FluxModelManager(FluxModelManager):
             self.current_weight = 0.0
             return False
 
+    def _check_lora_compatibility(self, lora_name: str) -> bool:
+        """Check if a LoRA is compatible with BF16 FLUX models"""
+        try:
+            # For Hugging Face repos, we can't easily check compatibility before loading
+            # So we'll do basic validation for local files and accept HF repos
+            if "/" in lora_name and not os.path.exists(lora_name):
+                # This is a Hugging Face input - assume it's compatible
+                logger.info(f"   - Assuming HF LoRA is compatible: {lora_name}")
+                return True
+
+            # For local files, check if they exist and have valid extensions
+            if os.path.exists(lora_name):
+                # Check file extension
+                if not lora_name.endswith((".safetensors", ".bin", ".pt", ".pth")):
+                    logger.error(
+                        f"   - Unsupported file format: {os.path.splitext(lora_name)[1]}"
+                    )
+                    return False
+
+                # Check file size (basic validation)
+                file_size = os.path.getsize(lora_name)
+                if file_size < 1024:  # Less than 1KB
+                    logger.error(
+                        f"   - LoRA file too small ({file_size} bytes), likely corrupted"
+                    )
+                    return False
+
+                logger.info(f"   - Local LoRA file compatibility check passed")
+                return True
+            else:
+                # File doesn't exist
+                logger.error(f"   - LoRA file not found: {lora_name}")
+                return False
+
+        except Exception as e:
+            logger.error(f"   - LoRA compatibility check failed: {str(e)}")
+            return False
+
     def generate_image(
         self,
         prompt: str,
@@ -310,6 +348,13 @@ class BF16FluxModelManager(FluxModelManager):
                 logger.info(f"   - Loading LoRA {i+1}: {lora_name}")
 
                 try:
+                    # Check LoRA compatibility before loading
+                    if not self._check_lora_compatibility(lora_name):
+                        logger.error(
+                            f"   - LoRA compatibility check failed: {lora_name}"
+                        )
+                        return False
+
                     # Parse the input to extract repo_id and filename for BF16 model
                     if "/" in lora_name and not os.path.exists(lora_name):
                         # This is a Hugging Face input, parse it

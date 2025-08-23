@@ -71,7 +71,7 @@ The web interface now supports uploading local LoRA files:
 - `.bin`
 - `.pt` / `.pth`
 
-**File Size Limit**: 500MB maximum
+**File Size Limit**: 1GB maximum
 
 ### Multiple LoRA Support
 
@@ -165,7 +165,7 @@ flux_api/
 
 3. **LoRA Upload Failures**
    - Check file format (.safetensors recommended)
-   - Ensure file size < 500MB
+   - Ensure file size < 1GB
    - Verify file integrity
 
 ### Logs
