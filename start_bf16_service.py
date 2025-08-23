@@ -9,7 +9,6 @@ import sys
 import subprocess
 import time
 import signal
-import psutil
 from pathlib import Path
 
 
