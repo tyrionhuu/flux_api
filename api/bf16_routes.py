@@ -504,11 +504,11 @@ async def upload_lora_file(file: UploadFile = File(...)):
             detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}",
         )
 
-    # Check file size (max 500MB)
-    max_size = 500 * 1024 * 1024  # 500MB
+    # Check file size (max 1GB)
+    max_size = 1024 * 1024 * 1024  # 1GB
     if not file.size or file.size > max_size:
         raise HTTPException(
-            status_code=400, detail="File too large. Maximum size is 500MB."
+            status_code=400, detail="File too large. Maximum size is 1GB."
         )
 
     try:
