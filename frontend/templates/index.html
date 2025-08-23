@@ -121,7 +121,26 @@
                         </div>
                     </div>
 
-
+                    <!-- Upscaler Configuration -->
+                    <div class="parameter-group">
+                        <label for="upscale">Upscaler (optional)</label>
+                        <div class="upscaler-container">
+                            <div class="upscaler-option">
+                                <input type="checkbox" id="upscale" name="upscale">
+                                <label for="upscale">Enable Remacri ESRGAN upscaling</label>
+                            </div>
+                            <div class="upscale-factor-container" id="upscale-factor-container" style="display: none;">
+                                <label for="upscale-factor">Upscale Factor:</label>
+                                <select id="upscale-factor">
+                                    <option value="2" selected>2x (Recommended)</option>
+                                    <option value="4">4x (Maximum Quality)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="helper-text">
+                            Upscale generated images for higher resolution and quality
+                        </div>
+                    </div>
 
                     <!-- Generation Button -->
                     <button id="generate-btn" class="generate-btn">
@@ -141,6 +160,9 @@
                             </div>
                             <div class="guide-item">
                                 <strong>Seed:</strong> Use same seed for consistent results, or random for variety
+                            </div>
+                            <div class="guide-item">
+                                <strong>Upscaler:</strong> Enable for higher resolution images (2x or 4x)
                             </div>
                             <div class="guide-item">
                                 <strong>Shortcuts:</strong> Ctrl+Enter to generate
