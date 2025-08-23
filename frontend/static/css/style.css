@@ -7,7 +7,7 @@
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #f5f4ef;
+    background-color: #f7f6f1;
     color: #1a1a1a;
     line-height: 1.6;
     font-weight: 400;
@@ -264,6 +264,10 @@ textarea {
     font-size: 0.75rem;
     color: #6b7280;
     font-style: italic;
+    word-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.4;
+    max-width: 100%;
 }
 
 .helper-text code {
@@ -277,32 +281,56 @@ textarea {
 /* Generate button - prominent blue button like Eigen AI */
 .generate-btn {
     width: 100%;
-    background: #3b82f6;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 1rem;
+    position: relative;
+    background: linear-gradient(135deg, #4f46e5, #2563eb);
+    color: #ffffff;
+    border: 1px solid #1d4ed8;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
     font-size: 1rem;
     font-weight: 600;
+    letter-spacing: 0.2px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
     margin-top: 1rem;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.30), inset 0 1px 0 rgba(255,255,255,0.15);
+    overflow: hidden;
+}
+
+.generate-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(120% 120% at 0% 0%, rgba(255,255,255,0.25), transparent 60%);
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.generate-btn i {
+    margin-right: 0.5rem;
 }
 
 .generate-btn:hover {
-    background: #2563eb;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 14px 28px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255,255,255,0.18);
+    background: linear-gradient(135deg, #5651e9, #2d6ae9);
 }
 
 .generate-btn:active {
     transform: translateY(0);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.28), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.generate-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2), 0 10px 24px rgba(37, 99, 235, 0.30);
 }
 
 .generate-btn:disabled {
-    background: #9ca3af;
+    background: linear-gradient(135deg, #9ca3af, #9ca3af);
+    border-color: #9ca3af;
     cursor: not-allowed;
-    transform: none;
+    opacity: 0.85;
     box-shadow: none;
 }
 
@@ -393,7 +421,7 @@ textarea {
 
 /* Modal */
 .modal {
-    display: none;
+    display: flex;
     position: fixed;
     z-index: 1000;
     left: 0;
@@ -402,6 +430,12 @@ textarea {
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.hidden {
+    display: none;
 }
 
 .modal-content {
@@ -693,3 +727,449 @@ textarea {
     display: none !important;
 }
 
+/* LoRA UI */
+.lora-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.lora-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.lora-buttons .btn {
+    flex: 1;
+    min-width: 120px;
+}
+
+/* Uploaded LoRA styling */
+.lora-entry.uploaded-lora {
+    background: #f0f9ff;
+    border-color: #3b82f6;
+}
+
+.lora-entry.uploaded-lora .lora-name {
+    background: #eff6ff;
+    color: #1e40af;
+    font-weight: 500;
+}
+
+.lora-entry.uploaded-lora .lora-name::placeholder {
+    color: #93c5fd;
+}
+
+/* Notification system */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    min-width: 300px;
+    max-width: 500px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    border-left: 4px solid;
+}
+
+.notification.notification-show {
+    transform: translateX(0);
+}
+
+.notification.notification-success {
+    border-left-color: #10b981;
+}
+
+.notification.notification-error {
+    border-left-color: #ef4444;
+}
+
+.notification.notification-info {
+    border-left-color: #3b82f6;
+}
+
+.notification-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+}
+
+.notification-content i:first-child {
+    flex-shrink: 0;
+    font-size: 18px;
+}
+
+.notification-success .notification-content i:first-child {
+    color: #10b981;
+}
+
+.notification-error .notification-content i:first-child {
+    color: #ef4444;
+}
+
+.notification-info .notification-content i:first-child {
+    color: #3b82f6;
+}
+
+.notification-message {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #374151;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: #9ca3af;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.notification-close:hover {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.notification-close i {
+    font-size: 12px;
+}
+
+/* Upload Progress Indicator - Minimal Style */
+.upload-progress {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    z-index: 10000;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    min-width: 280px;
+    max-width: 360px;
+    opacity: 0;
+    transition: all 0.3s ease;
+    border: 1px solid #f3f4f6;
+}
+
+.upload-progress.upload-progress-show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.upload-progress.upload-progress-complete {
+    transform: translate(-50%, -50%) scale(1.02);
+    opacity: 0;
+}
+
+.upload-progress-content {
+    text-align: center;
+}
+
+.upload-progress-text {
+    margin-bottom: 16px;
+}
+
+.upload-filename {
+    font-weight: 500;
+    font-size: 14px;
+    color: #374151;
+    margin-bottom: 2px;
+    word-break: break-word;
+}
+
+.upload-status {
+    font-size: 12px;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.upload-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #f3f4f6;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.upload-progress-fill {
+    height: 100%;
+    background: #3b82f6;
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.lora-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.lora-entry {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.75rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+/* Ensure inline layout with compact weight field */
+.lora-entry input {
+    width: auto; /* override global 100% */
+    flex: 1;
+}
+
+.lora-entry input.lora-name {
+    flex: 1 1 auto;
+}
+
+.lora-entry input.lora-weight {
+    flex: 0 0 80px;
+    width: 80px;
+    text-align: center;
+}
+
+.lora-entry .remove-lora {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem;
+    cursor: pointer;
+}
+
+.lora-entry .remove-lora:hover {
+    background: #dc2626;
+}
+
+/* Minimal page aesthetic tweaks */
+body {
+    background-color: #f7f6f1;
+}
+.left-panel, .right-panel {
+    border-radius: 10px;
+    border: 1px solid #e8e6de;
+    box-shadow: none;
+}
+.panel-header {
+    border-bottom: 1px solid #eeeae0;
+}
+
+/* LoRA UI minimal look */
+.lora-entry {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem;
+    background: #faf9f6;
+    border: 1px solid #ebe9e2;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.drag-handle {
+    color: #9aa0a6;
+    cursor: grab;
+    padding: 0 0.25rem;
+    flex-shrink: 0;
+}
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.lora-entry input.lora-name {
+    font-size: 0.85rem;
+    min-width: 0; /* Allow shrinking */
+}
+
+.lora-entry input.lora-weight {
+    width: 72px;
+    font-size: 0.85rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.lora-entry .remove-lora {
+    background: transparent;
+    color: #9b1c1c;
+    border: 1px solid #f1d6d6;
+    border-radius: 6px;
+    padding: 0.35rem 0.5rem;
+    flex-shrink: 0;
+    width: auto;
+    min-width: 32px;
+}
+
+.lora-entry .remove-lora:hover {
+    background: #fdecec;
+}
+
+/* Ensure the container doesn't overflow */
+.lora-container {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.lora-list {
+    max-width: 100%;
+}
+
+/* Generate button simplified but elegant */
+.generate-btn {
+    border-radius: 10px;
+    background: #2f66e1;
+    border: none;
+    box-shadow: 0 6px 16px rgba(47, 102, 225, 0.25);
+}
+.generate-btn:hover { 
+    background: #2a5bd0;
+}
+.generate-btn:disabled {
+    background: #aeb4bf;
+    box-shadow: none;
+}
+
+/* User Guide Styling */
+.user-guide {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #f8f7f3;
+    border: 1px solid #e8e6de;
+    border-radius: 8px;
+}
+
+.user-guide h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.user-guide h3 i {
+    color: #3182ce;
+    font-size: 0.8rem;
+}
+
+.guide-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.guide-item {
+    font-size: 0.8rem;
+    color: #4a5568;
+    line-height: 1.4;
+}
+
+.guide-item strong {
+    color: #2d3748;
+    font-weight: 600;
+}
+
+/* API Command Section (Inline) */
+.api-command-section {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+.api-command-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.api-command-header h4 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.api-command-header h4 i {
+    color: #007bff;
+}
+
+.api-command-container {
+    background: #1e1e1e;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    position: relative;
+}
+
+.api-command {
+    display: block;
+    background: #2d2d2d;
+    color: #00ff00;
+    padding: 1rem;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-bottom: 1rem;
+}
+
+.copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #4a5568;
+    color: white;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background-color 0.2s;
+}
+
+.copy-btn:hover {
+    background: #2d3748;
+}
+
+.api-info {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f7fafc;
+    border-radius: 6px;
+    border-left: 4px solid #4299e1;
+}
+
+.api-info p {
+    margin: 0;
+    color: #2d3748;
+    font-size: 0.9rem;
+}

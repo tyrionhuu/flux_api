@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eigen AI Flux API - ComfyUI Style</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
+    <!-- For development, you can also use: ?v=<%= Date.now() %> or ?v=3 -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -28,6 +29,49 @@
                 <div class="panel left-panel">
                     <div class="panel-header">
                         <h2><i class="fas fa-sliders-h"></i> Generation Parameters</h2>
+                    </div>
+                    
+                    <!-- LoRA Configuration Section -->
+                    <div class="parameter-group">
+                        <label>LoRA Configuration (optional)</label>
+                        <div class="lora-container">
+                            <div id="lora-list" class="lora-list">
+                                <!-- LoRA entries will be added here dynamically -->
+                            </div>
+                            <div class="lora-buttons">
+                                <button id="add-lora" class="btn btn-secondary">
+                                    <i class="fas fa-plus"></i> Add LoRA
+                                </button>
+                                <button id="upload-lora" class="btn btn-secondary">
+                                    <i class="fas fa-upload"></i> Upload LoRA
+                                </button>
+                            </div>
+                        </div>
+                        <div class="helper-text">
+                            Enter Hugging Face repo ID (e.g., <code>username/model</code>), full URL, or upload a local LoRA file
+                        </div>
+                        <button id="apply-lora-btn" class="btn btn-primary">
+                            <i class="fas fa-magic"></i> Apply LoRA
+                        </button>
+                        
+                        <!-- Hidden file input for LoRA upload -->
+                        <input type="file" id="lora-file-input" accept=".safetensors,.bin,.pt,.pth" style="display: none;">
+                        
+                        <!-- API Command Display -->
+                        <div id="api-command-section" class="api-command-section hidden">
+                            <div class="api-command-header">
+                                <h4><i class="fas fa-terminal"></i> API Command</h4>
+                                <button id="copy-command" class="btn btn-secondary copy-btn">
+                                    <i class="fas fa-copy"></i> Copy
+                                </button>
+                            </div>
+                            <div class="api-command-container">
+                                <code id="api-command" class="api-command"></code>
+                            </div>
+                            <div class="api-info">
+                                <p><strong>Note:</strong> This command will generate an image and save it as "generated_image.png" in your current directory.</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="parameter-group">
@@ -84,6 +128,25 @@
                         <i class="fas fa-play"></i>
                         Generate
                     </button>
+
+                    <!-- User Guide -->
+                    <div class="user-guide">
+                        <h3><i class="fas fa-info-circle"></i> Quick Guide</h3>
+                        <div class="guide-content">
+                            <div class="guide-item">
+                                <strong>LoRAs:</strong> Max 3 layers.
+                            </div>
+                            <div class="guide-item">
+                                <strong>Prompt:</strong> Be descriptive, e.g., "A serene mountain landscape at sunset"
+                            </div>
+                            <div class="guide-item">
+                                <strong>Seed:</strong> Use same seed for consistent results, or random for variety
+                            </div>
+                            <div class="guide-item">
+                                <strong>Shortcuts:</strong> Ctrl+Enter to generate
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Right Panel - Results -->
@@ -141,16 +204,14 @@
                         <i class="fas fa-download"></i>
                         Download
                     </button>
-                    <button id="copy-prompt" class="btn secondary">
-                        <i class="fas fa-copy"></i>
-                        Copy Prompt
-                    </button>
                 </div>
             </div>
         </div>
+
+
     </div>
 
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=11"></script>
 </body>
 </html>
 

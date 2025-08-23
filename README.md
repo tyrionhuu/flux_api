@@ -1,353 +1,200 @@
-# FLUX API - Dual Model Service
+# FLUX API - AI Image Generation Service
 
-AI image generation API with FP4 (quantized) and BF16 (full-precision) FLUX models, featuring automatic multi-GPU load balancing and default LoRA integration.
+A dual-model AI image generation API service featuring FLUX models with LoRA support.
 
-## 🚀 Quick Start
+## Features
 
-### FP4 Service (Port 8000) - Fast & Efficient
+- **Dual Model Support**: FP4 (quantized) and BF16 (full-precision) FLUX models
+- **GPU Management**: Automatic GPU selection and load balancing
+- **LoRA Support**: Apply custom LoRA weights for style customization
+- **LoRA File Upload**: Upload local LoRA files directly through the web interface
+- **ComfyUI-style Frontend**: Modern, intuitive web interface
+- **RESTful API**: Easy integration with external applications
+
+## Model Services
+
+### FP4 Model (Port 8000)
+- **Port**: 8000 (configurable)
+- **Model**: FLUX.1-schnell (quantized)
+- **Memory**: ~8GB VRAM
+- **Speed**: Fast inference with LoRA merging support
+
+### BF16 Model (Port 8001)
+- **Port**: 8001 (configurable)
+- **Model**: FLUX.1-schnell (full-precision)
+- **Memory**: ~16GB VRAM
+- **Speed**: High-quality inference with native LoRA support
+
+## Quick Start
+
+### 1. Start the Services
+
 ```bash
-# Single GPU
-./start_api.sh -g 1
+# Start FP4 service
+./start_fp4_api.sh
 
-# Multi-GPU balanced
-./start_api.sh -g 1,2,3
-
-# All GPUs
-./start_api.sh
-```
-
-### BF16 Service (Port 8001) - High Quality
-```bash
-# Single GPU  
-./start_bf16_api.sh -g 2
-
-# Multi-GPU balanced
-./start_bf16_api.sh -g 0,1
-
-# All GPUs
+# Start BF16 service
 ./start_bf16_api.sh
+
+# Start frontend (optional)
+cd frontend && python -m http.server 9000
 ```
 
-## 🔧 GPU Selection
+### 2. Access the Services
 
-| Command | GPU Mode | Use Case |
-|---------|----------|----------|
-| `./start_api.sh -g 1` | Single GPU 1 | Limited VRAM |
-| `./start_api.sh -g 1,2,3` | Balanced across GPUs 1,2,3 | High memory models |
-| `./start_api.sh` | All available GPUs | Maximum performance |
+- **Frontend**: http://localhost:9000
+- **FP4 API**: http://localhost:8000
+- **BF16 API**: http://localhost:8001
 
-## 📊 Service Comparison
+## LoRA Support
 
-| Feature | FP4 (Port 8000) | BF16 (Port 8001) |
-|---------|------------------|-------------------|
-| **Quality** | Good | Excellent |
-| **Speed** | Fast | Slower |
-| **VRAM** | ~8-12 GB | ~16-24 GB |
-| **Best For** | Real-time, batch | Final production |
+### Using Hugging Face LoRAs
 
-## 🌐 Access Points
-
-### ComfyUI-Style Web Frontend
-- **FP4 Frontend**: http://74.81.65.108:8000/ui
-- **BF16 Frontend**: http://74.81.65.108:8001/ui
-
-### API Documentation
-- **FP4 API**: http://74.81.65.108:8000/docs
-- **BF16 API**: http://74.81.65.108:8001/docs
-
-## 📝 Usage Examples
-
-### Basic Image Generation
 ```bash
-# FP4 - Fast generation
-curl -X POST "http://74.81.65.108:8000/generate" \
+# Apply a Hugging Face LoRA
+curl -X POST "http://localhost:8000/apply-lora" \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "A beautiful sunset over mountains"}'
-
-# BF16 - High quality  
-curl -X POST "http://74.81.65.108:8001/generate" \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "A beautiful sunset over mountains"}'
+  -d '{"lora_name": "username/model-name", "weight": 1.0}'
 ```
 
-### Custom Size and Seed
+### Uploading Local LoRA Files
+
+The web interface now supports uploading local LoRA files:
+
+1. **Click "Upload LoRA"** button in the frontend
+2. **Select your LoRA file** (.safetensors, .bin, .pt, .pth)
+3. **Set the weight** (0.0 - 2.0)
+4. **Apply the LoRA** using the "Apply LoRA" button
+
+**Supported Formats**:
+- `.safetensors` (recommended)
+- `.bin`
+- `.pt` / `.pth`
+
+**File Size Limit**: 500MB maximum
+
+### Multiple LoRA Support
+
+Both models support applying multiple LoRAs simultaneously:
+
+- **FP4 Model**: Merges multiple LoRAs into a single LoRA
+- **BF16 Model**: Applies multiple LoRAs using Diffusers' native support
+- **Maximum**: 3 LoRA layers
+- **Weight Combination**: Automatic weight calculation
+
+## API Usage
+
+### Generate Image
+
 ```bash
-curl -X POST "http://74.81.65.108:8000/generate" \
+curl -X POST "http://localhost:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "A beautiful landscape painting",
-    "width": 768,
-    "height": 768,
-    "seed": 42
-  }'
-```
-
-Notes:
-- Inference steps and guidance are fixed server-side to steps=10 and guidance=4.0 for consistency and speed.
-- Negative prompt is disabled.
-
-### Custom LoRA (single)
-```bash
-curl -X POST "http://74.81.65.108:8001/generate" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "A beautiful landscape",
-    # Hugging Face repo ID
-    "lora_name": "aleksa-codes/flux-ghibsky-illustration",
-    "lora_weight": 0.8
-  }'
-```
-
-You can also use a local LoRA checkpoint path (absolute path to .safetensors):
-```bash
-curl -X POST "http://74.81.65.108:8000/generate" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "A cozy ghibli village",
-    "lora_name": "/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors",
-    "lora_weight": 1.0
-  }'
-```
-
-### Multiple LoRAs
-Provide an ordered list; each entry has a name and weight. Repo IDs and/or local .safetensors paths are supported.
-```bash
-curl -X POST "http://74.81.65.108:8000/generate" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "A futuristic ghibli-style city",
+    "prompt": "A beautiful landscape with mountains and a lake",
+    "width": 512,
+    "height": 512,
+    "seed": 42,
     "loras": [
-      {"name": "aleksa-codes/flux-ghibsky-illustration", "weight": 0.8},
-      {"name": "/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors", "weight": 0.6}
-    ],
-    "width": 768,
-    "height": 512
+      {"name": "username/style-lora", "weight": 1.0},
+      {"name": "uploads/lora_files/uploaded_lora_123.safetensors", "weight": 0.8}
+    ]
   }'
 ```
 
-### Download to Local Machine
-```bash
-# Step 1: Generate image and get download URL
-response=$(curl -s -X POST "http://74.81.65.108:8000/generate" \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "A majestic dragon"}')
-
-# Step 2: Extract download URL and filename
-download_url=$(echo $response | jq -r '.download_url')
-filename=$(echo $response | jq -r '.filename')
-
-# Step 3: Download to your local machine
-curl -o "$filename" "http://74.81.65.108:8000$download_url"
-
-# Or download with custom name
-curl -o "my_dragon.png" "http://74.81.65.108:8000$download_url"
-```
-
-### One-liner Download
-```bash
-# Generate and download in one command
-curl -s -X POST "http://74.81.65.108:8000/generate" \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "A space station"}' | \
-  jq -r '"curl -o \"" + .filename + "\" \"http://74.81.65.108:8000" + .download_url + "\""' | \
-  bash
-```
-
-
-
-## 🎨 Default LoRA
-
-Both services automatically load and enforce **Ghibli-style illustration LoRA** (`/data/pingzhi/lora_checkpoints/Studio_Ghibli_Flux.safetensors`) with weight `1.0` when none is specified:
-
-- ✅ **No LoRA specified**: Default LoRA is applied on every request
-- ✅ **Custom LoRA**: Override with `lora_name` parameter  
-- ✅ **Weight 0.0**: Disable LoRA influence
-
-## ⚙️ Parameters Reference
-
-### Core Parameters
-- `prompt` **(required)**: Text description
-- `width`/`height` (256-1024): Image dimensions (default: 512)
-- `seed` (optional): Reproducible results
-- Steps and guidance are fixed server-side to 10 and 4.0 respectively
-
-### LoRA Parameters  
-- Preferred: `loras` (optional): list of `{ name, weight }` entries; `name` can be a HF repo ID (e.g., `user/repo`) or an absolute path to a `.safetensors` file
-- Legacy: `lora_name` (optional) and `lora_weight` (0.0-2.0) for single LoRA
-
-
-
-### Response Fields
-- `download_url`: API endpoint to download the image to your local machine
-- `filename`: Generated filename for the image
-- `image_url`: Server path where the image is stored
-
-## 🔍 Status & Monitoring
+### Upload LoRA File
 
 ```bash
-# Check service status
-curl http://74.81.65.108:8000/model-status  # FP4
-curl http://74.81.65.108:8001/model-status  # BF16
-
-# Health checks
-curl http://74.81.65.108:8000/health        # FP4  
-curl http://74.81.65.108:8001/health        # BF16
-
-# GPU status
-nvidia-smi
+curl -X POST "http://localhost:8000/upload-lora" \
+  -F "file=@/path/to/your/lora.safetensors"
 ```
 
-## 🆘 Troubleshooting
+## Configuration
 
-### GPU Issues
+### Port Configuration
+
+Set custom ports using environment variables or command-line flags:
+
 ```bash
-# Check GPU memory
-nvidia-smi
+# Environment variables
+export FP4_PORT=8000
+export BF16_PORT=8001
 
-# Kill GPU processes
-sudo fuser -v /dev/nvidia*
-sudo kill -9 <PID>
+# Or command-line flags
+./start_fp4_api.sh --port 8000
+./start_bf16_api.sh --port 8001
 ```
 
-### Port Issues
+### GPU Configuration
+
+The service automatically detects and uses available GPUs:
+
 ```bash
-# Check ports
-lsof -i :8000
-lsof -i :8001
-
-# Kill port processes
-sudo kill -9 <PID>
+# Check GPU status
+python -c "from utils.gpu_manager import GPUManager; gm = GPUManager(); print(gm.get_gpu_info())"
 ```
 
-### Service Won't Start
-1. Check virtual environment: `ls flux_env/`
-2. Check GPU availability: `nvidia-smi`
-3. Check file permissions: `ls -la start_*.sh`
-4. Activate environment: `source flux_env/bin/activate`
-
-### Memory Issues
-- Use FP4 instead of BF16 for lower VRAM
-- Use single GPU mode: `-g 1`
-- Reduce image size: `"width": 512, "height": 512`
-- Lower inference steps: `"num_inference_steps": 15`
-
-## 📁 File Structure
+## File Structure
 
 ```
 flux_api/
-├── start_api.sh              # FP4 launcher
-├── start_bf16_api.sh         # BF16 launcher  
-├── main_fp4.py               # FP4 app
-├── main_bf16.py              # BF16 app
-├── config/
-│   ├── fp4_settings.py       # FP4 config
-│   └── bf16_settings.py      # BF16 config
-├── models/
-│   ├── fp4_flux_model.py     # FP4 model
-│   └── bf16_flux_model.py    # BF16 model
-├── api/
-│   ├── fp4_routes.py         # FP4 endpoints
-│   └── bf16_routes.py        # BF16 endpoints
-└── flux_env/                 # Python environment
+├── api/                    # API routes and models
+├── models/                 # FLUX model implementations
+├── utils/                  # Utility modules
+├── config/                 # Configuration files
+├── frontend/               # Web interface
+├── uploads/                # Uploaded LoRA files
+│   └── lora_files/        # LoRA file storage
+├── generated_images/       # Generated images
+└── start_*.sh             # Service startup scripts
 ```
 
-## 💡 Tips
+## Troubleshooting
 
-- **Development**: Use FP4 for fast iteration
-- **Production**: Use BF16 for final outputs  
-- **Batch Jobs**: Use BF16 with high steps
-- **Real-time**: Use FP4 with low steps
-- **Multi-GPU**: Use balanced mode for large models
-- **Memory Saving**: Use single GPU with FP4
-- **Direct Downloads**: Use download URLs to get images to your local machine
+### Common Issues
 
-## 📥 Download Feature
+1. **Port Already in Use**
+   ```bash
+   # Kill process using port
+   sudo lsof -ti:8000 | xargs kill -9
+   ```
 
-The API now supports downloading generated images directly to your local machine:
+2. **GPU Memory Issues**
+   - Reduce image dimensions
+   - Use FP4 model for lower memory usage
+   - Check GPU memory with `nvidia-smi`
 
-### 🔧 How It Works
-1. **Generate**: Make a POST request to `/generate`
-2. **Get URL**: Response includes `download_url` and `filename`
-3. **Download**: Use the download URL to get the file locally
+3. **LoRA Upload Failures**
+   - Check file format (.safetensors recommended)
+   - Ensure file size < 500MB
+   - Verify file integrity
 
-### 🌐 Download Method
+### Logs
+
+Check service logs for detailed error information:
 
 ```bash
-# Generate and get download info
-curl -X POST "http://74.81.65.108:8000/generate" \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "A fantasy castle"}' > response.json
-
-# Download to local machine
-download_url=$(jq -r '.download_url' response.json)
-filename=$(jq -r '.filename' response.json)
-curl -o "$filename" "http://74.81.65.108:8000$download_url"
+# View real-time logs
+tail -f logs/flux_api.log
 ```
 
-### 🛡️ Security Features
-- Download endpoint only serves files from `generated_images/` directory
-- Path validation prevents directory traversal attacks
-- File type validation for supported image formats
-- Error handling with detailed feedback
+## Development
 
-### 📝 Batch Download Script
+### Adding New Features
+
+1. **Frontend**: Modify `frontend/static/js/app.js`
+2. **API**: Add routes in `api/fp4_routes.py` or `api/bf16_routes.py`
+3. **Models**: Extend `models/fp4_flux_model.py` or `models/bf16_flux_model.py`
+
+### Testing
+
 ```bash
-#!/bin/bash
-# Generate multiple images and download them
-prompts=("Dragon" "Castle" "Forest" "Ocean" "Mountain")
+# Test API endpoints
+python -c "import requests; print(requests.get('http://localhost:8000/').json())"
 
-for i in "${!prompts[@]}"; do
-  echo "Generating: ${prompts[$i]}"
-  
-  # Generate image
-  response=$(curl -s -X POST "http://74.81.65.108:8000/generate" \
-    -H "Content-Type: application/json" \
-    -d "{\"prompt\": \"${prompts[$i]}\", \"seed\": $((42 + i))}")
-  
-  # Download image
-  download_url=$(echo $response | jq -r '.download_url')
-  filename=$(echo $response | jq -r '.filename')
-  
-  curl -s -o "${prompts[$i],,}_$filename" "http://74.81.65.108:8000$download_url"
-  echo "Downloaded: ${prompts[$i],,}_$filename"
-done
+# Test model imports
+python -c "from models.fp4_flux_model import FluxModelManager; print('✅ FP4 model imports successfully')"
 ```
 
-## 🎨 ComfyUI Frontend Features
+## License
 
-### 🌟 What's Included
-- **Modern Dark Theme**: ComfyUI-inspired design with smooth animations
-- **Real-time Service Switching**: Toggle between FP4 and BF16 services instantly
-- **Interactive Parameters**: Visual sliders and inputs for all generation settings
-- **Live Image Gallery**: Generated images appear immediately with metadata
-- **Image Modal**: Click any image for full-size view with generation details
-- **Download Integration**: One-click download directly from the interface
-- **Responsive Design**: Works perfectly on desktop, tablet, and mobile
-- **Keyboard Shortcuts**: 
-  - `Ctrl/Cmd + Enter`: Generate image
-  - `Ctrl/Cmd + R`: Random seed
-  - `Escape`: Close modal
-
-### 🚀 Quick Start with Frontend
-1. **Open the interface**: Visit http://74.81.65.108:8000/ui
-2. **Choose your service**: FP4 (fast) or BF16 (quality)
-3. **Enter your prompt**: Describe what you want to generate
-4. **Adjust parameters**: Use sliders for steps, guidance, etc.
-5. **Generate**: Click the generate button and watch your image appear!
-6. **Download**: Click any image to view full-size and download
-
-### 🎛️ Frontend Controls
-- **Service Toggle**: Switch between FP4/BF16 without page reload
-- **Parameter Sliders**: Width/height; steps (10) and guidance (4.0) are fixed
-- **Seed Management**: Random seed generator with manual input option
-- **LoRA Support**: Single or multiple LoRAs with weights
-- **Aspect Ratios**: Quick presets for common image sizes
-- **Generation History**: Persistent gallery with local storage
-- **Error Handling**: Clear feedback for any issues
-
----
-
-🎯 **Ready to generate?** 
-- **Web Interface**: Visit http://74.81.65.108:8000/ui for the ComfyUI experience
-- **API Access**: Visit http://74.81.65.108:8000/docs for programmatic access
-- **Quick Start**: `./start_api.sh -g 1` to launch the service
+This project is licensed under the MIT License - see the LICENSE file for details.

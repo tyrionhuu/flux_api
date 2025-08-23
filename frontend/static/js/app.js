@@ -1,15 +1,17 @@
 // FLUX API ComfyUI Frontend
 class FluxAPI {
     constructor() {
-        // Build base host without an existing port to avoid patterns like :8000:8001
-        this.hostBase = window.location.protocol + '//' + window.location.hostname;
+        // Use current origin (protocol + host + port) so UI works on any served port
+        this.hostBase = window.location.origin;
         this.isGenerating = false;
+        this.loraEntries = [];
         
         this.init();
     }
 
     init() {
         this.setupEventListeners();
+        this.addLoraEntry('/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors', 1.0);
         
         // Ensure DOM is fully loaded before setting up sliders
         setTimeout(() => {
@@ -24,15 +26,53 @@ class FluxAPI {
         // Random seed button
         document.getElementById('random-seed').addEventListener('click', () => this.randomSeed());
         
+        // LoRA controls
+        document.getElementById('add-lora').addEventListener('click', () => this.addLoraEntry());
+        
+        // LoRA file upload
+        document.getElementById('upload-lora').addEventListener('click', () => this.triggerFileUpload());
+        document.getElementById('lora-file-input').addEventListener('change', (e) => this.handleFileUpload(e));
+        
+        // Apply LoRA button
+        const applyLoraBtn = document.getElementById('apply-lora-btn');
+        console.log('Apply LoRA button found:', applyLoraBtn);
+        if (applyLoraBtn) {
+            applyLoraBtn.addEventListener('click', () => {
+                console.log('Apply LoRA button clicked!');
+                this.showApiCommand();
+            });
+        } else {
+            console.error('Apply LoRA button not found!');
+        }
 
+        // Drag-and-drop reordering for LoRA list
+        const loraList = document.getElementById('lora-list');
+        loraList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = this.getDragAfterElement(loraList, e.clientY);
+            const dragging = document.querySelector('.lora-entry.dragging');
+            if (!dragging) return;
+            if (afterElement == null) {
+                loraList.appendChild(dragging);
+            } else {
+                loraList.insertBefore(dragging, afterElement);
+            }
+        });
+        loraList.addEventListener('drop', () => {
+            // Re-sync internal order with DOM order
+            this.loraEntries = Array.from(loraList.children);
+        });
 
-        // Clear history
-        document.getElementById('clear-history').addEventListener('click', () => this.clearHistory());
-
+        // Clear history (optional element)
+        const clearHistoryBtn = document.getElementById('clear-history');
+        if (clearHistoryBtn) {
+            clearHistoryBtn.addEventListener('click', () => this.clearHistory());
+        }
+        
         // Modal controls
         document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
         document.getElementById('download-image').addEventListener('click', () => this.downloadCurrentImage());
-        document.getElementById('copy-prompt').addEventListener('click', () => this.copyCurrentPrompt());
+        document.getElementById('copy-command').addEventListener('click', () => this.copyApiCommand());
 
         // Close modal on backdrop click
         document.getElementById('image-modal').addEventListener('click', (e) => {
@@ -40,6 +80,8 @@ class FluxAPI {
                 this.closeModal();
             }
         });
+        
+
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -47,9 +89,6 @@ class FluxAPI {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     this.generateImage();
-                } else if (e.key === 'r') {
-                    e.preventDefault();
-                    this.randomSeed();
                 }
             }
             if (e.key === 'Escape') {
@@ -149,6 +188,131 @@ class FluxAPI {
         seedInput.value = Math.floor(Math.random() * 4294967295);
     }
 
+    addLoraEntry(name = '', weight = 1.0, isUploaded = false) {
+        // Check maximum LoRA limit
+        if (this.loraEntries.length >= 3) {
+            console.warn('Maximum of 3 LoRAs allowed');
+            return;
+        }
+
+        const loraList = document.getElementById('lora-list');
+        const loraEntry = document.createElement('div');
+        loraEntry.className = 'lora-entry';
+        loraEntry.setAttribute('draggable', 'true');
+        
+        // Add special class for uploaded files
+        if (isUploaded) {
+            loraEntry.classList.add('uploaded-lora');
+        }
+        
+        loraEntry.innerHTML = `
+            <span class="drag-handle" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
+            <input type="text" placeholder="username/model-name or /path/to/lora.safetensors" class="lora-name" ${isUploaded ? 'readonly' : ''}>
+            <input type="number" placeholder="1.0" min="0.0" max="2.0" step="0.1" value="1.0" class="lora-weight">
+            <button class="remove-lora" title="Remove LoRA">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        // Set initial values if provided
+        const nameInput = loraEntry.querySelector('.lora-name');
+        const weightInput = loraEntry.querySelector('.lora-weight');
+        if (name) nameInput.value = name;
+        if (typeof weight === 'number') weightInput.value = String(weight);
+        
+        // Remove functionality
+        const removeBtn = loraEntry.querySelector('.remove-lora');
+        removeBtn.addEventListener('click', () => this.removeLoraEntry(loraEntry));
+
+        // Drag events
+        loraEntry.addEventListener('dragstart', () => {
+            loraEntry.classList.add('dragging');
+        });
+        loraEntry.addEventListener('dragend', () => {
+            loraEntry.classList.remove('dragging');
+            // Re-sync array with DOM order
+            this.loraEntries = Array.from(loraList.children);
+        });
+        
+        loraList.appendChild(loraEntry);
+        this.loraEntries.push(loraEntry);
+        
+        // Update Add LoRA button state
+        this.updateAddLoraButtonState();
+    }
+
+    updateAddLoraButtonState() {
+        const addLoraBtn = document.getElementById('add-lora');
+        if (addLoraBtn) {
+            if (this.loraEntries.length >= 3) {
+                addLoraBtn.disabled = true;
+                addLoraBtn.title = 'Maximum of 3 LoRAs reached';
+                addLoraBtn.style.opacity = '0.5';
+                addLoraBtn.style.cursor = 'not-allowed';
+            } else {
+                addLoraBtn.disabled = false;
+                addLoraBtn.title = 'Add LoRA';
+                addLoraBtn.style.opacity = '1';
+                addLoraBtn.style.cursor = 'pointer';
+            }
+        }
+    }
+
+    getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.lora-entry:not(.dragging)')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+    }
+
+    removeLoraEntry(loraEntry) {
+        const index = this.loraEntries.indexOf(loraEntry);
+        if (index > -1) {
+            this.loraEntries.splice(index, 1);
+        }
+        
+        // Clean up uploaded file data if this was an uploaded LoRA
+        if (loraEntry.classList.contains('uploaded-lora')) {
+            const nameInput = loraEntry.querySelector('.lora-name');
+            if (nameInput && this.uploadedFiles) {
+                this.uploadedFiles.delete(nameInput.value);
+            }
+        }
+        
+        loraEntry.remove();
+        // Ensure the array matches DOM after removal
+        const loraList = document.getElementById('lora-list');
+        this.loraEntries = Array.from(loraList.children);
+        
+        // Update Add LoRA button state after removal
+        this.updateAddLoraButtonState();
+    }
+
+    getLoraConfigs() {
+        const configs = [];
+        for (const entry of this.loraEntries) {
+            const name = entry.querySelector('.lora-name').value.trim();
+            const weight = parseFloat(entry.querySelector('.lora-weight').value);
+            if (name && !isNaN(weight)) {
+                // Check if this is an uploaded file
+                const isUploaded = entry.classList.contains('uploaded-lora');
+                configs.push({ 
+                    name, 
+                    weight, 
+                    isUploaded,
+                    file: isUploaded && this.uploadedFiles ? this.uploadedFiles.get(name) : null
+                });
+            }
+        }
+        return configs;
+    }
+
     async generateImage() {
         if (this.isGenerating) return;
 
@@ -167,8 +331,8 @@ class FluxAPI {
             
 
             
-            // Only generate on FP4 model - BF16 disabled
-            const response = await fetch(`${this.hostBase}:8000/generate`, {
+            // Only generate on FP4 model - BF16 disabled; use current origin/port
+            const response = await fetch(`${this.hostBase}/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(params)
@@ -203,7 +367,8 @@ class FluxAPI {
             height: parseInt(document.getElementById('height').value)
         };
         
-
+        // Always include LoRA configurations (empty list means remove any applied LoRA)
+        params.loras = this.getLoraConfigs();
 
         // Ensure both models use the same seed
         const seed = document.getElementById('seed').value;
@@ -228,7 +393,7 @@ class FluxAPI {
         const singleItem = document.createElement('div');
         singleItem.className = 'comparison-item';
         
-        const imageUrl = `${this.hostBase}:8000${result.download_url}`;
+        const imageUrl = `${this.hostBase}${result.download_url}`;
         
         singleItem.innerHTML = `
             <div class="comparison-images">
@@ -336,6 +501,50 @@ class FluxAPI {
         this.currentModalData = null;
     }
 
+
+
+    showApiCommand() {
+        const commandSection = document.getElementById('api-command-section');
+        const commandElement = document.getElementById('api-command');
+        
+        // Get current LoRA configuration
+        const loras = this.getLoraConfigs();
+        const prompt = document.getElementById('prompt').value;
+        const width = document.getElementById('width').value;
+        const height = document.getElementById('height').value;
+        const seed = document.getElementById('seed').value;
+        
+        // Build the one-liner download command
+        let command = `curl -s -X POST "${window.location.origin}/generate" -H "Content-Type: application/json" -d '{"prompt": "${prompt}", "width": ${width}, "height": ${height}`;
+        
+        if (seed) {
+            command += `, "seed": ${seed}`;
+        }
+        
+        if (loras && loras.length > 0) {
+            command += `, "loras": [`;
+            loras.forEach((lora, index) => {
+                command += `{"name": "${lora.name}", "weight": ${lora.weight}}`;
+                if (index < loras.length - 1) command += `, `;
+            });
+            command += `]`;
+        }
+        
+        command += `}' | jq -r '.download_url' | xargs -I {} curl -o "generated_image.png" "${window.location.origin}{}"`;
+        
+        commandElement.textContent = command;
+        commandSection.classList.remove('hidden');
+    }
+
+    copyApiCommand() {
+        const commandElement = document.getElementById('api-command');
+        navigator.clipboard.writeText(commandElement.textContent).then(() => {
+            this.showSuccess('API command copied to clipboard!');
+        }).catch(() => {
+            this.showError('Failed to copy API command');
+        });
+    }
+
     async downloadCurrentImage() {
         if (!this.currentModalData) return;
 
@@ -357,15 +566,7 @@ class FluxAPI {
         }
     }
 
-    copyCurrentPrompt() {
-        if (!this.currentModalData) return;
 
-        navigator.clipboard.writeText(this.currentModalData.params.prompt).then(() => {
-            this.showSuccess('Prompt copied to clipboard!');
-        }).catch(() => {
-            this.showError('Failed to copy prompt');
-        });
-    }
 
     clearHistory() {
         if (confirm('Clear all generated images?')) {
@@ -404,6 +605,172 @@ class FluxAPI {
 
     showError(message) {
         console.error('❌ Error:', message);
+        this.showNotification(message, 'error');
+    }
+
+    showSuccess(message) {
+        console.log('✅ Success:', message);
+        this.showNotification(message, 'success');
+    }
+
+    showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+                <span class="notification-message">${message}</span>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+
+        // Add to page
+        document.body.appendChild(notification);
+
+        // Auto-remove after 5 seconds for success, 10 seconds for errors
+        const timeout = type === 'error' ? 10000 : 5000;
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, timeout);
+
+        // Add slide-in animation
+        setTimeout(() => {
+            notification.classList.add('notification-show');
+        }, 100);
+    }
+
+    showUploadProgress(filename) {
+        // Create minimal upload progress indicator
+        const progressContainer = document.createElement('div');
+        progressContainer.id = 'upload-progress';
+        progressContainer.className = 'upload-progress';
+        progressContainer.innerHTML = `
+            <div class="upload-progress-content">
+                <div class="upload-progress-text">
+                    <div class="upload-filename">${filename}</div>
+                    <div class="upload-status">Uploading...</div>
+                </div>
+                <div class="upload-progress-bar">
+                    <div class="upload-progress-fill"></div>
+                </div>
+            </div>
+        `;
+
+        // Add to page
+        document.body.appendChild(progressContainer);
+
+        // Add slide-in animation
+        setTimeout(() => {
+            progressContainer.classList.add('upload-progress-show');
+        }, 100);
+
+        // Animate progress bar
+        const progressFill = progressContainer.querySelector('.upload-progress-fill');
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90; // Don't go to 100% until actually complete
+            progressFill.style.width = progress + '%';
+        }, 200);
+
+        // Store interval for cleanup
+        this.uploadProgressInterval = progressInterval;
+    }
+
+    hideUploadProgress() {
+        const progressContainer = document.getElementById('upload-progress');
+        if (progressContainer) {
+            // Complete the progress bar
+            const progressFill = progressContainer.querySelector('.upload-progress-fill');
+            if (progressFill) {
+                progressFill.style.width = '100%';
+            }
+
+            // Add completion animation
+            progressContainer.classList.add('upload-progress-complete');
+
+            // Remove after animation
+            setTimeout(() => {
+                if (progressContainer.parentElement) {
+                    progressContainer.remove();
+                }
+            }, 500);
+
+            // Clear progress interval
+            if (this.uploadProgressInterval) {
+                clearInterval(this.uploadProgressInterval);
+                this.uploadProgressInterval = null;
+            }
+        }
+    }
+
+    triggerFileUpload() {
+        // Trigger the hidden file input
+        document.getElementById('lora-file-input').click();
+    }
+
+    async handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Check file type
+        const allowedTypes = ['.safetensors', '.bin', '.pt', '.pth'];
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+        
+        if (!allowedTypes.includes(fileExtension)) {
+            this.showError(`Invalid file type. Please upload a LoRA file (${allowedTypes.join(', ')})`);
+            return;
+        }
+
+        // Check file size (max 500MB)
+        const maxSize = 500 * 1024 * 1024; // 500MB
+        if (file.size > maxSize) {
+            this.showError('File too large. Maximum size is 500MB.');
+            return;
+        }
+
+        try {
+            // Show upload progress indicator
+            this.showUploadProgress(file.name);
+            
+            // Upload the file to the server first
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch(`${this.hostBase}/upload-lora`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Upload failed');
+            }
+            
+            const uploadResult = await response.json();
+            const filename = uploadResult.filename;
+            
+            // Hide upload progress
+            this.hideUploadProgress();
+            
+            // Add the uploaded file to the LoRA list with the server filename
+            this.addLoraEntry(filename, 1.0, true); // true indicates it's an uploaded file
+            
+            this.showSuccess(`LoRA file "${file.name}" uploaded successfully!`);
+            
+            // Reset the file input
+            event.target.value = '';
+            
+        } catch (error) {
+            // Hide upload progress on error
+            this.hideUploadProgress();
+            this.showError(`Failed to upload file: ${error.message}`);
+        }
     }
 
 
@@ -424,6 +791,5 @@ document.addEventListener('DOMContentLoaded', () => {
 console.log(`
 🎨 FLUX API Frontend Shortcuts:
 Ctrl/Cmd + Enter: Generate image
-Ctrl/Cmd + R: Random seed
 Escape: Close modal
 `);

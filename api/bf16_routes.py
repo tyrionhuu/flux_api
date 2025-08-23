@@ -5,10 +5,10 @@ This reuses the existing route logic to avoid code duplication.
 
 import logging
 from typing import Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from models.bf16_flux_model import BF16FluxModelManager
-from api.models import GenerateRequest, GenerateResponse, ModelStatusResponse
-from config.fp4_settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
+from api.models import GenerateRequest, ModelStatusResponse
+from config.bf16_settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
 from utils.system_utils import get_system_memory
 import time
@@ -93,31 +93,51 @@ async def generate_image(request: GenerateRequest):
 
         # Handle multiple LoRA support
         loras_to_apply = []
-        
+        remove_all_loras = False
+
         # Check for new multiple LoRA format first
-        if request.loras:
-            for lora_config in request.loras:
-                if not lora_config.name or not lora_config.name.strip():
-                    raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
-                if lora_config.weight < 0 or lora_config.weight > 2.0:
-                    raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
-                loras_to_apply.append({
-                    "name": lora_config.name.strip(),
-                    "weight": lora_config.weight
-                })
+        if request.loras is not None:
+            if len(request.loras) == 0:
+                remove_all_loras = True
+            else:
+                for lora_config in request.loras:
+                    if not lora_config.name or not lora_config.name.strip():
+                        raise HTTPException(
+                            status_code=400, detail="LoRA name cannot be empty"
+                        )
+                    if lora_config.weight < 0 or lora_config.weight > 2.0:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="LoRA weight must be between 0 and 2.0",
+                        )
+                    loras_to_apply.append(
+                        {"name": lora_config.name.strip(), "weight": lora_config.weight}
+                    )
         # Legacy support for single LoRA
         elif request.lora_name:
             if not request.lora_name.strip():
-                raise HTTPException(status_code=400, detail="LoRA name cannot be empty if provided")
-            if request.lora_weight is None or request.lora_weight < 0 or request.lora_weight > 2.0:
-                raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
-            loras_to_apply.append({
-                "name": request.lora_name.strip(),
-                "weight": request.lora_weight
-            })
+                raise HTTPException(
+                    status_code=400, detail="LoRA name cannot be empty if provided"
+                )
+            if (
+                request.lora_weight is None
+                or request.lora_weight < 0
+                or request.lora_weight > 2.0
+            ):
+                raise HTTPException(
+                    status_code=400, detail="LoRA weight must be between 0 and 2.0"
+                )
+            loras_to_apply.append(
+                {"name": request.lora_name.strip(), "weight": request.lora_weight}
+            )
 
-        # If no LoRA specified, force default LoRA
-        if not loras_to_apply:
+        # Apply default only when loras is None and no legacy field
+        if (
+            not loras_to_apply
+            and not remove_all_loras
+            and request.loras is None
+            and not request.lora_name
+        ):
             loras_to_apply = [
                 {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
             ]
@@ -140,39 +160,59 @@ async def generate_image(request: GenerateRequest):
         lora_weight_applied = None
 
         if loras_to_apply:
-            # Apply multiple LoRAs in sequence
+            # Apply multiple LoRAs simultaneously
             logger.info(f"Applying {len(loras_to_apply)} LoRAs to loaded BF16 model")
             try:
+                # Validate all LoRA names first
                 for lora_config in loras_to_apply:
-                    # Validate LoRA name format (should be a valid Hugging Face repo ID)
-                    if not lora_config["name"] or "/" not in lora_config["name"]:
+                    if not lora_config["name"]:
+                        raise HTTPException(
+                            status_code=400, detail="LoRA name cannot be empty"
+                        )
+
+                    # Allow uploaded file paths (uploads/lora_files/...)
+                    if lora_config["name"].startswith("uploaded_lora_"):
+                        # This is an uploaded file, validate it exists
+                        import os
+
+                        upload_path = f"uploads/lora_files/{lora_config['name']}"
+                        if not os.path.exists(upload_path):
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Uploaded LoRA file not found: {lora_config['name']}",
+                            )
+                    elif "/" not in lora_config["name"]:
+                        # Must be a Hugging Face repository ID or local path
                         raise HTTPException(
                             status_code=400,
-                            detail=f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name')",
+                            detail=f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name'), local path, or uploaded file path",
                         )
-                    
-                    if not bf16_model_manager.apply_lora(lora_config["name"], lora_config["weight"]):
-                        logger.error(f"LoRA application failed: {lora_config['name']} - Model: {bf16_model_manager.is_loaded()}, Pipeline: {bf16_model_manager.get_pipeline() is None}")
-                        raise HTTPException(
-                            status_code=500,
-                            detail=f"Failed to apply LoRA {lora_config['name']}. Please check if the LoRA exists and is compatible.",
-                        )
-                    else:
-                        logger.info(f"LoRA {lora_config['name']} applied successfully with weight {lora_config['weight']}")
-                
-                # Use the last applied LoRA info for response
+
+                # Apply all LoRAs at once using the new method
+                if not bf16_model_manager.apply_multiple_loras(loras_to_apply):
+                    logger.error(
+                        f"Multiple LoRA application failed - Model: {bf16_model_manager.is_loaded()}, Pipeline: {bf16_model_manager.get_pipeline() is None}"
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to apply LoRAs. Please check if the LoRAs exist and are compatible.",
+                    )
+                else:
+                    logger.info(f"All {len(loras_to_apply)} LoRAs applied successfully")
+
+                # Get the updated LoRA info
                 current_lora = bf16_model_manager.get_lora_info()
                 if current_lora:
                     lora_applied = current_lora.get("name")
                     lora_weight_applied = current_lora.get("weight")
-                    logger.info(f"All LoRAs applied successfully to BF16 model. Current LoRA: {lora_applied} with weight {lora_weight_applied}")
+                    logger.info(
+                        f"Multiple LoRAs applied successfully to BF16 model. Current LoRAs: {lora_applied} with total weight {lora_weight_applied}"
+                    )
             except Exception as lora_error:
                 logger.error(
                     f"Exception during LoRA application to BF16 model: {lora_error} (Type: {type(lora_error).__name__})"
                 )
-                if "not found" in str(lora_error).lower() or "404" in str(
-                    lora_error
-                ):
+                if "not found" in str(lora_error).lower() or "404" in str(lora_error):
                     raise HTTPException(
                         status_code=400,
                         detail=f"One or more LoRAs not found. Please check the repository IDs.",
@@ -182,8 +222,16 @@ async def generate_image(request: GenerateRequest):
                         status_code=500,
                         detail=f"Failed to apply LoRAs to BF16 model: {str(lora_error)}",
                     )
+        elif remove_all_loras:
+            if bf16_model_manager.get_lora_info():
+                logger.info(
+                    "Removing all LoRAs from BF16 model as requested by client (empty list)"
+                )
+                bf16_model_manager.remove_lora()
+                current_lora = None
+                lora_applied = None
+                lora_weight_applied = None
         else:
-            # Should not occur because we always set default, but keep a safe fallback
             if current_lora:
                 lora_applied = current_lora.get("name")
                 lora_weight_applied = current_lora.get("weight")
@@ -350,10 +398,7 @@ def generate_image_internal(
         should_apply = (
             not current_info
             or current_info.get("name") != lora_applied
-            or (
-                lora_weight is not None
-                and current_info.get("weight") != lora_weight
-            )
+            or (lora_weight is not None and current_info.get("weight") != lora_weight)
         )
         if should_apply:
             logger.info(
@@ -436,4 +481,61 @@ def generate_image_internal(
         logger.error(f"Image generation failed: {e} (Type: {type(e).__name__})")
         raise HTTPException(
             status_code=500, detail=f"Image generation failed: {str(e)}"
+        )
+
+
+@router.post("/upload-lora")
+async def upload_lora_file(file: UploadFile = File(...)):
+    """Upload a LoRA file to the server"""
+    import os
+    import shutil
+    from pathlib import Path
+
+    # Check file type
+    allowed_extensions = [".safetensors", ".bin", ".pt", ".pth"]
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    file_extension = Path(file.filename).suffix.lower()
+
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}",
+        )
+
+    # Check file size (max 500MB)
+    max_size = 500 * 1024 * 1024  # 500MB
+    if not file.size or file.size > max_size:
+        raise HTTPException(
+            status_code=400, detail="File too large. Maximum size is 500MB."
+        )
+
+    try:
+        # Create uploads directory if it doesn't exist
+        uploads_dir = Path("uploads/lora_files")
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate unique filename
+        timestamp = int(time.time())
+        safe_filename = f"uploaded_lora_{timestamp}{file_extension}"
+        file_path = uploads_dir / safe_filename
+
+        # Save the uploaded file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        logger.info(f"LoRA file uploaded successfully: {file_path}")
+
+        return {
+            "message": "LoRA file uploaded successfully",
+            "filename": safe_filename,
+            "file_path": str(file_path),
+            "size": file.size,
+        }
+
+    except Exception as e:
+        logger.error(f"Error uploading LoRA file: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to upload LoRA file: {str(e)}"
         )

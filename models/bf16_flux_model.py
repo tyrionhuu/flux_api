@@ -4,6 +4,7 @@ This extends the base FluxModelManager to avoid code duplication.
 """
 
 import logging
+import os
 import torch
 from typing import Optional, Any
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
@@ -110,9 +111,7 @@ class BF16FluxModelManager(FluxModelManager):
                 logger.info("BF16 FLUX.1-schnell model loaded successfully!")
 
             except Exception as bf16_error:
-                logger.error(
-                    f"Error loading BF16 FLUX.1-schnell model: {bf16_error} (Type: {type(bf16_error).__name__})"
-                )
+                logger.error(f"Error loading BF16 FLUX.1-schnell model: {bf16_error}")
                 raise RuntimeError(
                     f"Failed to load BF16 FLUX.1-schnell model: {bf16_error}."
                 )
@@ -129,7 +128,9 @@ class BF16FluxModelManager(FluxModelManager):
             # Apply default LoRA
             lora_success = self._apply_default_lora_bf16()
             if not lora_success:
-                logger.warning("Failed to apply default LoRA, but model will continue without it")
+                logger.warning(
+                    "Failed to apply default LoRA, but model will continue without it"
+                )
                 # Reset LoRA state to indicate no LoRA is loaded
                 self.current_lora = None
                 self.current_weight = 0.0  # Use 0.0 instead of None for float type
@@ -137,9 +138,7 @@ class BF16FluxModelManager(FluxModelManager):
             return True
 
         except Exception as e:
-            logger.error(
-                f"Error loading BF16 FLUX model: {e} (Type: {type(e).__name__})"
-            )
+            logger.error(f"Error loading BF16 FLUX model: {e}")
             return False
 
     def _apply_default_lora_bf16(self):
@@ -149,46 +148,26 @@ class BF16FluxModelManager(FluxModelManager):
                 logger.warning("Pipeline not loaded, cannot apply default LoRA")
                 return False
 
-            logger.info(
-                f"Applying default LoRA to BF16 model: {DEFAULT_LORA_NAME} with weight {DEFAULT_LORA_WEIGHT}"
-            )
-
-            # Load and apply LoRA using diffusers method - following the correct pattern
-            logger.info(f"   - Loading default LoRA weights from {DEFAULT_LORA_NAME}")
+            logger.info(f"Applying default LoRA to BF16 model...")
             try:
                 # For BF16 model, we need to use just the repo name without /lora.safetensors
                 lora_repo = DEFAULT_LORA_NAME.replace("/lora.safetensors", "")
-                logger.info(f"   - Loading LoRA from repo: {lora_repo}")
-                
-                # Use the correct method as shown in the example
-                self.pipe.load_lora_weights(lora_repo, weight_name='lora.safetensors')
-                logger.info(f"   - Default LoRA weights loaded successfully")
+                self.pipe.load_lora_weights(lora_repo, weight_name="lora.safetensors")
+                logger.info(f"   - Default LoRA loaded successfully")
             except Exception as load_error:
                 logger.warning(
-                    f"   - Failed to load default LoRA weights: {load_error}"
+                    f"   - Failed to load default LoRA, trying alternative method..."
                 )
-                # Try alternative method for BF16 model
                 try:
-                    logger.info(f"   - Trying alternative LoRA loading method...")
-                    # Try without weight_name first
                     self.pipe.load_lora_weights(lora_repo)
-                    logger.info(f"   - Alternative LoRA loading without weight_name successful")
+                    logger.info(f"   - Alternative LoRA loading successful")
                 except Exception as alt_error:
-                    logger.warning(
-                        f"   - Alternative LoRA loading also failed: {alt_error}"
-                    )
+                    logger.warning(f"   - Alternative LoRA loading failed: {alt_error}")
                     return False
-
-                        # For BF16 model, load_lora_weights should handle the weight automatically
-            # The weight_name='lora.safetensors' should set the correct weight
-            logger.info(f"   - LoRA weight should be automatically set by load_lora_weights")
-            logger.info(f"   - Using default weight: {DEFAULT_LORA_WEIGHT}")
 
             self.current_lora = DEFAULT_LORA_NAME
             self.current_weight = DEFAULT_LORA_WEIGHT
-            logger.info(
-                f"Default LoRA {DEFAULT_LORA_NAME} applied successfully to BF16 model with weight {DEFAULT_LORA_WEIGHT}"
-            )
+            logger.info(f"   - Default LoRA applied (weight: {DEFAULT_LORA_WEIGHT})")
             return True
 
         except Exception as e:
@@ -229,9 +208,7 @@ class BF16FluxModelManager(FluxModelManager):
                 torch.cuda.set_device(0)
                 logger.info("Generating on cuda:0 (single GPU)")
             except Exception as gpu_error:
-                logger.error(
-                    f"GPU error during device selection: {gpu_error} (Type: {type(gpu_error).__name__})"
-                )
+                logger.error(f"GPU error during device selection: {gpu_error}")
                 raise RuntimeError(
                     f"GPU error: {gpu_error}. GPU required for image generation."
                 )
@@ -270,9 +247,7 @@ class BF16FluxModelManager(FluxModelManager):
 
             except Exception as memory_error:
                 if "CUDA" in str(memory_error) or "memory" in str(memory_error).lower():
-                    logger.warning(
-                        f"CUDA memory error detected: {memory_error} (Type: {type(memory_error).__name__})"
-                    )
+                    logger.warning(f"CUDA memory error detected: {memory_error}")
                     logger.info("Trying with reduced parameters...")
 
                     # Fallback with reduced parameters
@@ -298,42 +273,89 @@ class BF16FluxModelManager(FluxModelManager):
                 else:
                     # Re-raise if it's not a memory error
                     logger.error(
-                        f"Non-memory error during BF16 image generation: {memory_error} (Type: {type(memory_error).__name__})"
+                        f"Non-memory error during BF16 image generation: {memory_error}"
                     )
                     raise memory_error
 
         except Exception as e:
-            logger.error(
-                f"Error in BF16 image generation: {e} (Type: {type(e).__name__})"
-            )
+            logger.error(f"Error in BF16 image generation: {e}")
             raise RuntimeError(f"Failed to generate BF16 image: {e}")
 
     def apply_lora(self, lora_name: str, lora_weight: float = 1.0) -> bool:
-        """Apply LoRA to the BF16 model"""
+        """Apply a single LoRA to the BF16 model - for backward compatibility"""
+        return self.apply_multiple_loras([{"name": lora_name, "weight": lora_weight}])
+
+    def apply_multiple_loras(self, lora_configs: list) -> bool:
+        """Apply multiple LoRAs simultaneously to the BF16 model"""
         try:
             if not self.model_loaded or self.pipe is None:
-                logger.error("Model not loaded, cannot apply LoRA")
+                logger.error("Model not loaded, cannot apply LoRAs")
                 return False
 
-            logger.info(
-                f"Applying LoRA {lora_name} with weight {lora_weight} to BF16 model..."
-            )
+            if not lora_configs:
+                logger.info("No LoRAs to apply")
+                return True
 
-            # Load and apply LoRA
-            self.pipe.load_lora_weights(lora_name)
+            logger.info(f"Applying {len(lora_configs)} LoRAs to BF16 model...")
 
-            # Set LoRA scale
-            self.pipe.set_adapters([lora_name], adapter_weights=[lora_weight])
+            # For BF16 model with diffusers, we can load multiple LoRAs
+            # and set their weights simultaneously
+            lora_names = []
+            lora_weights = []
 
-            # Update state
-            self.current_lora = lora_name
-            self.current_weight = lora_weight
+            for i, lora_config in enumerate(lora_configs):
+                lora_name = lora_config["name"]
+                weight = lora_config["weight"]
 
-            logger.info(f"LoRA {lora_name} applied successfully to BF16 model")
-            return True
+                logger.info(f"   - Loading LoRA {i+1}: {lora_name}")
+
+                try:
+                    # Parse the input to extract repo_id and filename for BF16 model
+                    if "/" in lora_name and not os.path.exists(lora_name):
+                        # This is a Hugging Face input, parse it
+                        repo_id, filename = self._parse_hf_input(lora_name)
+
+                        if filename:
+                            # We have a specific filename, use it
+                            self.pipe.load_lora_weights(repo_id, weight_name=filename)
+                        else:
+                            # No specific filename, let diffusers auto-detect
+                            self.pipe.load_lora_weights(repo_id)
+                    else:
+                        # Local file or simple repo name
+                        self.pipe.load_lora_weights(lora_name)
+
+                    lora_names.append(lora_name)
+                    lora_weights.append(weight)
+                    logger.info(f"   - LoRA {i+1} loaded successfully")
+                except Exception as load_error:
+                    logger.error(f"   - Failed to load LoRA {i+1}: {load_error}")
+                    return False
+
+            # Set all LoRA adapters with their respective weights simultaneously
+            if lora_names:
+                try:
+                    # This should properly combine multiple LoRAs
+                    self.pipe.set_adapters(lora_names, adapter_weights=lora_weights)
+                    logger.info(f"   - Multiple LoRA adapters set successfully")
+
+                    # Update state to reflect multiple LoRAs
+                    self.current_lora = lora_names
+                    self.current_weight = sum(lora_weights)
+
+                    logger.info(
+                        f"   - All {len(lora_names)} LoRAs applied successfully"
+                    )
+                    return True
+                except Exception as adapter_error:
+                    logger.error(f"   - Failed to set LoRA adapters: {adapter_error}")
+                    return False
+            else:
+                logger.warning("No LoRAs were successfully loaded")
+                return False
 
         except Exception as e:
-            logger.error(f"Failed to apply LoRA to BF16 model: {e}")
+            logger.error(f"Failed to apply multiple LoRAs to BF16 model: {e}")
             return False
 
     def remove_lora(self) -> bool:
@@ -361,9 +383,18 @@ class BF16FluxModelManager(FluxModelManager):
 
     def get_lora_info(self) -> Optional[dict]:
         """Get current LoRA information for BF16 model"""
-        if self.current_lora:
+        if not self.current_lora:
+            return None
+
+        if isinstance(self.current_lora, str):
             return {
                 "name": self.current_lora,
+                "weight": self.current_weight,
+                "model_type": "bf16",
+            }
+        elif isinstance(self.current_lora, list):
+            return {
+                "name": [lora for lora in self.current_lora],
                 "weight": self.current_weight,
                 "model_type": "bf16",
             }

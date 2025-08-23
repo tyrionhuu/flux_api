@@ -10,16 +10,20 @@ echo "=========================="
 
 # Parse args (-g supports single GPU id or comma-separated list, e.g., "1,2,3")
 GPU_ID=""
+PORT=8000
 
 usage() {
     echo "Usage: $0 [-g <gpu_ids>]"
     echo "  -g <gpu_ids>   GPU index or comma-separated list (e.g., 1 or 1,2,3). If omitted, all GPUs remain visible."
 }
 
-while getopts ":g:h" opt; do
+while getopts ":g:p:h" opt; do
   case "$opt" in
     g)
       GPU_ID="$OPTARG"
+      ;;
+    p)
+      PORT="$OPTARG"
       ;;
     h)
       usage
@@ -113,12 +117,7 @@ if [ ! -f "main_fp4.py" ]; then
     exit 1
 fi
 
-# Check if flux_env exists
-if [ ! -d "flux_env" ]; then
-    echo "❌ flux_env virtual environment not found!"
-    echo "   Please ensure the virtual environment is set up correctly."
-    exit 1
-fi
+
 
 # Check if start_fp4_service.py exists
 if [ ! -f "start_fp4_service.py" ]; then
@@ -129,21 +128,18 @@ fi
 
 echo "✅ Environment check passed"
 
-# Clean up port 8000
-if ! cleanup_port 8000; then
+# Clean up selected port
+if ! cleanup_port "$PORT"; then
     echo "⚠️  Port cleanup incomplete, but continuing..."
 fi
 
 # Wait for port to be available
-if ! wait_for_port 8000 30; then
+if ! wait_for_port "$PORT" 30; then
     echo "❌ Port 8000 is not available, cannot start service"
     exit 1
 fi
 
 echo "🚀 Starting FLUX API Service..."
-
-# Activate virtual environment and start the service
-source flux_env/bin/activate
 
 # Assign GPU visibility only if -g provided; otherwise leave all GPUs visible
 if [ -n "$GPU_ID" ]; then
@@ -153,4 +149,8 @@ else
   echo "🔧 No -g provided; using all visible GPUs"
 fi
 
-flux_env/bin/python start_fp4_service.py
+# Export selected port for the Python service
+export FP4_API_PORT="$PORT"
+echo "🔧 Using FP4_API_PORT=${FP4_API_PORT}"
+
+python start_fp4_service.py
