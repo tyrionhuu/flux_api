@@ -646,11 +646,11 @@ def generate_image_internal(
         # Apply upscaling if requested
         try:
             from models.upscaler import apply_upscaling
-            image_filename, upscaled_image_path, final_width, final_height = apply_upscaling(
-                image, 
-                upscale, 
-                upscale_factor, 
-                save_image_with_unique_name
+
+            image_filename, upscaled_image_path, final_width, final_height = (
+                apply_upscaling(
+                    image, upscale, upscale_factor, save_image_with_unique_name
+                )
             )
         except Exception as upscale_error:
             logger.error(f"Upscaling failed with error: {upscale_error}")

@@ -46,14 +46,10 @@ class GenerateRequest(BaseModel):
         description="Random seed for reproducible results (0-4294967295)",
     )
     upscale: Optional[bool] = Field(
-        False,
-        description="Whether to upscale the generated image using Remacri ESRGAN"
+        False, description="Whether to upscale the generated image using Remacri ESRGAN"
     )
     upscale_factor: Optional[int] = Field(
-        2,
-        ge=2,
-        le=4,
-        description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
+        2, ge=2, le=4, description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
     )
 
 
