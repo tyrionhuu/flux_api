@@ -299,14 +299,17 @@ async def generate_image(request: GenerateRequest):
             request.upscale or False,
             request.upscale_factor or 2,
         )
-        
+
         # Trigger cleanup after successful image generation
         try:
             from utils.cleanup_service import cleanup_after_generation
+
             cleanup_after_generation()
         except Exception as cleanup_error:
-            logger.warning(f"Failed to trigger cleanup after generation: {cleanup_error}")
-        
+            logger.warning(
+                f"Failed to trigger cleanup after generation: {cleanup_error}"
+            )
+
         return result
     except Exception as e:
         logger.error(f"Request processing failed: {e} (Type: {type(e).__name__})")
@@ -751,6 +754,7 @@ async def upload_lora_file(file: UploadFile = File(...)):
         # Trigger cleanup after upload
         try:
             from utils.cleanup_service import cleanup_after_upload
+
             cleanup_after_upload()
         except Exception as cleanup_error:
             logger.warning(f"Failed to trigger cleanup after upload: {cleanup_error}")
