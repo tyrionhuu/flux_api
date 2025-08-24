@@ -3,24 +3,29 @@ Main FastAPI application for the BF16 FLUX API (Port 8001)
 """
 
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from api.bf16_routes import router
 from config.bf16_settings import API_TITLE, API_DESCRIPTION, API_VERSION, BF16_API_PORT
-import os
+from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
+
+# Ensure logs directory exists
+os.makedirs("logs", exist_ok=True)
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("flux_api_bf16.log")],
+    handlers=[logging.StreamHandler(), logging.FileHandler("logs/flux_api_bf16.log")],
 )
 
 # Configure specific loggers for better error visibility
 logging.getLogger("api.bf16_routes").setLevel(logging.INFO)
 logging.getLogger("models.bf16_flux_model").setLevel(logging.INFO)
+logging.getLogger("utils.cleanup_service").setLevel(logging.INFO)
 
 # Add a single enhanced console handler for better formatting
 console_handler = logging.StreamHandler()
@@ -73,6 +78,26 @@ app.include_router(router, prefix="")
 # Mount static files for frontend
 if os.path.exists("frontend/static"):
     app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Startup event - initialize cleanup service"""
+    try:
+        start_cleanup_service()
+        logging.info("BF16 FLUX API started with cleanup service")
+    except Exception as e:
+        logging.error(f"Failed to start cleanup service: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Shutdown event - stop cleanup service"""
+    try:
+        stop_cleanup_service()
+        logging.info("BF16 FLUX API shutdown, cleanup service stopped")
+    except Exception as e:
+        logging.error(f"Error stopping cleanup service: {e}")
 
 
 @app.get("/ui", response_class=HTMLResponse)

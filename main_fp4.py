@@ -1,26 +1,31 @@
 """
-Main FastAPI application for the FLUX API
+Main FastAPI application for the FP4 FLUX API (Port 8002)
 """
 
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from api.fp4_routes import router
 from config.fp4_settings import API_TITLE, API_DESCRIPTION, API_VERSION, FP4_API_PORT
-import os
+from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
+
+# Ensure logs directory exists
+os.makedirs("logs", exist_ok=True)
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("flux_api.log")],
+    handlers=[logging.StreamHandler(), logging.FileHandler("logs/flux_api_fp4.log")],
 )
 
 # Configure specific loggers for better error visibility
 logging.getLogger("api.fp4_routes").setLevel(logging.INFO)
 logging.getLogger("models.fp4_flux_model").setLevel(logging.INFO)
+logging.getLogger("utils.cleanup_service").setLevel(logging.INFO)
 
 # Add a single enhanced console handler for better formatting
 console_handler = logging.StreamHandler()
@@ -75,6 +80,26 @@ if os.path.exists("frontend/static"):
     app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Startup event - initialize cleanup service"""
+    try:
+        start_cleanup_service()
+        logging.info("FP4 FLUX API started with cleanup service")
+    except Exception as e:
+        logging.error(f"Failed to start cleanup service: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Shutdown event - stop cleanup service"""
+    try:
+        stop_cleanup_service()
+        logging.info("FP4 FLUX API shutdown, cleanup service stopped")
+    except Exception as e:
+        logging.error(f"Error stopping cleanup service: {e}")
+
+
 @app.get("/ui", response_class=HTMLResponse)
 async def serve_frontend():
     """Serve the ComfyUI-style frontend"""
@@ -85,9 +110,9 @@ async def serve_frontend():
     else:
         return """
         <html>
-            <head><title>FLUX API</title></head>
+            <head><title>FP4 FLUX API</title></head>
             <body>
-                <h1>FLUX API - Frontend Not Available</h1>
+                <h1>FP4 FLUX API - Frontend Not Available</h1>
                 <p>The frontend files are not found. Please check the frontend directory.</p>
                 <p><a href="/docs">Visit API Documentation</a></p>
             </body>
@@ -99,7 +124,7 @@ async def serve_frontend():
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "FLUX API"}
+    return {"status": "healthy", "service": "FP4 FLUX API"}
 
 
 if __name__ == "__main__":

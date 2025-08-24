@@ -1,0 +1,29 @@
+[Unit]
+Description=FLUX API Directory Cleanup Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/home/tianyu/flux_api
+ExecStart=/usr/bin/python3 /home/tianyu/flux_api/utils/cleanup_service.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment=PYTHONPATH=/home/tianyu/flux_api
+Environment=PYTHONUNBUFFERED=1
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/tianyu/flux_api/generated_images /home/tianyu/flux_api/uploads /home/tianyu/flux_api/logs
+
+[Install]
+WantedBy=multi-user.target
