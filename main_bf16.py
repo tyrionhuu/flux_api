@@ -59,6 +59,7 @@ root_logger.addHandler(console_handler)
 # Create FastAPI app with lifespan context manager
 from contextlib import asynccontextmanager
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
@@ -68,15 +69,16 @@ async def lifespan(app: FastAPI):
         logging.info("BF16 FLUX API started with cleanup service")
     except Exception as e:
         logging.error(f"Failed to start cleanup service: {e}")
-    
+
     yield
-    
+
     # Shutdown
     try:
         stop_cleanup_service()
         logging.info("BF16 FLUX API shutdown, cleanup service stopped")
     except Exception as e:
         logging.error(f"Error stopping cleanup service: {e}")
+
 
 app = FastAPI(
     title=API_TITLE,
@@ -100,8 +102,6 @@ app.include_router(router, prefix="")
 # Mount static files for frontend
 if os.path.exists("frontend/static"):
     app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
-
-
 
 
 @app.get("/ui", response_class=HTMLResponse)
