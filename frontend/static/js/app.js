@@ -80,6 +80,9 @@ class FluxAPI {
             });
         }
         
+        // Image upload functionality
+        this.setupImageUpload();
+        
         // LoRA info tooltip
         const loraInfoIcon = document.getElementById('lora-info-icon');
         const loraInfoTooltip = document.getElementById('lora-info-tooltip');
@@ -384,16 +387,20 @@ class FluxAPI {
         this.updateGenerateButton(true);
 
         try {
-            const params = this.getGenerationParams();
+            let response;
             
-
-            
-            // Only generate on FP4 model - BF16 disabled; use current origin/port
-            const response = await fetch(`${this.hostBase}/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(params)
-            });
+            if (this.hasUploadedImage()) {
+                // Use image upload generation endpoint
+                response = await this.generateImageWithUpload();
+            } else {
+                // Use regular text-to-image generation
+                const params = this.getGenerationParams();
+                response = await fetch(`${this.hostBase}/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+            }
 
             if (!response.ok) {
                 const error = await response.json();
@@ -404,6 +411,7 @@ class FluxAPI {
             console.log('Generation completed');
             
             // Show single image without model identification
+            const params = this.getGenerationParams();
             this.showSingleImage(result, params);
             this.showSuccess('Image generated successfully!');
 
@@ -415,6 +423,46 @@ class FluxAPI {
             this.showGenerationStatus(false);
             this.updateGenerateButton(false);
         }
+    }
+    
+    async generateImageWithUpload() {
+        const formData = new FormData();
+        
+        if (this.serverUploadedImagePath) {
+            formData.append('uploaded_image_path', this.serverUploadedImagePath);
+        } else if (this.uploadedImageFile) {
+            formData.append('file', this.uploadedImageFile);
+        } else {
+            throw new Error('No image selected or uploaded');
+        }
+        
+        // Add text prompt
+        formData.append('prompt', document.getElementById('prompt').value.trim());
+        
+        // Add LoRA configurations
+        const loraConfigs = this.getLoraConfigs();
+        if (loraConfigs.length > 0) {
+            formData.append('loras', JSON.stringify(loraConfigs));
+        }
+        
+        // Add other parameters
+        formData.append('width', document.getElementById('width').value);
+        formData.append('height', document.getElementById('height').value);
+        const seed = document.getElementById('seed').value;
+        if (seed) formData.append('seed', seed);
+        const upscaleCheckbox = document.getElementById('upscale');
+        if (upscaleCheckbox && upscaleCheckbox.checked) {
+            formData.append('upscale', 'true');
+            const upscaleFactor = document.getElementById('upscale-factor');
+            if (upscaleFactor) formData.append('upscale_factor', upscaleFactor.value);
+        }
+        const imageParams = this.getImageUploadParams();
+        if (imageParams) {
+            formData.append('image_strength', imageParams.image_strength);
+            formData.append('image_guidance_scale', imageParams.image_guidance_scale);
+        }
+        
+        return fetch(`${this.hostBase}/upload-image-generate`, { method: 'POST', body: formData });
     }
 
     getGenerationParams() {
@@ -449,6 +497,247 @@ class FluxAPI {
         return params;
     }
     
+
+    setupImageUpload() {
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('image-upload');
+        const removeBtn = document.getElementById('remove-image');
+        const confirmUploadBtn = document.getElementById('confirm-upload-image');
+        const uploadStatusLabel = document.getElementById('upload-status-label');
+        
+        if (!uploadArea || !fileInput || !removeBtn || !confirmUploadBtn) {
+            console.error('Image upload elements not found');
+            return;
+        }
+        
+        // Click on area to open file dialog
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        // File selection
+        fileInput.addEventListener('change', (e) => this.handleImageUpload(e));
+        
+        // Remove image
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.removeUploadedImage();
+            this.serverUploadedImagePath = null;
+            if (uploadStatusLabel) uploadStatusLabel.style.display = 'none';
+        });
+        
+        // Confirm upload to server
+        confirmUploadBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!this.uploadedImageFile) {
+                this.showError('Please choose an image first');
+                return;
+            }
+            try {
+                if (uploadStatusLabel) {
+                    uploadStatusLabel.style.display = 'inline';
+                    uploadStatusLabel.textContent = 'Uploading...';
+                }
+                const formData = new FormData();
+                formData.append('file', this.uploadedImageFile);
+                const resp = await fetch(`${this.hostBase}/upload-image`, { method: 'POST', body: formData });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Upload failed');
+                }
+                const json = await resp.json();
+                this.serverUploadedImagePath = json.file_path;
+                if (uploadStatusLabel) uploadStatusLabel.textContent = 'Uploaded';
+                this.showSuccess('Image uploaded to server');
+            } catch (err) {
+                if (uploadStatusLabel) uploadStatusLabel.textContent = 'Upload failed';
+                this.showError(err.message || 'Upload failed');
+            }
+        });
+        
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                this.handleImageUpload({ target: fileInput });
+            }
+        });
+        
+        // Setup slider event listeners
+        this.setupImageUploadSliders();
+    }
+    
+    setupImageUploadSliders() {
+        const imageStrengthSlider = document.getElementById('image-strength');
+        const imageStrengthValue = document.getElementById('image-strength-value');
+        const imageGuidanceSlider = document.getElementById('image-guidance');
+        const imageGuidanceValue = document.getElementById('image-guidance-value');
+        
+        if (imageStrengthSlider && imageStrengthValue) {
+            imageStrengthValue.textContent = imageStrengthSlider.value;
+            imageStrengthSlider.addEventListener('input', function() {
+                imageStrengthValue.textContent = this.value;
+            });
+        }
+        
+        if (imageGuidanceSlider && imageGuidanceValue) {
+            imageGuidanceValue.textContent = imageGuidanceSlider.value;
+            imageGuidanceSlider.addEventListener('input', function() {
+                imageGuidanceValue.textContent = this.value;
+            });
+        }
+    }
+    
+    handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            this.showError('Please select an image file');
+            return;
+        }
+        
+        // Validate file size (10MB max)
+        if (file.size > 10 * 1024 * 1024) {
+            this.showError('Image file too large (max 10MB)');
+            return;
+        }
+        
+        // Show image preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this.showImagePreview(e.target.result, file.name);
+        };
+        reader.readAsDataURL(file);
+        
+        // Store file for later use
+        this.uploadedImageFile = file;
+        
+        // Auto-upload to server after selection
+        this.autoUploadSelectedImage();
+    }
+    
+    async autoUploadSelectedImage() {
+        const uploadStatusLabel = document.getElementById('upload-status-label');
+        if (!this.uploadedImageFile) return;
+        try {
+            if (uploadStatusLabel) {
+                uploadStatusLabel.style.display = 'inline';
+                uploadStatusLabel.textContent = 'Uploading...';
+            }
+            const formData = new FormData();
+            formData.append('file', this.uploadedImageFile);
+            const resp = await fetch(`${this.hostBase}/upload-image`, { method: 'POST', body: formData });
+            
+            console.log('Upload response status:', resp.status);
+            console.log('Upload response headers:', Object.fromEntries(resp.headers.entries()));
+            
+            if (!resp.ok) {
+                const responseText = await resp.text();
+                console.error('Upload failed response text:', responseText);
+                let errorDetail = 'Upload failed';
+                try {
+                    const err = JSON.parse(responseText);
+                    errorDetail = err.detail || errorDetail;
+                } catch (parseError) {
+                    console.error('Failed to parse error response:', parseError);
+                    errorDetail = responseText || `HTTP ${resp.status}`;
+                }
+                throw new Error(errorDetail);
+            }
+            
+            const responseText = await resp.text();
+            console.log('Upload success response text:', responseText);
+            
+            let json;
+            try {
+                json = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('Failed to parse success response:', parseError);
+                console.error('Response text was:', responseText);
+                throw new Error('Server returned invalid JSON response');
+            }
+            
+            this.serverUploadedImagePath = json.file_path;
+            if (uploadStatusLabel) uploadStatusLabel.textContent = 'Uploaded';
+            this.showSuccess('Image uploaded to server');
+        } catch (err) {
+            console.error('Upload error:', err);
+            if (uploadStatusLabel) uploadStatusLabel.textContent = 'Upload failed';
+            this.showError(err.message || 'Upload failed');
+        }
+    }
+    
+    showImagePreview(imageDataUrl, fileName) {
+        const uploadArea = document.getElementById('upload-area');
+        const uploadPlaceholder = document.getElementById('upload-placeholder');
+        const imagePreview = document.getElementById('uploaded-image-preview');
+        const uploadControls = document.getElementById('upload-controls');
+        const uploadParams = document.getElementById('image-upload-params');
+        
+        if (uploadPlaceholder) uploadPlaceholder.classList.add('hidden');
+        if (imagePreview) {
+            imagePreview.src = imageDataUrl;
+            imagePreview.classList.remove('hidden');
+        }
+        if (uploadControls) uploadControls.style.display = 'block';
+        if (uploadParams) uploadParams.style.display = 'block';
+        
+        // Update upload area text
+        if (uploadArea) {
+            uploadArea.title = `Uploaded: ${fileName}`;
+        }
+    }
+    
+    removeUploadedImage() {
+        const uploadArea = document.getElementById('upload-area');
+        const uploadPlaceholder = document.getElementById('upload-placeholder');
+        const imagePreview = document.getElementById('uploaded-image-preview');
+        const uploadControls = document.getElementById('upload-controls');
+        const uploadParams = document.getElementById('image-upload-params');
+        const fileInput = document.getElementById('image-upload');
+        
+        // Clear file input
+        if (fileInput) fileInput.value = '';
+        
+        // Hide preview and show placeholder
+        if (uploadPlaceholder) uploadPlaceholder.classList.remove('hidden');
+        if (imagePreview) imagePreview.classList.add('hidden');
+        if (uploadControls) uploadControls.style.display = 'none';
+        if (uploadParams) uploadParams.style.display = 'none';
+        
+        // Clear stored file
+        this.uploadedImageFile = null;
+        
+        // Reset upload area
+        if (uploadArea) {
+            uploadArea.title = '';
+        }
+    }
+    
+    hasUploadedImage() {
+        return this.uploadedImageFile !== null && this.uploadedImageFile !== undefined;
+    }
+    
+    getImageUploadParams() {
+        if (!this.hasUploadedImage()) return null;
+        
+        return {
+            image_strength: parseFloat(document.getElementById('image-strength').value),
+            image_guidance_scale: parseFloat(document.getElementById('image-guidance').value)
+        };
+    }
 
 
     showSingleImage(result, params) {
@@ -633,8 +922,6 @@ class FluxAPI {
         }
     }
 
-
-
     clearHistory() {
         if (confirm('Clear all generated images?')) {
             const gallery = document.getElementById('image-gallery');
@@ -668,16 +955,12 @@ class FluxAPI {
 
     showSuccess(message) {
         console.log('✅ Success:', message);
+        this.showNotification(message, 'success');
     }
 
     showError(message) {
         console.error('❌ Error:', message);
         this.showNotification(message, 'error');
-    }
-
-    showSuccess(message) {
-        console.log('✅ Success:', message);
-        this.showNotification(message, 'success');
     }
 
     showNotification(message, type = 'info') {
@@ -878,14 +1161,6 @@ class FluxAPI {
         formData.append('file', file);
         return formData;
     }
-
-
-
-
-
-
-
-
 }
 
 // Initialize the app when DOM is loaded

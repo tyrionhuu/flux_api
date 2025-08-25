@@ -53,6 +53,53 @@ class GenerateRequest(BaseModel):
     )
 
 
+class ImageUploadGenerateRequest(BaseModel):
+    """Request model for image generation with uploaded image and prompt"""
+    
+    prompt: str = Field(..., description="Text prompt for image generation")
+    # Support for multiple LoRAs
+    loras: Optional[list[LoRAConfig]] = Field(
+        None,
+        description="List of LoRAs to apply. Each LoRA has a name and weight. If not specified, default LoRA will be used.",
+    )
+    # Legacy support for single LoRA (deprecated but maintained for backward compatibility)
+    lora_name: Optional[str] = Field(
+        None,
+        description="[DEPRECATED] Single LoRA name. Use 'loras' list instead for multiple LoRA support.",
+    )
+    lora_weight: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=2.0,
+        description="[DEPRECATED] Single LoRA weight. Use 'loras' list instead for multiple LoRA support.",
+    )
+    width: Optional[int] = Field(
+        512, ge=256, le=1024, description="Image width in pixels (256-1024)"
+    )
+    height: Optional[int] = Field(
+        512, ge=256, le=1024, description="Image height in pixels (256-1024)"
+    )
+    seed: Optional[int] = Field(
+        None,
+        ge=0,
+        le=2**32 - 1,
+        description="Random seed for reproducible results (0-4294967295)",
+    )
+    upscale: Optional[bool] = Field(
+        False, description="Whether to upscale the generated image using Remacri ESRGAN"
+    )
+    upscale_factor: Optional[int] = Field(
+        2, ge=2, le=4, description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
+    )
+    # Image upload specific parameters
+    image_strength: Optional[float] = Field(
+        0.8, ge=0.0, le=1.0, description="Strength of the uploaded image influence (0.0 to 1.0)"
+    )
+    image_guidance_scale: Optional[float] = Field(
+        1.5, ge=1.0, le=20.0, description="Guidance scale for image conditioning (1.0 to 20.0)"
+    )
+
+
 class GenerateResponse(BaseModel):
     """Response model for image generation"""
 

@@ -577,3 +577,27 @@ async def upload_lora_file(file: UploadFile = File(...)):
         raise HTTPException(
             status_code=500, detail=f"Failed to upload LoRA file: {str(e)}"
         )
+
+
+@router.post("/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    """Upload a reference image to the server without generating (BF16 service)."""
+    try:
+        from utils.image_utils import validate_uploaded_image, save_uploaded_image
+
+        validate_uploaded_image(file)
+        file_path = save_uploaded_image(file)  # saves to uploads/images by default
+
+        import os
+        filename = os.path.basename(file_path)
+
+        return {
+            "message": "Image uploaded successfully",
+            "filename": filename,
+            "file_path": file_path,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading image: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")

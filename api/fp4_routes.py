@@ -5,7 +5,7 @@ API routes for the FLUX API
 import logging
 import time
 from typing import Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from models.fp4_flux_model import FluxModelManager
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
@@ -771,3 +771,212 @@ async def upload_lora_file(file: UploadFile = File(...)):
         raise HTTPException(
             status_code=500, detail=f"Failed to upload LoRA file: {str(e)}"
         )
+
+
+@router.post("/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    """Upload a reference image to the server without generating."""
+    try:
+        from utils.image_utils import validate_uploaded_image, save_uploaded_image
+
+        validate_uploaded_image(file)
+        file_path = save_uploaded_image(file)  # saves to uploads/images by default
+
+        import os
+        filename = os.path.basename(file_path)
+
+        return {
+            "message": "Image uploaded successfully",
+            "filename": filename,
+            "file_path": file_path,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading image: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
+
+
+@router.post("/upload-image-generate")
+async def upload_image_and_generate(
+    file: UploadFile = File(None),
+    prompt: str = Form(...),
+    loras: Optional[str] = Form(None),
+    lora_name: Optional[str] = Form(None),
+    lora_weight: Optional[float] = Form(None),
+    width: int = Form(512),
+    height: int = Form(512),
+    seed: Optional[int] = Form(None),
+    upscale: bool = Form(False),
+    upscale_factor: int = Form(2),
+    image_strength: float = Form(0.8),
+    image_guidance_scale: float = Form(1.5),
+    uploaded_image_path: Optional[str] = Form(None)
+):
+    """Generate image using uploaded image (file or previously uploaded path) and prompt with optional LoRA support"""
+    try:
+        from utils.image_utils import (
+            validate_uploaded_image,
+            save_uploaded_image,
+            load_and_preprocess_image,
+            cleanup_uploaded_image,
+        )
+
+        temp_file_to_cleanup = None
+
+        # Resolve input image source: either a freshly uploaded file or a server-side uploaded path
+        if uploaded_image_path:
+            # Use existing uploaded image on server (no validation possible here beyond path safety)
+            input_image_path = uploaded_image_path
+        else:
+            if file is None:
+                raise HTTPException(status_code=400, detail="Either file or uploaded_image_path must be provided")
+            # Validate and persist temporarily
+            validate_uploaded_image(file)
+            input_image_path = save_uploaded_image(file)
+            temp_file_to_cleanup = input_image_path
+
+        try:
+            # Load and preprocess the uploaded image
+            input_image = load_and_preprocess_image(input_image_path, (width, height))
+
+            # Parse LoRA configuration
+            loras_to_apply = []
+            remove_all_loras = False
+
+            if loras:
+                import json
+                try:
+                    lora_configs = json.loads(loras)
+                    for lora_config in lora_configs:
+                        if not lora_config.get("name") or not lora_config["name"].strip():
+                            raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
+                        if lora_config.get("weight", 1.0) < 0 or lora_config.get("weight", 1.0) > 2.0:
+                            raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
+                        loras_to_apply.append({
+                            "name": lora_config["name"].strip(),
+                            "weight": lora_config["weight"]
+                        })
+                except json.JSONDecodeError:
+                    raise HTTPException(status_code=400, detail="Invalid LoRA configuration format")
+            elif lora_name:
+                if not lora_name.strip():
+                    raise HTTPException(status_code=400, detail="LoRA name cannot be empty if provided")
+                if lora_weight is None or lora_weight < 0 or lora_weight > 2.0:
+                    raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
+                loras_to_apply.append({
+                    "name": lora_name.strip(),
+                    "weight": lora_weight
+                })
+
+            # Apply default LoRA if none specified
+            if not loras_to_apply and not remove_all_loras:
+                loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
+
+            # Validate dimensions
+            if width < 256 or width > 1024 or height < 256 or height > 1024:
+                raise HTTPException(status_code=400, detail="Width and height must be between 256 and 1024")
+
+            # Validate upscale factor
+            if upscale and upscale_factor not in [2, 4]:
+                raise HTTPException(status_code=400, detail="Upscale factor must be 2 or 4")
+
+            # Validate image strength and guidance
+            if image_strength < 0.0 or image_strength > 1.0:
+                raise HTTPException(status_code=400, detail="Image strength must be between 0.0 and 1.0")
+            if image_guidance_scale < 1.0 or image_guidance_scale > 20.0:
+                raise HTTPException(status_code=400, detail="Image guidance scale must be between 1.0 and 20.0")
+
+            # Clean up input
+            prompt = prompt.strip()
+            if not prompt:
+                raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+
+            # Ensure model is loaded
+            with _model_manager_lock:
+                if not model_manager.is_loaded():
+                    logger.info("Model not loaded, loading it first...")
+                    model_manager.load_model()
+
+                if not model_manager.is_loaded():
+                    raise HTTPException(status_code=500, detail="Failed to load model")
+
+            # Apply LoRAs if specified
+            if loras_to_apply:
+                for lora_config in loras_to_apply:
+                    model_manager.apply_lora(lora_config["name"], lora_config["weight"])
+            elif remove_all_loras:
+                if model_manager.get_lora_info():
+                    logger.info("Removing all LoRAs as requested by client (empty list)")
+                    model_manager.remove_lora()
+
+            # Generate image using the model (placeholder: regular generate with prompt)
+            logger.info(f"Starting image generation with uploaded image and prompt: {prompt}")
+
+            pipeline = model_manager.get_pipeline()
+            if not pipeline:
+                raise HTTPException(status_code=500, detail="Model pipeline not available")
+
+            if seed is not None:
+                import torch
+                torch.manual_seed(seed)
+
+            generation_start_time = time.time()
+
+            # For now use standard generate; future: img2img
+            result = model_manager.generate_image(
+                prompt=prompt,
+                num_inference_steps=10,
+                guidance_scale=image_guidance_scale,
+                width=width,
+                height=height,
+                seed=seed,
+            )
+
+            generation_time = time.time() - generation_start_time
+
+            generated_image = extract_image_from_result(result)
+
+            image_filename = save_image_with_unique_name(generated_image)
+
+            if upscale:
+                try:
+                    from models.upscaler import apply_upscaling
+                    image_filename, upscaled_image_path, final_width, final_height = apply_upscaling(
+                        generated_image, upscale, upscale_factor, save_image_with_unique_name
+                    )
+                    logger.info(f"Image upscaled by {upscale_factor}x: {image_filename}")
+                except Exception as upscale_error:
+                    logger.warning(f"Upscaling failed: {upscale_error}")
+                    image_filename = save_image_with_unique_name(generated_image)
+
+            # Create download URL
+            import os
+            filename = os.path.basename(image_filename)
+            download_url = f"/download/{filename}"
+
+            return {
+                "message": f"Generated image from uploaded image and prompt: {prompt}",
+                "image_url": image_filename,
+                "download_url": download_url,
+                "filename": filename,
+                "generation_time": f"{generation_time:.2f}s",
+                "width": width,
+                "height": height,
+                "seed": seed,
+                "image_strength": image_strength,
+                "image_guidance_scale": image_guidance_scale,
+                "upscaled": upscale,
+                "upscale_factor": upscale_factor if upscale else None,
+            }
+
+        finally:
+            # Only cleanup if we created a temp file in this request
+            if temp_file_to_cleanup:
+                cleanup_uploaded_image(temp_file_to_cleanup)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in upload-image-generate: {e}")
+        raise HTTPException(status_code=500, detail=f"Image generation failed: {str(e)}")

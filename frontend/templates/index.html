@@ -82,6 +82,62 @@
                         <textarea id="prompt" placeholder="Describe the image you want to generate..." rows="3">A beautiful landscape with mountains and a lake</textarea>
                     </div>
 
+                    <!-- Image Upload Section -->
+                    <div class="parameter-group">
+                        <label for="image-upload">
+                            <i class="fas fa-image"></i> Upload Image
+                            <span class="info-icon" id="upload-info-icon" title="Click for more information">ℹ</span>
+                            <div class="info-tooltip" id="upload-info-tooltip">
+                                Upload an image to use as a reference for generation. The AI will combine your prompt with the visual elements from this image.
+                            </div>
+                        </label>
+                        
+                        <div class="image-upload-container">
+                            <div class="upload-area" id="upload-area">
+                                <div class="upload-placeholder" id="upload-placeholder">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <p>Click to upload or drag & drop</p>
+                                    <p class="upload-hint">Supports: PNG, JPG, JPEG, BMP, TIFF, WEBP (Max 10MB)</p>
+                                </div>
+                                <img id="uploaded-image-preview" class="uploaded-image-preview hidden" alt="Uploaded image preview">
+                            </div>
+                            <input type="file" id="image-upload" accept="image/*" style="display: none;">
+                            <div class="upload-controls" id="upload-controls" style="display: none;">
+                                <button type="button" id="confirm-upload-image" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-cloud-upload-alt"></i> Upload
+                                </button>
+                                <button type="button" id="remove-image" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-trash"></i> Remove
+                                </button>
+                                <span id="upload-status-label" class="upload-info" style="display:none; margin-left: .5rem;"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- Image Upload Parameters -->
+                        <div class="image-upload-params" id="image-upload-params" style="display: none;">
+                            <div class="parameter-row">
+                                <div class="parameter-group">
+                                    <label for="image-strength">Image Strength</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="image-strength" min="0.0" max="1.0" step="0.1" value="0.8" class="slider">
+                                        <span class="slider-value" id="image-strength-value">0.8</span>
+                                    </div>
+                                    <small>How much the uploaded image influences the generation (0.0 = none, 1.0 = strong)</small>
+                                </div>
+                            </div>
+                            <div class="parameter-row">
+                                <div class="parameter-group">
+                                    <label for="image-guidance">Image Guidance</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="image-guidance" min="1.0" max="20.0" step="0.5" value="1.5" class="slider">
+                                        <span class="slider-value" id="image-guidance-value">1.5</span>
+                                    </div>
+                                    <small>Guidance scale for image conditioning (higher = more faithful to image)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
 
 
                     <div class="parameter-row">
