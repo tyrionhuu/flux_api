@@ -80,6 +80,52 @@ class FluxAPI {
             });
         }
         
+        // LoRA info tooltip
+        const loraInfoIcon = document.getElementById('lora-info-icon');
+        const loraInfoTooltip = document.getElementById('lora-info-tooltip');
+        console.log('LoRA info icon found:', loraInfoIcon);
+        console.log('LoRA info tooltip found:', loraInfoTooltip);
+        console.log('LoRA info icon HTML:', loraInfoIcon ? loraInfoIcon.outerHTML : 'NOT FOUND');
+        console.log('LoRA info tooltip HTML:', loraInfoTooltip ? loraInfoTooltip.outerHTML : 'NOT FOUND');
+        
+        if (loraInfoIcon && loraInfoTooltip) {
+            console.log('Setting up LoRA info tooltip event listeners');
+            
+            // Test if the icon is clickable
+            loraInfoIcon.style.cursor = 'pointer';
+            console.log('Icon cursor style set to pointer');
+            
+            loraInfoIcon.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Info icon clicked!');
+                console.log('Tooltip before toggle:', loraInfoTooltip.className);
+                loraInfoTooltip.classList.toggle('show');
+                console.log('Tooltip after toggle:', loraInfoTooltip.className);
+                console.log('Tooltip computed styles:', window.getComputedStyle(loraInfoTooltip));
+            });
+            
+            // Close tooltip when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!loraInfoIcon.contains(e.target) && !loraInfoTooltip.contains(e.target)) {
+                    loraInfoTooltip.classList.remove('show');
+                }
+            });
+            
+            // Close tooltip when pressing Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    loraInfoTooltip.classList.remove('show');
+                }
+            });
+        } else {
+            console.error('LoRA info elements not found!');
+            console.error('Available elements with similar IDs:');
+            document.querySelectorAll('[id*="lora"]').forEach(el => {
+                console.log('Found element:', el.id, el);
+            });
+        }
+        
         // Modal controls
         document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
         document.getElementById('download-image').addEventListener('click', () => this.downloadCurrentImage());
