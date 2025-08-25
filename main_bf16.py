@@ -56,11 +56,33 @@ for handler in root_logger.handlers[:]:
 # Add our enhanced handler
 root_logger.addHandler(console_handler)
 
-# Create FastAPI app
+# Create FastAPI app with lifespan context manager
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup
+    try:
+        start_cleanup_service()
+        logging.info("BF16 FLUX API started with cleanup service")
+    except Exception as e:
+        logging.error(f"Failed to start cleanup service: {e}")
+    
+    yield
+    
+    # Shutdown
+    try:
+        stop_cleanup_service()
+        logging.info("BF16 FLUX API shutdown, cleanup service stopped")
+    except Exception as e:
+        logging.error(f"Error stopping cleanup service: {e}")
+
 app = FastAPI(
     title=API_TITLE,
     description=API_DESCRIPTION,
     version=API_VERSION,
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -80,24 +102,6 @@ if os.path.exists("frontend/static"):
     app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Startup event - initialize cleanup service"""
-    try:
-        start_cleanup_service()
-        logging.info("BF16 FLUX API started with cleanup service")
-    except Exception as e:
-        logging.error(f"Failed to start cleanup service: {e}")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Shutdown event - stop cleanup service"""
-    try:
-        stop_cleanup_service()
-        logging.info("BF16 FLUX API shutdown, cleanup service stopped")
-    except Exception as e:
-        logging.error(f"Error stopping cleanup service: {e}")
 
 
 @app.get("/ui", response_class=HTMLResponse)

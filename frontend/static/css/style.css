@@ -121,7 +121,7 @@ body {
 
 .workflow-container {
     display: grid;
-    grid-template-columns: 350px 1fr;
+    grid-template-columns: 400px 1fr;
     gap: 2rem;
     height: calc(100vh - 200px);
 }
@@ -165,6 +165,13 @@ body {
     font-weight: 500;
     color: #374151;
     font-size: 0.875rem;
+    position: relative;
+    overflow: visible;
+    /* Debug: ensure label can contain positioned elements */
+    min-height: 1.5rem;
+    /* Ensure label can handle longer content */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .parameter-row {
@@ -761,6 +768,85 @@ textarea {
     color: #93c5fd;
 }
 
+/* Information tooltip styles */
+.info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: #3b82f6;
+    color: white;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: 0.5rem;
+    transition: all 0.2s ease;
+    user-select: none;
+    border: 2px solid #1e40af;
+}
+
+.info-icon:hover {
+    background: #2563eb;
+    transform: scale(1.1);
+}
+
+.info-tooltip {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    background: #1f2937;
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    max-width: 350px;
+    z-index: 9999;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s ease;
+    pointer-events: none;
+    margin-top: 0.5rem;
+    /* Debug: ensure tooltip is visible when needed */
+    min-height: 20px;
+    /* Allow text to wrap properly */
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.info-tooltip.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.info-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 20px;
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid #1f2937;
+    z-index: 9998;
+}
+
+.info-tooltip code {
+    background: #374151;
+    padding: 0.125rem 0.25rem;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.75rem;
+}
+
 /* Upscaler UI */
 .upscaler-container {
     display: flex;
@@ -976,44 +1062,7 @@ textarea {
     gap: 0.5rem;
 }
 
-.lora-entry {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    padding: 0.75rem;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-}
-
-/* Ensure inline layout with compact weight field */
-.lora-entry input {
-    width: auto; /* override global 100% */
-    flex: 1;
-}
-
-.lora-entry input.lora-name {
-    flex: 1 1 auto;
-}
-
-.lora-entry input.lora-weight {
-    flex: 0 0 80px;
-    width: 80px;
-    text-align: center;
-}
-
-.lora-entry .remove-lora {
-    background: #ef4444;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 0.5rem;
-    cursor: pointer;
-}
-
-.lora-entry .remove-lora:hover {
-    background: #dc2626;
-}
+/* LoRA entry styling - removed duplicate rules */
 
 /* Minimal page aesthetic tweaks */
 body {
@@ -1041,6 +1090,8 @@ body {
     margin-bottom: 0.5rem;
     max-width: 100%;
     box-sizing: border-box;
+    /* Ensure content doesn't overflow */
+    overflow: hidden;
 }
 
 .drag-handle {
@@ -1056,6 +1107,10 @@ body {
 .lora-entry input.lora-name {
     font-size: 0.85rem;
     min-width: 0; /* Allow shrinking */
+    /* Ensure long file paths wrap properly */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    text-overflow: ellipsis;
 }
 
 .lora-entry input.lora-weight {
@@ -1074,6 +1129,7 @@ body {
     flex-shrink: 0;
     width: auto;
     min-width: 32px;
+    cursor: pointer;
 }
 
 .lora-entry .remove-lora:hover {
