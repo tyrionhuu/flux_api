@@ -85,10 +85,10 @@
                     <!-- Image Upload Section -->
                     <div class="parameter-group">
                         <label for="image-upload">
-                            <i class="fas fa-image"></i> Upload Image
+                            <i class="fas fa-image"></i> Select Image
                             <span class="info-icon" id="upload-info-icon" title="Click for more information">ℹ</span>
                             <div class="info-tooltip" id="upload-info-tooltip">
-                                Upload an image to use as a reference for generation. The AI will combine your prompt with the visual elements from this image.
+                                Select an image to use as a reference for generation. The image will be automatically uploaded and the AI will combine your prompt with the visual elements from this image.
                             </div>
                         </label>
                         
@@ -96,16 +96,13 @@
                             <div class="upload-area" id="upload-area">
                                 <div class="upload-placeholder" id="upload-placeholder">
                                     <i class="fas fa-cloud-upload-alt"></i>
-                                    <p>Click to upload or drag & drop</p>
+                                    <p>Click to select or drag & drop</p>
                                     <p class="upload-hint">Supports: PNG, JPG, JPEG, BMP, TIFF, WEBP (Max 10MB)</p>
                                 </div>
                                 <img id="uploaded-image-preview" class="uploaded-image-preview hidden" alt="Uploaded image preview">
                             </div>
                             <input type="file" id="image-upload" accept="image/*" style="display: none;">
                             <div class="upload-controls" id="upload-controls" style="display: none;">
-                                <button type="button" id="confirm-upload-image" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-cloud-upload-alt"></i> Upload
-                                </button>
                                 <button type="button" id="remove-image" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-trash"></i> Remove
                                 </button>

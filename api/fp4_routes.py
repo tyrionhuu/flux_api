@@ -3,6 +3,7 @@ API routes for the FLUX API
 """
 
 import logging
+import os
 import time
 from typing import Optional
 
@@ -336,14 +337,59 @@ async def generate_with_image(
         from PIL import Image
         import io
         
+        # Debug logging for form parameters
+        logger.info(f"Received generate-with-image request - prompt: {prompt}, num_inference_steps: {num_inference_steps}, guidance_scale: {guidance_scale}, width: {width}, height: {height}, seed: {seed}")
+        logger.info(f"Image file: {image.filename}, content_type: {image.content_type}, size: {image.size}")
+        
         # Apply prompt prefix if provided, otherwise use the original prompt
         if prompt_prefix:
             enhanced_prompt = f"{prompt_prefix}, {prompt}"
         else:
             enhanced_prompt = prompt
+            
+        # Validate parameters
+        if not prompt or not prompt.strip():
+            raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+            
+        if num_inference_steps and (num_inference_steps < 1 or num_inference_steps > 100):
+            raise HTTPException(status_code=400, detail="num_inference_steps must be between 1 and 100")
+            
+        if guidance_scale and (guidance_scale < 0.1 or guidance_scale > 20.0):
+            raise HTTPException(status_code=400, detail="guidance_scale must be between 0.1 and 20.0")
+            
+        if width and (width < 256 or width > 1024):
+            raise HTTPException(status_code=400, detail="width must be between 256 and 1024")
+            
+        if height and (height < 256 or height > 1024):
+            raise HTTPException(status_code=400, detail="height must be between 256 and 1024")
+            
         # Load input image
-        raw = await image.read()
-        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        if not image.filename:
+            raise HTTPException(status_code=400, detail="No image file provided")
+            
+        # Validate image file type
+        if not image.content_type or not image.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="File must be an image")
+            
+        # Check file size (max 10MB)
+        if image.size and image.size > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Image file too large (max 10MB)")
+            
+        # Check file extension
+        allowed_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
+        file_extension = os.path.splitext(image.filename)[1].lower()
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported image format. Allowed: {', '.join(allowed_extensions)}"
+            )
+            
+        try:
+            raw = await image.read()
+            img = Image.open(io.BytesIO(raw)).convert("RGB")
+        except Exception as img_error:
+            logger.error(f"Failed to load image: {img_error}")
+            raise HTTPException(status_code=400, detail=f"Failed to load image: {str(img_error)}")
         
         # Ensure model is loaded
         with _model_manager_lock:
@@ -901,7 +947,7 @@ async def upload_image_and_generate(
     width: int = Form(512),
     height: int = Form(512),
     seed: Optional[int] = Form(None),
-    upscale: bool = Form(False),
+    upscale: Optional[str] = Form("false"),
     upscale_factor: int = Form(2),
     image_strength: float = Form(0.8),
     image_guidance_scale: float = Form(1.5),
@@ -1071,7 +1117,7 @@ async def upload_image_and_generate(
 
             image_filename = save_image_with_unique_name(generated_image)
 
-            if upscale:
+            if upscale and upscale.lower() in ["true", "1", "yes", "on"]:
                 try:
                     from models.upscaler import apply_upscaling
 
@@ -1116,7 +1162,7 @@ async def upload_image_and_generate(
                 "seed": seed,
                 "image_strength": image_strength,
                 "image_guidance_scale": image_guidance_scale,
-                "upscaled": upscale,
+                "upscaled": upscale and upscale.lower() in ["true", "1", "yes", "on"],
                 "upscale_factor": upscale_factor if upscale else None,
             }
 

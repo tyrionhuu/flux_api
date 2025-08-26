@@ -577,10 +577,9 @@ class FluxAPI {
         const uploadArea = document.getElementById('upload-area');
         const fileInput = document.getElementById('image-upload');
         const removeBtn = document.getElementById('remove-image');
-        const confirmUploadBtn = document.getElementById('confirm-upload-image');
         const uploadStatusLabel = document.getElementById('upload-status-label');
         
-        if (!uploadArea || !fileInput || !removeBtn || !confirmUploadBtn) {
+        if (!uploadArea || !fileInput || !removeBtn) {
             console.error('Image upload elements not found');
             return;
         }
@@ -599,34 +598,7 @@ class FluxAPI {
             if (uploadStatusLabel) uploadStatusLabel.style.display = 'none';
         });
         
-        // Confirm upload to server
-        confirmUploadBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            if (!this.uploadedImageFile) {
-                this.showError('Please choose an image first');
-                return;
-            }
-            try {
-                if (uploadStatusLabel) {
-                    uploadStatusLabel.style.display = 'inline';
-                    uploadStatusLabel.textContent = 'Uploading...';
-                }
-                const formData = new FormData();
-                formData.append('file', this.uploadedImageFile);
-                const resp = await fetch(`${this.hostBase}/upload-image`, { method: 'POST', body: formData });
-                if (!resp.ok) {
-                    const err = await resp.json().catch(() => ({}));
-                    throw new Error(err.detail || 'Upload failed');
-                }
-                const json = await resp.json();
-                this.serverUploadedImagePath = json.file_path;
-                if (uploadStatusLabel) uploadStatusLabel.textContent = 'Uploaded';
-                this.showSuccess('Image uploaded to server');
-            } catch (err) {
-                if (uploadStatusLabel) uploadStatusLabel.textContent = 'Upload failed';
-                this.showError(err.message || 'Upload failed');
-            }
-        });
+
         
         // Drag and drop
         uploadArea.addEventListener('dragover', (e) => {
@@ -769,6 +741,7 @@ class FluxAPI {
             imagePreview.src = imageDataUrl;
             imagePreview.classList.remove('hidden');
         }
+        // Show only remove button and parameters since upload is automatic
         if (uploadControls) uploadControls.style.display = 'block';
         if (uploadParams) uploadParams.style.display = 'block';
         
