@@ -99,6 +99,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# Add request validation middleware to filter malformed requests
+@app.middleware("http")
+async def validate_requests(request, call_next):
+    """Filter out malformed HTTP requests"""
+    # Check if request has valid headers
+    if not request.headers.get("host"):
+        # Log and reject malformed requests
+        logging.warning(
+            f"Rejecting malformed request from {request.client.host if request.client else 'unknown'}"
+        )
+        return {"error": "Invalid request"}
+
+    response = await call_next(request)
+    return response
+
+
 # Include API routes
 app.include_router(router, prefix="")
 
