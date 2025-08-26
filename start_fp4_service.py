@@ -5,10 +5,10 @@ This script starts the FLUX API service directly using the flux_env virtual envi
 """
 
 import os
-import sys
-import subprocess
-import time
 import signal
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 

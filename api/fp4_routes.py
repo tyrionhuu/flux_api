@@ -5,18 +5,18 @@ API routes for the FLUX API
 import logging
 import time
 from typing import Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from models.fp4_flux_model import FluxModelManager
-from utils.image_utils import extract_image_from_result, save_image_with_unique_name
-from utils.system_utils import get_system_memory
-from utils.queue_manager import QueueManager
-from config.fp4_settings import (
-    STATIC_IMAGES_DIR,
-    DEFAULT_LORA_NAME,
-    DEFAULT_LORA_WEIGHT,
-)
+
 from api.models import GenerateRequest
+from config.fp4_settings import (DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT,
+                                 STATIC_IMAGES_DIR)
+from models.fp4_flux_model import FluxModelManager
+from utils.image_utils import (extract_image_from_result,
+                               save_image_with_unique_name)
+from utils.queue_manager import QueueManager
+from utils.system_utils import get_system_memory
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -777,7 +777,8 @@ async def upload_lora_file(file: UploadFile = File(...)):
 async def upload_image(file: UploadFile = File(...)):
     """Upload a reference image to the server without generating."""
     try:
-        from utils.image_utils import validate_uploaded_image, save_uploaded_image
+        from utils.image_utils import (save_uploaded_image,
+                                       validate_uploaded_image)
 
         validate_uploaded_image(file)
         file_path = save_uploaded_image(file)  # saves to uploads/images by default
@@ -816,12 +817,10 @@ async def upload_image_and_generate(
 ):
     """Generate image using uploaded image (file or previously uploaded path) and prompt with optional LoRA support"""
     try:
-        from utils.image_utils import (
-            validate_uploaded_image,
-            save_uploaded_image,
-            load_and_preprocess_image,
-            cleanup_uploaded_image,
-        )
+        from utils.image_utils import (cleanup_uploaded_image,
+                                       load_and_preprocess_image,
+                                       save_uploaded_image,
+                                       validate_uploaded_image)
 
         temp_file_to_cleanup = None
 

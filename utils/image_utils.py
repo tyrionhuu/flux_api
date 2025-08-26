@@ -2,12 +2,14 @@
 Image utilities for the FLUX API
 """
 
-from PIL import Image
-from typing import Any, Optional
-from config.fp4_settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
 import os
 import uuid
-from fastapi import UploadFile, HTTPException
+from typing import Any, Optional
+
+from fastapi import HTTPException, UploadFile
+from PIL import Image
+
+from config.fp4_settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
 
 
 def extract_image_from_result(result: Any) -> Image.Image:

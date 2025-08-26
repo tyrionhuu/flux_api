@@ -2,8 +2,9 @@
 System utilities for the FLUX API
 """
 
-import psutil
 from typing import Tuple
+
+import psutil
 
 
 def get_system_memory() -> Tuple[float, float]:

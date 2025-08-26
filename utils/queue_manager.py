@@ -5,10 +5,10 @@ Queue manager for handling concurrent requests in the FLUX API
 import asyncio
 import logging
 import time
-from typing import Dict, Any, Optional, Callable
+import uuid
 from dataclasses import dataclass
 from enum import Enum
-import uuid
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

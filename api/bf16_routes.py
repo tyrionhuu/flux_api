@@ -4,14 +4,17 @@ This reuses the existing route logic to avoid code duplication.
 """
 
 import logging
+import time
 from typing import Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from models.bf16_flux_model import BF16FluxModelManager
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
+
 from api.models import GenerateRequest, ModelStatusResponse
 from config.bf16_settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
-from utils.image_utils import extract_image_from_result, save_image_with_unique_name
+from models.bf16_flux_model import BF16FluxModelManager
+from utils.image_utils import (extract_image_from_result,
+                               save_image_with_unique_name)
 from utils.system_utils import get_system_memory
-import time
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -38,6 +41,7 @@ def download_image(filename: str):
     """Download a generated image file"""
     import os
     from pathlib import Path
+
     from fastapi.responses import FileResponse
 
     # Security: only allow files from generated_images directory
@@ -583,7 +587,8 @@ async def upload_lora_file(file: UploadFile = File(...)):
 async def upload_image(file: UploadFile = File(...)):
     """Upload a reference image to the server without generating (BF16 service)."""
     try:
-        from utils.image_utils import validate_uploaded_image, save_uploaded_image
+        from utils.image_utils import (save_uploaded_image,
+                                       validate_uploaded_image)
 
         validate_uploaded_image(file)
         file_path = save_uploaded_image(file)  # saves to uploads/images by default

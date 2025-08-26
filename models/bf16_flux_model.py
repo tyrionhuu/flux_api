@@ -5,15 +5,13 @@ This extends the base FluxModelManager to avoid code duplication.
 
 import logging
 import os
+from typing import Any, Optional
+
 import torch
-from typing import Optional, Any
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
-from config.bf16_settings import (
-    BF16_MODEL_ID,
-    MODEL_TYPE_BF16_GPU,
-    DEFAULT_LORA_NAME,
-    DEFAULT_LORA_WEIGHT,
-)
+
+from config.bf16_settings import (BF16_MODEL_ID, DEFAULT_LORA_NAME,
+                                  DEFAULT_LORA_WEIGHT, MODEL_TYPE_BF16_GPU)
 from models.fp4_flux_model import FluxModelManager
 
 # Configure logging

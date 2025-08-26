@@ -4,12 +4,15 @@ Main FastAPI application for the FP4 FLUX API (Port 8002)
 
 import logging
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+
 from api.fp4_routes import router
-from config.fp4_settings import API_TITLE, API_DESCRIPTION, API_VERSION, FP4_API_PORT
+from config.fp4_settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
+                                 FP4_API_PORT)
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
 
 # Ensure logs directory exists

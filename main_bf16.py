@@ -4,12 +4,15 @@ Main FastAPI application for the BF16 FLUX API (Port 8001)
 
 import logging
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+
 from api.bf16_routes import router
-from config.bf16_settings import API_TITLE, API_DESCRIPTION, API_VERSION, BF16_API_PORT
+from config.bf16_settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
+                                  BF16_API_PORT)
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
 
 # Ensure logs directory exists
