@@ -777,60 +777,7 @@ class FluxAPI {
         gallery.appendChild(singleItem);
     }
 
-    addComparisonToGallery(fp4Result, bf16Result, params) {
 
-        const gallery = document.getElementById('image-gallery');
-        
-        // Clear previous images - replace instead of accumulating
-        gallery.innerHTML = '';
-        
-        const comparisonItem = document.createElement('div');
-        comparisonItem.className = 'comparison-item';
-        
-        const fp4ImageUrl = `${this.hostBase}:8000${fp4Result.download_url}`;
-        const bf16ImageUrl = `${this.hostBase}:8001${bf16Result.download_url}`;
-        
-                        comparisonItem.innerHTML = `
-                    <div class="comparison-images">
-                                        <div class="image-container">
-                            <img src="${fp4ImageUrl}" alt="Generated image" loading="lazy">
-                            <div class="image-meta">
-                                <div class="details">
-                                    <span>${fp4Result.width || params.width}×${fp4Result.height || params.height}</span>
-                                    <span>${fp4Result.generation_time || 'N/A'}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="image-container">
-                            <img src="${bf16ImageUrl}" alt="Generated image" loading="lazy">
-                            <div class="image-meta">
-                                <div class="details">
-                                    <span>${bf16Result.width || params.width}×${bf16Result.height || params.height}</span>
-                                    <span>${bf16Result.generation_time || 'N/A'}</span>
-                                </div>
-                            </div>
-                        </div>
-            </div>
-            <div class="comparison-footer">
-                <div class="prompt">${params.prompt}</div>
-            </div>
-        `;
-
-        // Add click handlers for individual images
-        const fp4Image = comparisonItem.querySelector('.image-container:first-child img');
-        const bf16Image = comparisonItem.querySelector('.image-container:last-child img');
-        
-        fp4Image.addEventListener('click', () => {
-            this.showImageModal(fp4Result, params, fp4ImageUrl);
-        });
-        
-        bf16Image.addEventListener('click', () => {
-            this.showImageModal(bf16Result, params, bf16ImageUrl);
-        });
-
-        // Add the new comparison (replaces previous)
-        gallery.appendChild(comparisonItem);
-    }
 
 
 

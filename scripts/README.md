@@ -36,7 +36,7 @@ Manages log files and provides utilities for log monitoring and cleanup.
 # Clean logs larger than 100MB
 ./scripts/manage_logs.sh clean
 
-# Follow BF16 API logs
+# Follow FP4 API logs
 ./scripts/manage_logs.sh follow
 # Then select the log file to follow
 ```
@@ -169,7 +169,7 @@ Both scripts include comprehensive error handling:
 
 These scripts work with the main FLUX API components:
 
-- **Main APIs**: `main_bf16.py`, `main_fp4.py`
+- **Main APIs**: `main_fp4.py`
 - **Cleanup Service**: `utils/cleanup_service.py`
 - **Systemd Services**: `services/flux-cleanup.service`
 - **Log Files**: `logs/` directory

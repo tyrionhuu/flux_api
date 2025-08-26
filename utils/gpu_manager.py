@@ -195,7 +195,7 @@ class GPUManager:
             gpu_memory.append((i, free_memory, total_memory))
             print(f"GPU {i}: {free_memory:.1f}GB free / {total_memory:.1f}GB total")
 
-        # Filter out GPUs with insufficient memory (less than 8GB free for BF16 model)
+        # Filter out GPUs with insufficient memory (less than 8GB free for FP4 model)
         sufficient_memory_gpus = [
             (i, free, total) for i, free, total in gpu_memory if free >= 8.0
         ]
