@@ -333,14 +333,6 @@ class FluxModelManager:
                     "height": height,
                 }
 
-                # Override pipeline defaults that might constrain dimensions
-                generation_kwargs["max_area"] = (
-                    width * height
-                )  # Allow our requested dimensions
-                generation_kwargs["max_sequence_length"] = max(
-                    width, height
-                )  # Allow our requested dimensions
-
                 # Add negative prompt if provided
                 if negative_prompt:
                     generation_kwargs["negative_prompt"] = negative_prompt
@@ -367,15 +359,7 @@ class FluxModelManager:
                         "width": width,
                         "height": height,
                     }
-
-                    # Override pipeline defaults that might constrain dimensions
-                    generation_kwargs["max_area"] = (
-                        width * height
-                    )  # Allow our requested dimensions
-                    generation_kwargs["max_sequence_length"] = max(
-                        width, height
-                    )  # Allow our requested dimensions
-
+                    
                     if negative_prompt:
                         generation_kwargs["negative_prompt"] = negative_prompt
 
@@ -462,14 +446,6 @@ class FluxModelManager:
             # Add width and height parameters
             generation_kwargs["width"] = width
             generation_kwargs["height"] = height
-
-            # Override pipeline defaults that might constrain dimensions
-            generation_kwargs["max_area"] = (
-                width * height
-            )  # Allow our requested dimensions
-            generation_kwargs["max_sequence_length"] = max(
-                width, height
-            )  # Allow our requested dimensions
 
             logger.info(
                 f"Using requested dimensions: {width}x{height} with max_area={width * height}"

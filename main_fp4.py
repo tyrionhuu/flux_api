@@ -5,9 +5,9 @@ Main FastAPI application for the FP4 FLUX API (Port 8002)
 import logging
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.fp4_routes import router
@@ -100,20 +100,52 @@ app.add_middleware(
 )
 
 
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler to catch any unhandled errors"""
+    import traceback
+    
+    # Log the full error with traceback
+    logging.error(f"Unhandled exception in {request.url}: {exc}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
+    
+    # Return a proper JSON error response
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "detail": str(exc),
+            "type": type(exc).__name__,
+            "path": str(request.url)
+        }
+    )
+
+
 # Add request validation middleware to filter malformed requests
 @app.middleware("http")
 async def validate_requests(request, call_next):
     """Filter out malformed HTTP requests"""
-    # Check if request has valid headers
-    if not request.headers.get("host"):
-        # Log and reject malformed requests
-        logging.warning(
-            f"Rejecting malformed request from {request.client.host if request.client else 'unknown'}"
-        )
-        return {"error": "Invalid request"}
+    try:
+        # Check if request has valid headers
+        if not request.headers.get("host"):
+            # Log and reject malformed requests
+            logging.warning(
+                f"Rejecting malformed request from {request.client.host if request.client else 'unknown'}"
+            )
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid request", "detail": "Missing host header"}
+            )
 
-    response = await call_next(request)
-    return response
+        response = await call_next(request)
+        return response
+    except Exception as e:
+        logging.error(f"Error in request validation middleware: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error", "detail": str(e)}
+        )
 
 
 # Include API routes

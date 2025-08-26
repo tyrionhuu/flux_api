@@ -14,28 +14,38 @@ from config.fp4_settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
 
 def extract_image_from_result(result: Any) -> Image.Image:
     """Extract image from FLUX pipeline result"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"Extracting image from result type: {type(result)}")
+        
         # Handle different possible return types from FLUX pipeline
         if hasattr(result, "images") and result.images:
+            logger.info("Found result.images, returning first image")
             return result.images[0]
         elif isinstance(result, (list, tuple)) and len(result) > 0:
+            logger.info(f"Result is {type(result)} with {len(result)} items")
             # If result is a tuple/list, try to find the image
-            for item in result:
+            for i, item in enumerate(result):
                 if isinstance(item, Image.Image):
+                    logger.info(f"Found PIL Image at index {i}")
                     return item
                 elif hasattr(item, "images") and item.images:
+                    logger.info(f"Found item with images attribute at index {i}")
                     return item.images[0]
         elif isinstance(result, Image.Image):
+            logger.info("Result is already a PIL Image")
             return result
 
         # Fallback: create a simple placeholder image
-        print("Warning: Could not extract image from result, using placeholder")
+        logger.warning("Could not extract image from result, using placeholder")
         return Image.new(
             "RGB", DEFAULT_IMAGE_SIZE, color=PLACEHOLDER_COLORS["placeholder"]
         )
 
     except Exception as e:
-        print(f"Error extracting image from result: {e}")
+        logger.error(f"Error extracting image from result: {e}")
         return Image.new("RGB", DEFAULT_IMAGE_SIZE, color=PLACEHOLDER_COLORS["error"])
 
 

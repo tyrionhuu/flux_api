@@ -62,6 +62,21 @@ def debug_version():
     }
 
 
+@router.post("/test-form")
+async def test_form_endpoint(
+    prompt: str = Form(...),
+    test_param: Optional[str] = Form(None),
+):
+    """Test endpoint to verify form handling works"""
+    return {
+        "status": "success",
+        "message": "Form test successful",
+        "prompt": prompt,
+        "test_param": test_param,
+        "timestamp": time.time()
+    }
+
+
 @router.get("/")
 def read_root():
     """Root endpoint for testing"""
@@ -324,10 +339,10 @@ async def generate_image(request: GenerateRequest):
 async def generate_with_image(
     prompt: str = Form(...),
     image: UploadFile = File(...),
-    num_inference_steps: int = Form(25),
-    guidance_scale: float = Form(2.5),
-    width: int = Form(512),
-    height: int = Form(512),
+    num_inference_steps: Optional[int] = Form(25),
+    guidance_scale: Optional[float] = Form(2.5),
+    width: Optional[int] = Form(512),
+    height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
     negative_prompt: Optional[str] = Form(None),
     prompt_prefix: Optional[str] = Form(None),
@@ -402,23 +417,42 @@ async def generate_with_image(
         generation_start_time = time.time()
         
         # Generate image using the new method
-        result = model_manager.generate_image_with_image(
-            prompt=enhanced_prompt,
-            image=img,
-            num_inference_steps=num_inference_steps,
-            guidance_scale=guidance_scale,
-            width=width,
-            height=height,
-            seed=seed,
-            negative_prompt=negative_prompt,
-        )
+        try:
+            logger.info(f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}")
+            result = model_manager.generate_image_with_image(
+                prompt=enhanced_prompt,
+                image=img,
+                num_inference_steps=num_inference_steps or 25,
+                guidance_scale=guidance_scale or 2.5,
+                width=width or 512,
+                height=height or 512,
+                seed=seed,
+                negative_prompt=negative_prompt,
+            )
+            logger.info(f"Model generation completed successfully, result type: {type(result)}")
+        except Exception as gen_error:
+            logger.error(f"Model generation failed: {gen_error}")
+            raise HTTPException(status_code=500, detail=f"Image generation failed: {str(gen_error)}")
         
         # Calculate generation time
         generation_time = time.time() - generation_start_time
         
         # Extract and save the generated image
-        generated_image = extract_image_from_result(result)
-        image_filename = save_image_with_unique_name(generated_image)
+        try:
+            generated_image = extract_image_from_result(result)
+            if generated_image is None:
+                raise RuntimeError("Failed to extract image from generation result")
+            logger.info(f"Successfully extracted generated image: {type(generated_image)}")
+        except Exception as extract_error:
+            logger.error(f"Failed to extract image from result: {extract_error}")
+            raise HTTPException(status_code=500, detail=f"Failed to extract generated image: {str(extract_error)}")
+            
+        try:
+            image_filename = save_image_with_unique_name(generated_image)
+            logger.info(f"Successfully saved image to: {image_filename}")
+        except Exception as save_error:
+            logger.error(f"Failed to save generated image: {save_error}")
+            raise HTTPException(status_code=500, detail=f"Failed to save generated image: {str(save_error)}")
         
         # Convert image to base64 for direct response
         try:
