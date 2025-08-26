@@ -452,7 +452,7 @@ class FluxModelManager:
             # Add width and height parameters
             generation_kwargs["width"] = width
             generation_kwargs["height"] = height
-            
+
             # Force the FLUX pipeline to respect our exact dimensions
             # This prevents the automatic resizing that overrides our width/height
             generation_kwargs["max_area"] = width * height
