@@ -55,7 +55,7 @@ class GenerateRequest(BaseModel):
 
 class ImageUploadGenerateRequest(BaseModel):
     """Request model for image generation with uploaded image and prompt"""
-    
+
     prompt: str = Field(..., description="Text prompt for image generation")
     # Support for multiple LoRAs
     loras: Optional[list[LoRAConfig]] = Field(
@@ -93,10 +93,16 @@ class ImageUploadGenerateRequest(BaseModel):
     )
     # Image upload specific parameters
     image_strength: Optional[float] = Field(
-        0.8, ge=0.0, le=1.0, description="Strength of the uploaded image influence (0.0 to 1.0)"
+        0.8,
+        ge=0.0,
+        le=1.0,
+        description="Strength of the uploaded image influence (0.0 to 1.0)",
     )
     image_guidance_scale: Optional[float] = Field(
-        1.5, ge=1.0, le=20.0, description="Guidance scale for image conditioning (1.0 to 20.0)"
+        1.5,
+        ge=1.0,
+        le=20.0,
+        description="Guidance scale for image conditioning (1.0 to 20.0)",
     )
 
 

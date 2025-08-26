@@ -783,6 +783,7 @@ async def upload_image(file: UploadFile = File(...)):
         file_path = save_uploaded_image(file)  # saves to uploads/images by default
 
         import os
+
         filename = os.path.basename(file_path)
 
         return {
@@ -811,7 +812,7 @@ async def upload_image_and_generate(
     upscale_factor: int = Form(2),
     image_strength: float = Form(0.8),
     image_guidance_scale: float = Form(1.5),
-    uploaded_image_path: Optional[str] = Form(None)
+    uploaded_image_path: Optional[str] = Form(None),
 ):
     """Generate image using uploaded image (file or previously uploaded path) and prompt with optional LoRA support"""
     try:
@@ -830,7 +831,10 @@ async def upload_image_and_generate(
             input_image_path = uploaded_image_path
         else:
             if file is None:
-                raise HTTPException(status_code=400, detail="Either file or uploaded_image_path must be provided")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Either file or uploaded_image_path must be provided",
+                )
             # Validate and persist temporarily
             validate_uploaded_image(file)
             input_image_path = save_uploaded_image(file)
@@ -846,46 +850,77 @@ async def upload_image_and_generate(
 
             if loras:
                 import json
+
                 try:
                     lora_configs = json.loads(loras)
                     for lora_config in lora_configs:
-                        if not lora_config.get("name") or not lora_config["name"].strip():
-                            raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
-                        if lora_config.get("weight", 1.0) < 0 or lora_config.get("weight", 1.0) > 2.0:
-                            raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
-                        loras_to_apply.append({
-                            "name": lora_config["name"].strip(),
-                            "weight": lora_config["weight"]
-                        })
+                        if (
+                            not lora_config.get("name")
+                            or not lora_config["name"].strip()
+                        ):
+                            raise HTTPException(
+                                status_code=400, detail="LoRA name cannot be empty"
+                            )
+                        if (
+                            lora_config.get("weight", 1.0) < 0
+                            or lora_config.get("weight", 1.0) > 2.0
+                        ):
+                            raise HTTPException(
+                                status_code=400,
+                                detail="LoRA weight must be between 0 and 2.0",
+                            )
+                        loras_to_apply.append(
+                            {
+                                "name": lora_config["name"].strip(),
+                                "weight": lora_config["weight"],
+                            }
+                        )
                 except json.JSONDecodeError:
-                    raise HTTPException(status_code=400, detail="Invalid LoRA configuration format")
+                    raise HTTPException(
+                        status_code=400, detail="Invalid LoRA configuration format"
+                    )
             elif lora_name:
                 if not lora_name.strip():
-                    raise HTTPException(status_code=400, detail="LoRA name cannot be empty if provided")
+                    raise HTTPException(
+                        status_code=400, detail="LoRA name cannot be empty if provided"
+                    )
                 if lora_weight is None or lora_weight < 0 or lora_weight > 2.0:
-                    raise HTTPException(status_code=400, detail="LoRA weight must be between 0 and 2.0")
-                loras_to_apply.append({
-                    "name": lora_name.strip(),
-                    "weight": lora_weight
-                })
+                    raise HTTPException(
+                        status_code=400, detail="LoRA weight must be between 0 and 2.0"
+                    )
+                loras_to_apply.append(
+                    {"name": lora_name.strip(), "weight": lora_weight}
+                )
 
             # Apply default LoRA if none specified
             if not loras_to_apply and not remove_all_loras:
-                loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
+                loras_to_apply = [
+                    {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
+                ]
 
             # Validate dimensions
             if width < 256 or width > 1024 or height < 256 or height > 1024:
-                raise HTTPException(status_code=400, detail="Width and height must be between 256 and 1024")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Width and height must be between 256 and 1024",
+                )
 
             # Validate upscale factor
             if upscale and upscale_factor not in [2, 4]:
-                raise HTTPException(status_code=400, detail="Upscale factor must be 2 or 4")
+                raise HTTPException(
+                    status_code=400, detail="Upscale factor must be 2 or 4"
+                )
 
             # Validate image strength and guidance
             if image_strength < 0.0 or image_strength > 1.0:
-                raise HTTPException(status_code=400, detail="Image strength must be between 0.0 and 1.0")
+                raise HTTPException(
+                    status_code=400, detail="Image strength must be between 0.0 and 1.0"
+                )
             if image_guidance_scale < 1.0 or image_guidance_scale > 20.0:
-                raise HTTPException(status_code=400, detail="Image guidance scale must be between 1.0 and 20.0")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image guidance scale must be between 1.0 and 20.0",
+                )
 
             # Clean up input
             prompt = prompt.strip()
@@ -907,18 +942,25 @@ async def upload_image_and_generate(
                     model_manager.apply_lora(lora_config["name"], lora_config["weight"])
             elif remove_all_loras:
                 if model_manager.get_lora_info():
-                    logger.info("Removing all LoRAs as requested by client (empty list)")
+                    logger.info(
+                        "Removing all LoRAs as requested by client (empty list)"
+                    )
                     model_manager.remove_lora()
 
             # Generate image using the model (placeholder: regular generate with prompt)
-            logger.info(f"Starting image generation with uploaded image and prompt: {prompt}")
+            logger.info(
+                f"Starting image generation with uploaded image and prompt: {prompt}"
+            )
 
             pipeline = model_manager.get_pipeline()
             if not pipeline:
-                raise HTTPException(status_code=500, detail="Model pipeline not available")
+                raise HTTPException(
+                    status_code=500, detail="Model pipeline not available"
+                )
 
             if seed is not None:
                 import torch
+
                 torch.manual_seed(seed)
 
             generation_start_time = time.time()
@@ -942,16 +984,25 @@ async def upload_image_and_generate(
             if upscale:
                 try:
                     from models.upscaler import apply_upscaling
-                    image_filename, upscaled_image_path, final_width, final_height = apply_upscaling(
-                        generated_image, upscale, upscale_factor, save_image_with_unique_name
+
+                    image_filename, upscaled_image_path, final_width, final_height = (
+                        apply_upscaling(
+                            generated_image,
+                            upscale,
+                            upscale_factor,
+                            save_image_with_unique_name,
+                        )
                     )
-                    logger.info(f"Image upscaled by {upscale_factor}x: {image_filename}")
+                    logger.info(
+                        f"Image upscaled by {upscale_factor}x: {image_filename}"
+                    )
                 except Exception as upscale_error:
                     logger.warning(f"Upscaling failed: {upscale_error}")
                     image_filename = save_image_with_unique_name(generated_image)
 
             # Create download URL
             import os
+
             filename = os.path.basename(image_filename)
             download_url = f"/download/{filename}"
 
@@ -979,4 +1030,6 @@ async def upload_image_and_generate(
         raise
     except Exception as e:
         logger.error(f"Error in upload-image-generate: {e}")
-        raise HTTPException(status_code=500, detail=f"Image generation failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Image generation failed: {str(e)}"
+        )

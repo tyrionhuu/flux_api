@@ -589,6 +589,7 @@ async def upload_image(file: UploadFile = File(...)):
         file_path = save_uploaded_image(file)  # saves to uploads/images by default
 
         import os
+
         filename = os.path.basename(file_path)
 
         return {
