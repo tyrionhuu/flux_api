@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 import tempfile
+import hashlib
 from typing import Any, Optional, Union
 
 import torch
@@ -37,6 +38,15 @@ class FluxModelManager:
         self.current_weight: float = 1.0
         # Track temporary LoRA files for cleanup
         self._temp_lora_paths: list = []
+        # Persistent cache directory for merged LoRAs and nunchaku conversions
+        self._lora_cache_dir = os.path.join("cache", "merged_loras")
+        self._nunchaku_cache_dir = os.path.join("cache", "nunchaku_loras")
+        try:
+            os.makedirs(self._lora_cache_dir, exist_ok=True)
+            os.makedirs(self._nunchaku_cache_dir, exist_ok=True)
+        except Exception:
+            # If cache dir can't be created, we will fall back to temp-only
+            pass
 
     def __del__(self):
         """Cleanup when object is destroyed"""
@@ -232,7 +242,15 @@ class FluxModelManager:
                     f"   - Loading default LoRA parameters from {DEFAULT_LORA_NAME}"
                 )
                 try:
-                    transformer.update_lora_params(DEFAULT_LORA_NAME)
+                    # Try to load cached nunchaku conversion first
+                    if self._load_cached_nunchaku_conversion(DEFAULT_LORA_NAME, transformer):
+                        logger.info("   - Using cached nunchaku conversion for default LoRA")
+                    else:
+                        # No cache hit, perform the conversion
+                        logger.info("   - Converting default LoRA to nunchaku format...")
+                        transformer.update_lora_params(DEFAULT_LORA_NAME)
+                        # Cache the conversion result for future use
+                        self._cache_nunchaku_conversion(DEFAULT_LORA_NAME, transformer)
                     logger.info(f"   - Default LoRA parameters loaded successfully")
                 except Exception as load_error:
                     logger.warning(
@@ -654,7 +672,17 @@ class FluxModelManager:
                 return False
 
             logger.info(f"   - Loading LoRA parameters from: {lora_path}")
-            transformer.update_lora_params(lora_path)
+            
+            # Try to load cached nunchaku conversion first
+            if self._load_cached_nunchaku_conversion(lora_path, transformer):
+                logger.info("   - Using cached nunchaku conversion")
+            else:
+                # No cache hit, perform the conversion
+                logger.info("   - Converting LoRA to nunchaku format...")
+                transformer.update_lora_params(lora_path)
+                # Cache the conversion result for future use
+                self._cache_nunchaku_conversion(lora_path, transformer)
+            
             logger.info(f"   - Setting LoRA strength to {weight}")
             transformer.set_lora_strength(weight)
             logger.info("   - LoRA applied successfully")
@@ -820,29 +848,70 @@ class FluxModelManager:
 
             logger.info(f"Merging {len(lora_configs)} LoRAs into a single LoRA...")
 
-            # Create a temporary directory for the merged LoRA
+            # Resolve all LoRA paths first and build a deterministic cache key
+            resolved_paths: list[str] = []
+            weights_for_key: list[float] = []
+            for lora_config in lora_configs:
+                lora_name = lora_config["name"]
+                weight = float(lora_config["weight"])
+                lora_path = self._get_lora_path(lora_name)
+                if not lora_path:
+                    logger.error(f"   - Could not resolve path for LoRA: {lora_name}")
+                    return None
+                resolved_paths.append(lora_path)
+                weights_for_key.append(weight)
+
+            # Compute a cache key using SHA256 over (file hashes + weights)
+            def _sha256_file(path: str) -> str:
+                h = hashlib.sha256()
+                with open(path, "rb") as f:
+                    for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                        h.update(chunk)
+                return h.hexdigest()
+
+            hasher = hashlib.sha256()
+            for p, w in zip(resolved_paths, weights_for_key):
+                try:
+                    file_hash = _sha256_file(p)
+                    hasher.update(file_hash.encode("utf-8"))
+                except Exception:
+                    # Fall back to size+mtime if hashing fails
+                    try:
+                        stat = os.stat(p)
+                        hasher.update(str(stat.st_size).encode("utf-8"))
+                        hasher.update(str(int(stat.st_mtime)).encode("utf-8"))
+                    except Exception:
+                        hasher.update(p.encode("utf-8"))
+                hasher.update(str(w).encode("utf-8"))
+            cache_key = hasher.hexdigest()
+            cache_filename = f"merged_{cache_key}.safetensors"
+            cached_path = (
+                os.path.join(self._lora_cache_dir, cache_filename)
+                if os.path.isdir(self._lora_cache_dir)
+                else None
+            )
+
+            # Cache hit
+            if cached_path and os.path.exists(cached_path):
+                logger.info(f"   - Using cached merged LoRA: {cached_path}")
+                return cached_path
+
+            # Create a temporary directory for the merge operation
             temp_dir = tempfile.mkdtemp(prefix="merged_lora_")
-            merged_lora_path = os.path.join(temp_dir, "merged_lora.safetensors")
+            temp_merge_path = os.path.join(temp_dir, "merged_lora.safetensors")
 
             try:
                 # Load all LoRAs
                 lora_data_list = []
                 lora_weights_list = []
 
-                for i, lora_config in enumerate(lora_configs):
+                for i, (lora_config, lora_path) in enumerate(zip(lora_configs, resolved_paths)):
                     lora_name = lora_config["name"]
                     weight = lora_config["weight"]
 
                     logger.info(
                         f"   - Loading LoRA {i+1}: {lora_name} (weight: {weight})"
                     )
-
-                    lora_path = self._get_lora_path(lora_name)
-                    if not lora_path:
-                        logger.error(
-                            f"   - Could not resolve path for LoRA: {lora_name}"
-                        )
-                        return None
 
                     # Load the LoRA weights
                     try:
@@ -889,11 +958,20 @@ class FluxModelManager:
 
                     merged_lora[key] = merged_tensor
 
-                # Save the merged LoRA
-                safe_save_file(merged_lora, merged_lora_path)
-                logger.info(f"   - Merged LoRA saved: {merged_lora_path}")
+                # Save the merged LoRA to cache if possible, otherwise temp
+                if cached_path:
+                    try:
+                        safe_save_file(merged_lora, cached_path)
+                        logger.info(f"   - Merged LoRA saved to cache: {cached_path}")
+                        return cached_path
+                    except Exception as cache_save_error:
+                        logger.warning(
+                            f"   - Failed to save merged LoRA to cache ({cache_save_error}), using temp path"
+                        )
 
-                return merged_lora_path
+                safe_save_file(merged_lora, temp_merge_path)
+                logger.info(f"   - Merged LoRA saved: {temp_merge_path}")
+                return temp_merge_path
 
             except Exception as merge_error:
                 logger.error(f"Error during LoRA merging: {merge_error}")
@@ -1073,6 +1151,71 @@ class FluxModelManager:
         except Exception as e:
             logger.error(f"Error resolving LoRA path: {e}")
             return None
+
+    def _get_nunchaku_cache_path(self, lora_path: str) -> Optional[str]:
+        """Get the cache path for a nunchaku-converted LoRA"""
+        try:
+            if not os.path.isdir(self._nunchaku_cache_dir):
+                return None
+            
+            # Create cache key from file path and modification time
+            stat = os.stat(lora_path)
+            cache_key = f"{os.path.basename(lora_path)}_{int(stat.st_mtime)}_{stat.st_size}"
+            # Make filename safe
+            cache_key = "".join(c for c in cache_key if c.isalnum() or c in "._-")
+            return os.path.join(self._nunchaku_cache_dir, f"{cache_key}.nunchaku")
+        except Exception:
+            return None
+
+    def _cache_nunchaku_conversion(self, lora_path: str, transformer) -> bool:
+        """Cache the nunchaku conversion result for a LoRA"""
+        try:
+            cache_path = self._get_nunchaku_cache_path(lora_path)
+            if not cache_path:
+                return False
+            
+            # Get the converted LoRA parameters from the transformer
+            # This is a bit hacky but we need to extract the converted format
+            if hasattr(transformer, '_lora_params') and transformer._lora_params is not None:
+                # Save the converted parameters
+                torch.save(transformer._lora_params, cache_path)
+                logger.info(f"   - Cached nunchaku conversion: {cache_path}")
+                return True
+            else:
+                logger.warning("   - Could not extract nunchaku parameters for caching")
+                return False
+        except Exception as e:
+            logger.warning(f"   - Failed to cache nunchaku conversion: {e}")
+            return False
+
+    def _load_cached_nunchaku_conversion(self, lora_path: str, transformer) -> bool:
+        """Load cached nunchaku conversion if available"""
+        try:
+            cache_path = self._get_nunchaku_cache_path(lora_path)
+            if not cache_path or not os.path.exists(cache_path):
+                return False
+            
+            # Check if cache is still valid (file hasn't changed)
+            if os.path.exists(lora_path):
+                stat = os.stat(lora_path)
+                cache_stat = os.stat(cache_path)
+                if cache_stat.st_mtime < stat.st_mtime:
+                    # Cache is stale, remove it
+                    os.remove(cache_path)
+                    return False
+            
+            # Load cached conversion
+            cached_params = torch.load(cache_path, map_location='cpu')
+            if hasattr(transformer, '_lora_params'):
+                transformer._lora_params = cached_params
+                logger.info(f"   - Loaded cached nunchaku conversion: {cache_path}")
+                return True
+            else:
+                logger.warning("   - Transformer doesn't support cached parameters")
+                return False
+        except Exception as e:
+            logger.warning(f"   - Failed to load cached nunchaku conversion: {e}")
+            return False
 
     def _cleanup_temp_loras(self):
         """Clean up any temporary LoRA files"""

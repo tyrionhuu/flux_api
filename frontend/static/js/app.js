@@ -409,10 +409,15 @@ class FluxAPI {
         try {
             const formData = new FormData();
             
+            // Decide endpoint and payload based on image source
+            let endpoint = '/generate-with-image';
             if (this.serverUploadedImagePath) {
+                // Use previously uploaded image path -> dedicated endpoint
+                endpoint = '/upload-image-generate';
                 formData.append('uploaded_image_path', this.serverUploadedImagePath);
             } else if (this.uploadedImageFile) {
-                formData.append('file', this.uploadedImageFile);
+                // Direct image-to-image -> field name must be 'image'
+                formData.append('image', this.uploadedImageFile);
             }
             
             formData.append('prompt', prompt);
@@ -433,14 +438,21 @@ class FluxAPI {
             const seed = document.getElementById('seed').value;
             if (seed) formData.append('seed', seed);
             
-            const response = await fetch(`${this.hostBase}/generate-with-image`, { 
+            const response = await fetch(`${this.hostBase}${endpoint}`, { 
                 method: 'POST', 
                 body: formData 
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(`Generation failed: ${error.detail || 'Unknown error'}`);
+                let detail = 'Unknown error';
+                try {
+                    const error = await response.json();
+                    detail = error.detail || JSON.stringify(error);
+                } catch (_) {
+                    const text = await response.text();
+                    detail = text?.slice(0, 500) || detail;
+                }
+                throw new Error(`Generation failed: ${detail}`);
             }
 
             const result = await response.json();
