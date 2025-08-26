@@ -105,11 +105,11 @@ app.add_middleware(
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler to catch any unhandled errors"""
     import traceback
-
+    
     # Log the full error with traceback
     logging.error(f"Unhandled exception in {request.url}: {exc}")
     logging.error(f"Traceback: {traceback.format_exc()}")
-
+    
     # Return a proper JSON error response
     return JSONResponse(
         status_code=500,
@@ -117,8 +117,8 @@ async def global_exception_handler(request: Request, exc: Exception):
             "error": "Internal server error",
             "detail": str(exc),
             "type": type(exc).__name__,
-            "path": str(request.url),
-        },
+            "path": str(request.url)
+        }
     )
 
 
@@ -135,7 +135,7 @@ async def validate_requests(request, call_next):
             )
             return JSONResponse(
                 status_code=400,
-                content={"error": "Invalid request", "detail": "Missing host header"},
+                content={"error": "Invalid request", "detail": "Missing host header"}
             )
 
         response = await call_next(request)
@@ -144,7 +144,7 @@ async def validate_requests(request, call_next):
         logging.error(f"Error in request validation middleware: {e}")
         return JSONResponse(
             status_code=500,
-            content={"error": "Internal server error", "detail": str(e)},
+            content={"error": "Internal server error", "detail": str(e)}
         )
 
 

@@ -15,12 +15,11 @@ from config.fp4_settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
 def extract_image_from_result(result: Any) -> Image.Image:
     """Extract image from FLUX pipeline result"""
     import logging
-
     logger = logging.getLogger(__name__)
-
+    
     try:
         logger.info(f"Extracting image from result type: {type(result)}")
-
+        
         # Handle different possible return types from FLUX pipeline
         if hasattr(result, "images") and result.images:
             logger.info("Found result.images, returning first image")

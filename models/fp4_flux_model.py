@@ -316,7 +316,7 @@ class FluxModelManager:
             # Try with user-specified parameters first
             try:
                 logger.info(
-                    f"Generating with parameters: steps={num_inference_steps}, guidance={guidance_scale}, size={width}x{height}"
+                    f"Generating with parameters: steps={num_inference_steps}, guidance={guidance_scale}, size={width}x{height}, max_area={width * height}, _auto_resize=False"
                 )
 
                 # Set seed if provided
@@ -331,6 +331,9 @@ class FluxModelManager:
                     "guidance_scale": guidance_scale,
                     "width": width,
                     "height": height,
+                    # Force the FLUX pipeline to respect our exact dimensions
+                    "max_area": width * height,
+                    "_auto_resize": False,
                 }
 
                 # Add negative prompt if provided
@@ -358,6 +361,9 @@ class FluxModelManager:
                         "guidance_scale": fallback_guidance,
                         "width": width,
                         "height": height,
+                        # Force the FLUX pipeline to respect our exact dimensions
+                        "max_area": width * height,
+                        "_auto_resize": False,
                     }
 
                     if negative_prompt:
@@ -446,9 +452,14 @@ class FluxModelManager:
             # Add width and height parameters
             generation_kwargs["width"] = width
             generation_kwargs["height"] = height
+            
+            # Force the FLUX pipeline to respect our exact dimensions
+            # This prevents the automatic resizing that overrides our width/height
+            generation_kwargs["max_area"] = width * height
+            generation_kwargs["_auto_resize"] = False
 
             logger.info(
-                f"Using requested dimensions: {width}x{height} with max_area={width * height}"
+                f"Using requested dimensions: {width}x{height} with max_area={width * height},_auto_resize=False"
             )
 
             # Add negative prompt if provided

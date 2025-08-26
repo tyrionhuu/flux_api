@@ -135,7 +135,7 @@ fi
 
 # Wait for port to be available
 if ! wait_for_port "$PORT" 30; then
-    echo "❌ Port 8000 is not available, cannot start service"
+    echo "❌ Port $PORT is not available, cannot start service"
     exit 1
 fi
 
