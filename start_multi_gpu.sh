@@ -152,17 +152,40 @@ start_service() {
         python_cmd="$VENV_PATH/bin/python"
     fi
     
-    # Start the service in background with proper environment
+    # Calculate threads per GPU instance to prevent CPU oversubscription
+    local total_cpus=$(nproc)
+    local threads_per_gpu=$((total_cpus / NUM_GPUS / 2))
+    # Ensure at least 2 threads per instance
+    threads_per_gpu=$(( threads_per_gpu < 2 ? 2 : threads_per_gpu ))
+    
+    echo "   Configuring with $threads_per_gpu CPU threads (total CPUs: $total_cpus, GPUs: $NUM_GPUS)"
+    
+    # Start the service in background with proper environment and thread limits
     if [ "$MODEL_TYPE" = "fp4" ]; then
-        env CUDA_VISIBLE_DEVICES=$gpu_id FP4_API_PORT=$port nohup $python_cmd main_fp4.py > "$log_file" 2>&1 &
+        env CUDA_VISIBLE_DEVICES=$gpu_id \
+            FP4_API_PORT=$port \
+            OMP_NUM_THREADS=$threads_per_gpu \
+            MKL_NUM_THREADS=$threads_per_gpu \
+            NUMEXPR_NUM_THREADS=$threads_per_gpu \
+            OPENBLAS_NUM_THREADS=$threads_per_gpu \
+            VECLIB_MAXIMUM_THREADS=$threads_per_gpu \
+            nohup $python_cmd main_fp4.py > "$log_file" 2>&1 &
     else
-        env CUDA_VISIBLE_DEVICES=$gpu_id BF16_API_PORT=$port nohup $python_cmd main_bf16.py > "$log_file" 2>&1 &
+        env CUDA_VISIBLE_DEVICES=$gpu_id \
+            BF16_API_PORT=$port \
+            OMP_NUM_THREADS=$threads_per_gpu \
+            MKL_NUM_THREADS=$threads_per_gpu \
+            NUMEXPR_NUM_THREADS=$threads_per_gpu \
+            OPENBLAS_NUM_THREADS=$threads_per_gpu \
+            VECLIB_MAXIMUM_THREADS=$threads_per_gpu \
+            nohup $python_cmd main_bf16.py > "$log_file" 2>&1 &
     fi
     
     local pid=$!
     echo $pid >> "$PID_FILE"
     
     echo "   Started PID $pid, log: $log_file"
+    echo "   Thread limits: OMP=$threads_per_gpu, MKL=$threads_per_gpu"
     
     # Brief pause to avoid race conditions
     sleep 1
@@ -210,16 +233,52 @@ start_nginx() {
         return 1
     fi
     
+    # Stop the systemd nginx service if it's running
+    echo "   Checking for systemd nginx service..."
+    if systemctl is-active nginx > /dev/null 2>&1; then
+        echo "   Stopping systemd nginx service..."
+        sudo systemctl stop nginx
+        sleep 2
+    fi
+    
+    # Also stop any other nginx instances
+    if pgrep -x nginx > /dev/null; then
+        echo "   Stopping remaining nginx instances..."
+        sudo nginx -s quit 2>/dev/null || true
+        sleep 2
+        # Force kill if still running
+        if pgrep -x nginx > /dev/null; then
+            sudo pkill -9 nginx 2>/dev/null || true
+            sleep 1
+        fi
+    fi
+    
     # Test nginx config
-    if ! nginx -t -c "$PWD/$NGINX_CONFIG" 2>/dev/null; then
+    if ! sudo nginx -t -c "$PWD/$NGINX_CONFIG" 2>/dev/null; then
         echo "⚠️  Nginx config test failed. Please check $NGINX_CONFIG"
         echo "   Services are running on ports ${BASE_PORT}-$((BASE_PORT + NUM_GPUS - 1))"
         return 1
     fi
     
     # Start nginx with our config
-    sudo nginx -c "$PWD/$NGINX_CONFIG"
-    echo "✅ Nginx started on port 80"
+    echo "   Starting nginx with custom config..."
+    if sudo nginx -c "$PWD/$NGINX_CONFIG"; then
+        # Verify nginx started successfully and is listening on port 8080
+        sleep 2
+        if sudo lsof -i :8080 > /dev/null 2>&1; then
+            echo "✅ Nginx started successfully on port 8080"
+            return 0
+        else
+            echo "⚠️  Nginx started but not listening on port 8080"
+            echo "   Checking nginx status..."
+            sudo nginx -t -c "$PWD/$NGINX_CONFIG"
+            return 1
+        fi
+    else
+        echo "❌ Failed to start nginx. Error output above."
+        echo "   Try manually: sudo nginx -c $PWD/$NGINX_CONFIG"
+        return 1
+    fi
 }
 
 # Function to show status
@@ -251,7 +310,10 @@ main() {
     # Handle stop command
     if [ "${1:-}" = "stop" ]; then
         stop_all_services
+        # Stop nginx (both custom and systemd)
         sudo nginx -s stop 2>/dev/null || true
+        sudo systemctl stop nginx 2>/dev/null || true
+        sudo pkill -9 nginx 2>/dev/null || true
         exit 0
     fi
     

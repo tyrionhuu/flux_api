@@ -4,6 +4,17 @@ Main FastAPI application for the FP4 FLUX API (Port 8002)
 
 import logging
 import os
+import torch
+
+# Set PyTorch thread limits BEFORE any other imports or operations
+# This prevents thread oversubscription when running multiple instances
+num_cores = os.cpu_count() or 8
+threads_per_instance = max(1, num_cores // 4)  # Use 1/4 of cores per instance
+torch.set_num_threads(threads_per_instance)
+
+# Also set inter-op threads to prevent thread explosion
+torch.set_num_interop_threads(max(1, threads_per_instance // 2))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +32,12 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler(), logging.FileHandler("logs/flux_api_fp4.log")],
 )
+
+# Log PyTorch thread configuration
+logger = logging.getLogger(__name__)
+logger.info(f"System CPU cores: {num_cores}")
+logger.info(f"PyTorch threads per instance: {torch.get_num_threads()}")
+logger.info(f"PyTorch inter-op threads: {torch.get_num_interop_threads()}")
 
 # Configure specific loggers for better error visibility
 logging.getLogger("api.fp4_routes").setLevel(logging.INFO)

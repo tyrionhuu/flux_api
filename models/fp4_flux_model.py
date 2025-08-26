@@ -54,6 +54,9 @@ class FluxModelManager:
                 return True
 
             logger.info("Loading FLUX model...")
+            
+            # Log thread configuration for monitoring
+            logger.info(f"PyTorch thread config - Threads: {torch.get_num_threads()}, Inter-op: {torch.get_num_interop_threads()}")
 
             # Check if CUDA is available
             if not torch.cuda.is_available():

@@ -31,6 +31,9 @@ class BF16FluxModelManager(FluxModelManager):
         """Load the BF16 FLUX model with GPU-only support"""
         try:
             logger.info("Loading BF16 FLUX model...")
+            
+            # Log thread configuration for monitoring
+            logger.info(f"PyTorch thread config - Threads: {torch.get_num_threads()}, Inter-op: {torch.get_num_interop_threads()}")
 
             # Check if CUDA is available
             if not torch.cuda.is_available():
