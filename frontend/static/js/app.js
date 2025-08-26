@@ -326,11 +326,29 @@ class FluxAPI {
             }
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(`Generation failed: ${error.detail || 'Unknown error'}`);
+                let detail = 'Unknown error';
+                try {
+                    const error = await response.json();
+                    detail = error.detail || JSON.stringify(error);
+                } catch (_) {
+                    const text = await response.text();
+                    detail = text?.slice(0, 500) || detail;
+                }
+                throw new Error(`Generation failed: ${detail}`);
             }
 
-            const result = await response.json();
+            // Robust JSON parsing (handle proxies returning empty/HTML)
+            let result;
+            try {
+                result = await response.json();
+            } catch (_) {
+                const text = await response.text();
+                try {
+                    result = JSON.parse(text);
+                } catch (_) {
+                    throw new Error(`Invalid JSON response: ${text?.slice(0, 500) || 'empty body'}`);
+                }
+            }
             console.log('Generation completed');
             
             // Show single image without model identification
