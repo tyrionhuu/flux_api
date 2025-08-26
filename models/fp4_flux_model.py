@@ -359,7 +359,7 @@ class FluxModelManager:
                         "width": width,
                         "height": height,
                     }
-                    
+
                     if negative_prompt:
                         generation_kwargs["negative_prompt"] = negative_prompt
 

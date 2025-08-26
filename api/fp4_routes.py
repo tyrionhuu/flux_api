@@ -73,7 +73,7 @@ async def test_form_endpoint(
         "message": "Form test successful",
         "prompt": prompt,
         "test_param": test_param,
-        "timestamp": time.time()
+        "timestamp": time.time(),
     }
 
 
@@ -349,76 +349,97 @@ async def generate_with_image(
 ):
     """Generate image using image + text input (image-to-image generation)"""
     try:
-        from PIL import Image
         import io
-        
+
+        from PIL import Image
+
         # Debug logging for form parameters
-        logger.info(f"Received generate-with-image request - prompt: {prompt}, num_inference_steps: {num_inference_steps}, guidance_scale: {guidance_scale}, width: {width}, height: {height}, seed: {seed}")
-        logger.info(f"Image file: {image.filename}, content_type: {image.content_type}, size: {image.size}")
-        
+        logger.info(
+            f"Received generate-with-image request - prompt: {prompt}, num_inference_steps: {num_inference_steps}, guidance_scale: {guidance_scale}, width: {width}, height: {height}, seed: {seed}"
+        )
+        logger.info(
+            f"Image file: {image.filename}, content_type: {image.content_type}, size: {image.size}"
+        )
+
         # Apply prompt prefix if provided, otherwise use the original prompt
         if prompt_prefix:
             enhanced_prompt = f"{prompt_prefix}, {prompt}"
         else:
             enhanced_prompt = prompt
-            
+
         # Validate parameters
         if not prompt or not prompt.strip():
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
-            
-        if num_inference_steps and (num_inference_steps < 1 or num_inference_steps > 100):
-            raise HTTPException(status_code=400, detail="num_inference_steps must be between 1 and 100")
-            
+
+        if num_inference_steps and (
+            num_inference_steps < 1 or num_inference_steps > 100
+        ):
+            raise HTTPException(
+                status_code=400, detail="num_inference_steps must be between 1 and 100"
+            )
+
         if guidance_scale and (guidance_scale < 0.1 or guidance_scale > 20.0):
-            raise HTTPException(status_code=400, detail="guidance_scale must be between 0.1 and 20.0")
-            
+            raise HTTPException(
+                status_code=400, detail="guidance_scale must be between 0.1 and 20.0"
+            )
+
         if width and (width < 256 or width > 1024):
-            raise HTTPException(status_code=400, detail="width must be between 256 and 1024")
-            
+            raise HTTPException(
+                status_code=400, detail="width must be between 256 and 1024"
+            )
+
         if height and (height < 256 or height > 1024):
-            raise HTTPException(status_code=400, detail="height must be between 256 and 1024")
-            
+            raise HTTPException(
+                status_code=400, detail="height must be between 256 and 1024"
+            )
+
         # Load input image
         if not image.filename:
             raise HTTPException(status_code=400, detail="No image file provided")
-            
+
         # Validate image file type
         if not image.content_type or not image.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="File must be an image")
-            
+
         # Check file size (max 10MB)
         if image.size and image.size > 10 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="Image file too large (max 10MB)")
-            
+            raise HTTPException(
+                status_code=400, detail="Image file too large (max 10MB)"
+            )
+
         # Check file extension
         allowed_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
         file_extension = os.path.splitext(image.filename)[1].lower()
         if file_extension not in allowed_extensions:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported image format. Allowed: {', '.join(allowed_extensions)}"
+                detail=f"Unsupported image format. Allowed: {', '.join(allowed_extensions)}",
             )
-            
+
         try:
             raw = await image.read()
             img = Image.open(io.BytesIO(raw)).convert("RGB")
         except Exception as img_error:
             logger.error(f"Failed to load image: {img_error}")
-            raise HTTPException(status_code=400, detail=f"Failed to load image: {str(img_error)}")
-        
+            raise HTTPException(
+                status_code=400, detail=f"Failed to load image: {str(img_error)}"
+            )
+
         # Ensure model is loaded
         with _model_manager_lock:
             if not model_manager.is_loaded():
                 logger.info("Model not loaded, loading it first...")
                 if not model_manager.load_model():
                     raise HTTPException(status_code=500, detail="Failed to load model")
-        
+
         # Start timing
         generation_start_time = time.time()
-        
+
         # Generate image using the new method
         try:
-            logger.info(f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}")
+            logger.info(
+                f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}"
+            )
             result = model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
                 image=img,
@@ -429,39 +450,52 @@ async def generate_with_image(
                 seed=seed,
                 negative_prompt=negative_prompt,
             )
-            logger.info(f"Model generation completed successfully, result type: {type(result)}")
+            logger.info(
+                f"Model generation completed successfully, result type: {type(result)}"
+            )
         except Exception as gen_error:
             logger.error(f"Model generation failed: {gen_error}")
-            raise HTTPException(status_code=500, detail=f"Image generation failed: {str(gen_error)}")
-        
+            raise HTTPException(
+                status_code=500, detail=f"Image generation failed: {str(gen_error)}"
+            )
+
         # Calculate generation time
         generation_time = time.time() - generation_start_time
-        
+
         # Extract and save the generated image
         try:
             generated_image = extract_image_from_result(result)
             if generated_image is None:
                 raise RuntimeError("Failed to extract image from generation result")
-            logger.info(f"Successfully extracted generated image: {type(generated_image)}")
+            logger.info(
+                f"Successfully extracted generated image: {type(generated_image)}"
+            )
         except Exception as extract_error:
             logger.error(f"Failed to extract image from result: {extract_error}")
-            raise HTTPException(status_code=500, detail=f"Failed to extract generated image: {str(extract_error)}")
-            
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to extract generated image: {str(extract_error)}",
+            )
+
         try:
             image_filename = save_image_with_unique_name(generated_image)
             logger.info(f"Successfully saved image to: {image_filename}")
         except Exception as save_error:
             logger.error(f"Failed to save generated image: {save_error}")
-            raise HTTPException(status_code=500, detail=f"Failed to save generated image: {str(save_error)}")
-        
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to save generated image: {str(save_error)}",
+            )
+
         # Convert image to base64 for direct response
         try:
             from utils.image_utils import image_to_base64
+
             image_base64 = image_to_base64(generated_image, "PNG")
         except Exception as base64_error:
             logger.warning(f"Failed to convert image to base64: {base64_error}")
             image_base64 = None
-        
+
         # Return the result with download URL and base64
         return {
             "status": "success",
@@ -469,9 +503,9 @@ async def generate_with_image(
             "download_url": f"/download/{image_filename}",
             "filename": image_filename,
             "image_base64": image_base64,  # Base64 encoded image data
-            "generation_time": f"{generation_time:.2f}s"
+            "generation_time": f"{generation_time:.2f}s",
         }
-        
+
     except Exception as e:
         logger.error(f"Error in generate_with_image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -851,6 +885,7 @@ def generate_image_internal(
         # Convert image to base64 for direct response
         try:
             from utils.image_utils import image_to_base64
+
             image_base64 = image_to_base64(image, "PNG")
         except Exception as base64_error:
             logger.warning(f"Failed to convert image to base64: {base64_error}")
@@ -1179,6 +1214,7 @@ async def upload_image_and_generate(
             # Convert image to base64 for direct response
             try:
                 from utils.image_utils import image_to_base64
+
                 image_base64 = image_to_base64(generated_image, "PNG")
             except Exception as base64_error:
                 logger.warning(f"Failed to convert image to base64: {base64_error}")
