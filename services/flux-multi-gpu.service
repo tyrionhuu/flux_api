@@ -1,0 +1,29 @@
+[Unit]
+Description=FLUX Multi-GPU API Service (8 GPUs)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=pingzhi
+WorkingDirectory=/home/pingzhi/flux_api
+ExecStart=/home/pingzhi/flux_api/start_multi_gpu.sh -m fp4
+ExecStop=/home/pingzhi/flux_api/start_multi_gpu.sh stop
+PIDFile=/home/pingzhi/flux_api/flux_multi_gpu.pids
+Restart=on-failure
+RestartSec=10
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=65536
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+Environment="CUDA_DEVICE_ORDER=PCI_BUS_ID"
+
+# Logging
+StandardOutput=append:/home/pingzhi/flux_api/logs/multi_gpu_service.log
+StandardError=append:/home/pingzhi/flux_api/logs/multi_gpu_service_error.log
+
+[Install]
+WantedBy=multi-user.target
