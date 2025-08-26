@@ -11,7 +11,7 @@ class FluxAPI {
 
     init() {
         this.setupEventListeners();
-        this.addLoraEntry('/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors', 1.0);
+        this.addLoraEntry('21j3h123/realEarthKontext/blob/main/lora_emoji.safetensors', 1.0);
         
         // Ensure DOM is fully loaded before setting up sliders
         setTimeout(() => {

@@ -8,10 +8,9 @@ import shutil
 import tempfile
 from typing import Any, Optional, Union
 
-from PIL import Image
-
 import torch
 from diffusers import FluxKontextPipeline
+from PIL import Image
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 
@@ -182,9 +181,14 @@ class FluxModelManager:
                     logger.info(f"CUDA Graph warm-up iteration {i+1}/2")
                     # Create a dummy image for warmup (Kontext requires image input)
                     current_device = torch.cuda.current_device()
-                    dummy_image = torch.randn(1, 3, 512, 512).to(f"cuda:{current_device}")
+                    dummy_image = torch.randn(1, 3, 512, 512).to(
+                        f"cuda:{current_device}"
+                    )
                     _ = self.pipe(
-                        image=dummy_image, prompt="warmup prompt", num_inference_steps=5, guidance_scale=1.0
+                        image=dummy_image,
+                        prompt="warmup prompt",
+                        num_inference_steps=5,
+                        guidance_scale=1.0,
                     )
 
                     # Clear CUDA cache between warm-up iterations
@@ -328,10 +332,14 @@ class FluxModelManager:
                     "width": width,
                     "height": height,
                 }
-                
+
                 # Override pipeline defaults that might constrain dimensions
-                generation_kwargs["max_area"] = width * height  # Allow our requested dimensions
-                generation_kwargs["max_sequence_length"] = max(width, height)  # Allow our requested dimensions
+                generation_kwargs["max_area"] = (
+                    width * height
+                )  # Allow our requested dimensions
+                generation_kwargs["max_sequence_length"] = max(
+                    width, height
+                )  # Allow our requested dimensions
 
                 # Add negative prompt if provided
                 if negative_prompt:
@@ -359,10 +367,14 @@ class FluxModelManager:
                         "width": width,
                         "height": height,
                     }
-                    
+
                     # Override pipeline defaults that might constrain dimensions
-                    generation_kwargs["max_area"] = width * height  # Allow our requested dimensions
-                    generation_kwargs["max_sequence_length"] = max(width, height)  # Allow our requested dimensions
+                    generation_kwargs["max_area"] = (
+                        width * height
+                    )  # Allow our requested dimensions
+                    generation_kwargs["max_sequence_length"] = max(
+                        width, height
+                    )  # Allow our requested dimensions
 
                     if negative_prompt:
                         generation_kwargs["negative_prompt"] = negative_prompt
@@ -408,16 +420,20 @@ class FluxModelManager:
             input_image = Image.open(image).convert("RGB")
         else:
             input_image = image
-        
+
         # Resize input image to requested dimensions
         if input_image.size != (width, height):
-            logger.info(f"Resizing input image from {input_image.size} to ({width}, {height})")
+            logger.info(
+                f"Resizing input image from {input_image.size} to ({width}, {height})"
+            )
             input_image = input_image.resize((width, height), Image.Resampling.LANCZOS)
 
         # Set device for generation
         visible_gpu_count = torch.cuda.device_count()
         if visible_gpu_count > 1:
-            logger.info(f"Generating with balanced multi-GPU mode ({visible_gpu_count} GPUs)")
+            logger.info(
+                f"Generating with balanced multi-GPU mode ({visible_gpu_count} GPUs)"
+            )
         else:
             try:
                 torch.cuda.set_device(0)
@@ -442,16 +458,22 @@ class FluxModelManager:
                 "num_inference_steps": num_inference_steps,
                 "guidance_scale": guidance_scale,
             }
-            
+
             # Add width and height parameters
             generation_kwargs["width"] = width
             generation_kwargs["height"] = height
-            
+
             # Override pipeline defaults that might constrain dimensions
-            generation_kwargs["max_area"] = width * height  # Allow our requested dimensions
-            generation_kwargs["max_sequence_length"] = max(width, height)  # Allow our requested dimensions
-            
-            logger.info(f"Using requested dimensions: {width}x{height} with max_area={width * height}")
+            generation_kwargs["max_area"] = (
+                width * height
+            )  # Allow our requested dimensions
+            generation_kwargs["max_sequence_length"] = max(
+                width, height
+            )  # Allow our requested dimensions
+
+            logger.info(
+                f"Using requested dimensions: {width}x{height} with max_area={width * height}"
+            )
 
             # Add negative prompt if provided
             if negative_prompt:
@@ -497,7 +519,9 @@ class FluxModelManager:
             hasattr(self.pipe, "transformer")
             and hasattr(self.pipe.transformer, "update_lora_params")
         ):
-            logger.error("FluxKontextPipeline transformer does not have LoRA support methods")
+            logger.error(
+                "FluxKontextPipeline transformer does not have LoRA support methods"
+            )
             return False
         return True
 

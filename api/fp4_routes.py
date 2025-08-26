@@ -329,12 +329,18 @@ async def generate_with_image(
     height: int = Form(512),
     seed: Optional[int] = Form(None),
     negative_prompt: Optional[str] = Form(None),
+    prompt_prefix: Optional[str] = Form(None),
 ):
     """Generate image using image + text input (image-to-image generation)"""
     try:
         from PIL import Image
         import io
         
+        # Apply prompt prefix if provided, otherwise use the original prompt
+        if prompt_prefix:
+            enhanced_prompt = f"{prompt_prefix}, {prompt}"
+        else:
+            enhanced_prompt = prompt
         # Load input image
         raw = await image.read()
         img = Image.open(io.BytesIO(raw)).convert("RGB")
@@ -351,7 +357,7 @@ async def generate_with_image(
         
         # Generate image using the new method
         result = model_manager.generate_image_with_image(
-            prompt=prompt,
+            prompt=enhanced_prompt,
             image=img,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
@@ -379,7 +385,7 @@ async def generate_with_image(
         # Return the result with download URL and base64
         return {
             "status": "success",
-            "message": "Image generated successfully",
+            "message": f"Image generated successfully for prompt: {enhanced_prompt}",
             "download_url": f"/download/{image_filename}",
             "filename": image_filename,
             "image_base64": image_base64,  # Base64 encoded image data
@@ -663,10 +669,14 @@ def generate_image_internal(
     seed: Optional[int] = None,
     upscale: bool = False,
     upscale_factor: int = 2,
+    prompt_prefix: Optional[str] = None,
 ):
     """Internal function to generate images - used by both endpoints"""
-    # Append "Use GHIBLISTYLE" to the start of the user prompt
-    enhanced_prompt = f"Use GHIBLISTYLE, {prompt}"
+    # Apply prompt prefix if provided, otherwise use the original prompt
+    if prompt_prefix:
+        enhanced_prompt = f"{prompt_prefix}, {prompt}"
+    else:
+        enhanced_prompt = prompt
     logger.info(f"Starting image generation for prompt: {enhanced_prompt}")
 
     # Model should already be loaded at this point

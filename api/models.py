@@ -114,7 +114,9 @@ class GenerateResponse(BaseModel):
     image_url: str = Field(..., description="Path to the generated image on server")
     download_url: str = Field(..., description="URL endpoint to download the image")
     filename: str = Field(..., description="Generated image filename")
-    image_base64: Optional[str] = Field(None, description="Base64 encoded image data for direct use")
+    image_base64: Optional[str] = Field(
+        None, description="Base64 encoded image data for direct use"
+    )
     generation_time: str = Field(..., description="Time taken to generate the image")
     vram_usage_gb: str = Field(..., description="VRAM usage in GB")
     system_memory_used_gb: str = Field(..., description="System memory used in GB")
