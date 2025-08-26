@@ -8,7 +8,7 @@ import os
 FP4_API_PORT = int(os.environ.get("FP4_API_PORT", "8000"))
 
 # Model Configuration
-NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-schnell"
+NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-kontext-dev"
 
 # Quantized Model Files (for reference - not currently used)
 # FP4_WEIGHTS_FILE = "svdq-fp4_r32-flux.1-schnell.safetensors"

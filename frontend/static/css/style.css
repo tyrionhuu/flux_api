@@ -285,6 +285,14 @@ textarea {
     font-size: 0.75rem;
 }
 
+/* Generation buttons container */
+.generation-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
 /* Generate button - prominent blue button like Eigen AI */
 .generate-btn {
     width: 100%;
@@ -299,9 +307,20 @@ textarea {
     letter-spacing: 0.2px;
     cursor: pointer;
     transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
-    margin-top: 1rem;
     box-shadow: 0 10px 24px rgba(37, 99, 235, 0.30), inset 0 1px 0 rgba(255,255,255,0.15);
     overflow: hidden;
+}
+
+/* Generate with image button - different color scheme */
+.generate-with-image-btn {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    border-color: #e91e63;
+    box-shadow: 0 10px 24px rgba(240, 147, 251, 0.30), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+.generate-with-image-btn:hover {
+    background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+    box-shadow: 0 14px 28px rgba(240, 147, 251, 0.35), inset 0 1px 0 rgba(255,255,255,0.18);
 }
 
 .generate-btn::after {

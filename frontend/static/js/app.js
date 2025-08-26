@@ -16,12 +16,14 @@ class FluxAPI {
         // Ensure DOM is fully loaded before setting up sliders
         setTimeout(() => {
             this.setupSliders();
+            this.updateButtonVisibility(); // Set initial button state
         }, 500);
     }
 
     setupEventListeners() {
-        // Generate button
+        // Generate buttons
         document.getElementById('generate-btn').addEventListener('click', () => this.generateImage());
+        document.getElementById('generate-with-image-btn').addEventListener('click', () => this.generateImageWithImage());
 
         // Random seed button
         document.getElementById('random-seed').addEventListener('click', () => this.randomSeed());
@@ -465,6 +467,79 @@ class FluxAPI {
         return fetch(`${this.hostBase}/upload-image-generate`, { method: 'POST', body: formData });
     }
 
+    async generateImageWithImage() {
+        if (this.isGenerating) return;
+
+        const prompt = document.getElementById('prompt').value.trim();
+        if (!prompt) {
+            this.showError('Please enter a prompt');
+            return;
+        }
+
+        if (!this.hasUploadedImage()) {
+            this.showError('Please upload an image first');
+            return;
+        }
+
+        this.isGenerating = true;
+        this.showGenerationStatus(true);
+        this.updateGenerateButton(true);
+
+        try {
+            const formData = new FormData();
+            
+            if (this.serverUploadedImagePath) {
+                formData.append('uploaded_image_path', this.serverUploadedImagePath);
+            } else if (this.uploadedImageFile) {
+                formData.append('file', this.uploadedImageFile);
+            }
+            
+            formData.append('prompt', prompt);
+            
+            // Add width and height parameters
+            const width = document.getElementById('width').value;
+            const height = document.getElementById('height').value;
+            formData.append('width', width);
+            formData.append('height', height);
+            
+            // Add LoRA configurations
+            const loraConfigs = this.getLoraConfigs();
+            if (loraConfigs.length > 0) {
+                formData.append('loras', JSON.stringify(loraConfigs));
+            }
+            
+            // Add other parameters
+            const seed = document.getElementById('seed').value;
+            if (seed) formData.append('seed', seed);
+            
+            const response = await fetch(`${this.hostBase}/generate-with-image`, { 
+                method: 'POST', 
+                body: formData 
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(`Generation failed: ${error.detail || 'Unknown error'}`);
+            }
+
+            const result = await response.json();
+            console.log('Image-to-image generation completed');
+            
+            // Show single image
+            const params = this.getGenerationParams();
+            this.showSingleImage(result, params);
+            this.showSuccess('Image generated successfully!');
+
+        } catch (error) {
+            console.error('Generation error:', error);
+            this.showError(error.message);
+        } finally {
+            this.isGenerating = false;
+            this.showGenerationStatus(false);
+            this.updateGenerateButton(false);
+        }
+    }
+
     getGenerationParams() {
         const params = {
             prompt: document.getElementById('prompt').value.trim(),
@@ -624,6 +699,9 @@ class FluxAPI {
         // Store file for later use
         this.uploadedImageFile = file;
         
+        // Update button visibility
+        this.updateButtonVisibility();
+        
         // Auto-upload to server after selection
         this.autoUploadSelectedImage();
     }
@@ -724,10 +802,26 @@ class FluxAPI {
         if (uploadArea) {
             uploadArea.title = '';
         }
+        
+        // Update button visibility
+        this.updateButtonVisibility();
     }
     
     hasUploadedImage() {
         return this.uploadedImageFile !== null && this.uploadedImageFile !== undefined;
+    }
+
+    updateButtonVisibility() {
+        const generateBtn = document.getElementById('generate-btn');
+        const generateWithImageBtn = document.getElementById('generate-with-image-btn');
+        
+        if (this.hasUploadedImage()) {
+            generateBtn.style.display = 'none';
+            generateWithImageBtn.style.display = 'block';
+        } else {
+            generateBtn.style.display = 'block';
+            generateWithImageBtn.style.display = 'none';
+        }
     }
     
     getImageUploadParams() {

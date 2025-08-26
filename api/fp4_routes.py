@@ -69,6 +69,7 @@ def read_root():
         "endpoints": [
             "/static-image",
             "/generate",
+            "/generate-with-image",
             "/loras",
             "/apply-lora",
             "/remove-lora",
@@ -316,6 +317,78 @@ async def generate_image(request: GenerateRequest):
         raise HTTPException(
             status_code=500, detail=f"Request processing failed: {str(e)}"
         )
+
+
+@router.post("/generate-with-image")
+async def generate_with_image(
+    prompt: str = Form(...),
+    image: UploadFile = File(...),
+    num_inference_steps: int = Form(25),
+    guidance_scale: float = Form(2.5),
+    width: int = Form(512),
+    height: int = Form(512),
+    seed: Optional[int] = Form(None),
+    negative_prompt: Optional[str] = Form(None),
+):
+    """Generate image using image + text input (image-to-image generation)"""
+    try:
+        from PIL import Image
+        import io
+        
+        # Load input image
+        raw = await image.read()
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        
+        # Ensure model is loaded
+        with _model_manager_lock:
+            if not model_manager.is_loaded():
+                logger.info("Model not loaded, loading it first...")
+                if not model_manager.load_model():
+                    raise HTTPException(status_code=500, detail="Failed to load model")
+        
+        # Start timing
+        generation_start_time = time.time()
+        
+        # Generate image using the new method
+        result = model_manager.generate_image_with_image(
+            prompt=prompt,
+            image=img,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=guidance_scale,
+            width=width,
+            height=height,
+            seed=seed,
+            negative_prompt=negative_prompt,
+        )
+        
+        # Calculate generation time
+        generation_time = time.time() - generation_start_time
+        
+        # Extract and save the generated image
+        generated_image = extract_image_from_result(result)
+        image_filename = save_image_with_unique_name(generated_image)
+        
+        # Convert image to base64 for direct response
+        try:
+            from utils.image_utils import image_to_base64
+            image_base64 = image_to_base64(generated_image, "PNG")
+        except Exception as base64_error:
+            logger.warning(f"Failed to convert image to base64: {base64_error}")
+            image_base64 = None
+        
+        # Return the result with download URL and base64
+        return {
+            "status": "success",
+            "message": "Image generated successfully",
+            "download_url": f"/download/{image_filename}",
+            "filename": image_filename,
+            "image_base64": image_base64,  # Base64 encoded image data
+            "generation_time": f"{generation_time:.2f}s"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in generate_with_image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/load-model")
@@ -685,11 +758,20 @@ def generate_image_internal(
         filename = os.path.basename(image_filename)
         download_url = f"/download/{filename}"
 
+        # Convert image to base64 for direct response
+        try:
+            from utils.image_utils import image_to_base64
+            image_base64 = image_to_base64(image, "PNG")
+        except Exception as base64_error:
+            logger.warning(f"Failed to convert image to base64: {base64_error}")
+            image_base64 = None
+
         return {
             "message": f"Generated {model_type_name} image for prompt: {enhanced_prompt}",
             "image_url": image_filename,
             "download_url": download_url,
             "filename": filename,
+            "image_base64": image_base64,  # Base64 encoded image data
             "generation_time": f"{generation_time:.2f}s",
             "lora_applied": actual_lora_info.get("name") if actual_lora_info else None,
             "lora_weight": actual_lora_info.get("weight") if actual_lora_info else None,
@@ -964,13 +1046,12 @@ async def upload_image_and_generate(
 
             generation_start_time = time.time()
 
-            # For now use standard generate; future: img2img
-            result = model_manager.generate_image(
+            # Use image-to-image generation with the uploaded image
+            result = model_manager.generate_image_with_image(
                 prompt=prompt,
+                image=input_image,  # Use the loaded input image
                 num_inference_steps=10,
                 guidance_scale=image_guidance_scale,
-                width=width,
-                height=height,
                 seed=seed,
             )
 
@@ -1005,11 +1086,20 @@ async def upload_image_and_generate(
             filename = os.path.basename(image_filename)
             download_url = f"/download/{filename}"
 
+            # Convert image to base64 for direct response
+            try:
+                from utils.image_utils import image_to_base64
+                image_base64 = image_to_base64(generated_image, "PNG")
+            except Exception as base64_error:
+                logger.warning(f"Failed to convert image to base64: {base64_error}")
+                image_base64 = None
+
             return {
                 "message": f"Generated image from uploaded image and prompt: {prompt}",
                 "image_url": image_filename,
                 "download_url": download_url,
                 "filename": filename,
+                "image_base64": image_base64,  # Base64 encoded image data
                 "generation_time": f"{generation_time:.2f}s",
                 "width": width,
                 "height": height,

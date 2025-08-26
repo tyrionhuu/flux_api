@@ -8,8 +8,10 @@ import shutil
 import tempfile
 from typing import Any, Optional, Union
 
+from PIL import Image
+
 import torch
-from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
+from diffusers import FluxKontextPipeline
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 
@@ -25,8 +27,8 @@ class FluxModelManager:
     """Manages FLUX model loading and quantization"""
 
     def __init__(self):
-        self.pipe: Optional[FluxPipeline] = (
-            None  # Will be FluxPipeline with Nunchaku transformer
+        self.pipe: Optional[FluxKontextPipeline] = (
+            None  # Will be FluxKontextPipeline with Nunchaku transformer
         )
         self.model_loaded = False
         self.model_type = "none"
@@ -104,7 +106,7 @@ class FluxModelManager:
 
                 # Load the Nunchaku transformer on the same device
                 transformer_result = NunchakuFluxTransformer2dModel.from_pretrained(
-                    f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-schnell.safetensors"
+                    f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-kontext-dev.safetensors"
                 )
 
                 # Handle the tuple return: (transformer, config_dict)
@@ -117,20 +119,20 @@ class FluxModelManager:
                         device
                     )  # Direct transformer object
 
-                # Create FluxPipeline with the Nunchaku transformer
+                # Create FluxKontextPipeline with the Nunchaku transformer
                 if device_map == "balanced":
                     # Multi-GPU balanced mode
                     logger.info("Loading pipeline with balanced device map")
-                    self.pipe = FluxPipeline.from_pretrained(
-                        "black-forest-labs/FLUX.1-schnell",
+                    self.pipe = FluxKontextPipeline.from_pretrained(
+                        "black-forest-labs/FLUX.1-Kontext-dev",
                         transformer=transformer,
                         torch_dtype=torch.bfloat16,
                         device_map=device_map,
                     )
                 else:
                     # Single GPU mode
-                    self.pipe = FluxPipeline.from_pretrained(
-                        "black-forest-labs/FLUX.1-schnell",
+                    self.pipe = FluxKontextPipeline.from_pretrained(
+                        "black-forest-labs/FLUX.1-Kontext-dev",
                         transformer=transformer,
                         torch_dtype=torch.bfloat16,
                     ).to(device)
@@ -178,8 +180,11 @@ class FluxModelManager:
                 # Warm-up with multiple iterations to optimize CUDA graphs
                 for i in range(2):
                     logger.info(f"CUDA Graph warm-up iteration {i+1}/2")
+                    # Create a dummy image for warmup (Kontext requires image input)
+                    current_device = torch.cuda.current_device()
+                    dummy_image = torch.randn(1, 3, 512, 512).to(f"cuda:{current_device}")
                     _ = self.pipe(
-                        "warmup prompt", num_inference_steps=5, guidance_scale=1.0
+                        image=dummy_image, prompt="warmup prompt", num_inference_steps=5, guidance_scale=1.0
                     )
 
                     # Clear CUDA cache between warm-up iterations
@@ -252,7 +257,7 @@ class FluxModelManager:
                 return True
             else:
                 logger.warning(
-                    "FluxPipeline transformer does not have LoRA support methods"
+                    "FluxKontextPipeline transformer does not have LoRA support methods"
                 )
                 return False
 
@@ -300,7 +305,7 @@ class FluxModelManager:
                     f"GPU error: {gpu_error}. GPU required for image generation."
                 )
 
-        # Generate the image using the FluxPipeline (same as the example)
+        # Generate the image using the FluxKontextPipeline (same as the example)
         try:
             logger.info(f"Generating image with prompt: {prompt}")
 
@@ -323,6 +328,10 @@ class FluxModelManager:
                     "width": width,
                     "height": height,
                 }
+                
+                # Override pipeline defaults that might constrain dimensions
+                generation_kwargs["max_area"] = width * height  # Allow our requested dimensions
+                generation_kwargs["max_sequence_length"] = max(width, height)  # Allow our requested dimensions
 
                 # Add negative prompt if provided
                 if negative_prompt:
@@ -350,6 +359,10 @@ class FluxModelManager:
                         "width": width,
                         "height": height,
                     }
+                    
+                    # Override pipeline defaults that might constrain dimensions
+                    generation_kwargs["max_area"] = width * height  # Allow our requested dimensions
+                    generation_kwargs["max_sequence_length"] = max(width, height)  # Allow our requested dimensions
 
                     if negative_prompt:
                         generation_kwargs["negative_prompt"] = negative_prompt
@@ -370,6 +383,92 @@ class FluxModelManager:
             logger.error(f"Error in image generation: {e} (Type: {type(e).__name__})")
             raise RuntimeError(f"Failed to generate image: {e}")
 
+    def generate_image_with_image(
+        self,
+        prompt: str,
+        image: Union[str, Image.Image],
+        num_inference_steps: int = 25,
+        guidance_scale: float = 2.5,
+        width: int = 512,
+        height: int = 512,
+        seed: Optional[int] = None,
+        negative_prompt: Optional[str] = None,
+    ) -> Any:
+        """Generate image using image + text input (image-to-image generation)"""
+        if not self.model_loaded or self.pipe is None:
+            raise RuntimeError("Model not loaded")
+
+        # Ensure we're using GPU
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA not available. GPU required for image generation.")
+
+        # Process image input
+        if isinstance(image, str):
+            # Load image from path
+            input_image = Image.open(image).convert("RGB")
+        else:
+            input_image = image
+        
+        # Resize input image to requested dimensions
+        if input_image.size != (width, height):
+            logger.info(f"Resizing input image from {input_image.size} to ({width}, {height})")
+            input_image = input_image.resize((width, height), Image.Resampling.LANCZOS)
+
+        # Set device for generation
+        visible_gpu_count = torch.cuda.device_count()
+        if visible_gpu_count > 1:
+            logger.info(f"Generating with balanced multi-GPU mode ({visible_gpu_count} GPUs)")
+        else:
+            try:
+                torch.cuda.set_device(0)
+                logger.info("Generating on cuda:0 (single GPU)")
+            except Exception as gpu_error:
+                logger.error(f"GPU error during device selection: {gpu_error}")
+                raise RuntimeError(f"GPU error: {gpu_error}")
+
+        try:
+            logger.info(f"Generating image with prompt: {prompt} and input image")
+
+            # Set seed if provided
+            generator = None
+            if seed is not None:
+                generator = torch.Generator(device="cuda").manual_seed(seed)
+                logger.info(f"Using seed: {seed}")
+
+            # Prepare generation kwargs for image-to-image
+            generation_kwargs = {
+                "prompt": prompt,
+                "image": input_image,
+                "num_inference_steps": num_inference_steps,
+                "guidance_scale": guidance_scale,
+            }
+            
+            # Add width and height parameters
+            generation_kwargs["width"] = width
+            generation_kwargs["height"] = height
+            
+            # Override pipeline defaults that might constrain dimensions
+            generation_kwargs["max_area"] = width * height  # Allow our requested dimensions
+            generation_kwargs["max_sequence_length"] = max(width, height)  # Allow our requested dimensions
+            
+            logger.info(f"Using requested dimensions: {width}x{height} with max_area={width * height}")
+
+            # Add negative prompt if provided
+            if negative_prompt:
+                generation_kwargs["negative_prompt"] = negative_prompt
+
+            # Add generator if seed is set
+            if generator:
+                generation_kwargs["generator"] = generator
+
+            result = self.pipe(**generation_kwargs)
+            logger.info("Image-to-image generation completed successfully")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error during image-to-image generation: {e}")
+            raise RuntimeError(f"Image generation failed: {e}")
+
     def get_model_status(self) -> dict:
         """Get the current model status"""
         return {
@@ -383,8 +482,8 @@ class FluxModelManager:
         """Check if the model is loaded and pipeline is available"""
         return self.model_loaded and self.pipe is not None
 
-    def get_pipeline(self) -> Optional[FluxPipeline]:
-        """Get the loaded FluxPipeline with Nunchaku transformer"""
+    def get_pipeline(self) -> Optional[FluxKontextPipeline]:
+        """Get the loaded FluxKontextPipeline with Nunchaku transformer"""
         return self.pipe
 
     def _is_ready_with_lora(self) -> bool:
@@ -398,7 +497,7 @@ class FluxModelManager:
             hasattr(self.pipe, "transformer")
             and hasattr(self.pipe.transformer, "update_lora_params")
         ):
-            logger.error("FluxPipeline transformer does not have LoRA support methods")
+            logger.error("FluxKontextPipeline transformer does not have LoRA support methods")
             return False
         return True
 
