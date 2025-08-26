@@ -25,6 +25,39 @@ A dual-model AI image generation API service featuring FLUX models with LoRA sup
 - **Memory**: ~16GB VRAM
 - **Speed**: High-quality inference with native LoRA support
 
+## Installation
+
+### Prerequisites
+
+- Python 3.12
+- CUDA-compatible GPU with sufficient VRAM
+- Git
+
+### Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd flux_api
+   ```
+
+2. **Install dependencies from requirements.txt**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Install PyTorch with CUDA support**
+   ```bash
+   pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
+   ```
+
+4. **Install Nunchaku package**
+   ```bash
+   pip install https://github.com/nunchaku-tech/nunchaku/releases/download/v0.3.2/nunchaku-0.3.2+torch2.8-cp312-cp312-linux_x86_64.whl
+   ```
+
+**Note**: The Nunchaku package is required for FLUX model support and must be installed after PyTorch.
+
 ## Quick Start
 
 ### 1. Start the Services
