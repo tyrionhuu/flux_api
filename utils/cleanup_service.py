@@ -12,7 +12,7 @@ from typing import Optional
 from config.cleanup_settings import (CLEANUP_INTERVAL_SECONDS,
                                      CLEANUP_ON_GENERATION, CLEANUP_ON_UPLOAD)
 
-from .directory_cleanup import DirectoryCleanup
+from .cleanup_directories import DirectoryCleanup
 
 logger = logging.getLogger(__name__)
 
