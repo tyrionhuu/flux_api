@@ -798,7 +798,6 @@ async def generate_with_image(
                 detail=f"Failed to save generated image: {str(save_error)}",
             )
 
-        # Return the result with download URL and base64
         return {
             "status": "success",
             "message": f"Image generated successfully for prompt: {enhanced_prompt}",

@@ -2,8 +2,6 @@
 Image utilities for the FLUX API
 """
 
-import base64
-import io
 import logging
 import os
 import uuid
@@ -156,27 +154,3 @@ def cleanup_uploaded_image(file_path: str) -> None:
             os.remove(file_path)
     except Exception as e:
         print(f"Warning: Failed to cleanup uploaded image {file_path}: {e}")
-
-
-def image_to_base64(image: Image.Image, format: str = "PNG") -> str:
-    """Convert PIL image to base64 string
-
-    Args:
-        image: PIL Image object
-        format: Image format (PNG, JPEG, etc.)
-
-    Returns:
-        Base64 encoded string with data URI prefix
-    """
-
-    # Convert image to bytes
-    buffer = io.BytesIO()
-    image.save(buffer, format=format)
-    img_bytes = buffer.getvalue()
-
-    # Encode to base64
-    img_base64 = base64.b64encode(img_bytes).decode("utf-8")
-
-    # Return with data URI prefix
-    mime_type = f"image/{format.lower()}"
-    return f"data:{mime_type};base64,{img_base64}"
