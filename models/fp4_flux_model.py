@@ -10,7 +10,7 @@ import hashlib
 from typing import Any, Optional, Union
 
 import torch
-from diffusers import FluxKontextPipeline
+from diffusers.pipelines.flux.pipeline_flux_kontext import FluxKontextPipeline
 from PIL import Image
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
