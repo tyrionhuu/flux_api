@@ -58,7 +58,7 @@ A dual-model AI image generation API service featuring FLUX models with LoRA sup
 
 ```bash
 # Start FP4 service
-./start_fp4_api.sh
+./start_flux_api.sh
 
 # Start frontend (optional)
 cd frontend && python -m http.server 9000
@@ -141,7 +141,7 @@ Set custom ports using environment variables or command-line flags:
 export FP4_PORT=8000
 
 # Or command-line flags
-./start_fp4_api.sh --port 8000
+./start_flux_api.sh --port 8000
 ```
 
 ## File Structure
