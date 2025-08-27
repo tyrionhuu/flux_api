@@ -1253,17 +1253,18 @@ body {
 }
 
 .api-command-container {
-    background: #1e1e1e;
+    background: #ffffff;
     border-radius: 8px;
     padding: 1rem;
     margin: 1rem 0;
     position: relative;
+    border: 1px solid #e9ecef;
 }
 
 .api-command {
     display: block;
-    background: #2d2d2d;
-    color: #00ff00;
+    background: #f8f9fa;
+    color: #2d3748;
     padding: 1rem;
     border-radius: 6px;
     font-family: 'Courier New', monospace;
@@ -1272,6 +1273,8 @@ body {
     white-space: pre-wrap;
     word-break: break-all;
     margin-bottom: 1rem;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .copy-btn {
@@ -1449,7 +1452,6 @@ body {
     border-radius: 3px;
     background: #d1d5db;
     outline: none;
-    -webkit-appearance: none;
 }
 
 .slider::-webkit-slider-thumb {

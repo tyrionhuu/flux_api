@@ -156,6 +156,20 @@ class FluxAPI {
                 this.closeModal();
             }
         });
+        
+        // Auto-update API command when parameters change
+        const promptInput = document.getElementById('prompt');
+        const widthSelect = document.getElementById('width');
+        const heightSelect = document.getElementById('height');
+        const seedInput = document.getElementById('seed');
+        
+        if (promptInput) promptInput.addEventListener('input', () => this.updateApiCommand());
+        if (widthSelect) widthSelect.addEventListener('change', () => this.updateApiCommand());
+        if (heightSelect) heightSelect.addEventListener('change', () => this.updateApiCommand());
+        if (seedInput) seedInput.addEventListener('input', () => this.updateApiCommand());
+        
+        // Initial API command display
+        this.updateApiCommand();
     }
 
 
@@ -855,6 +869,38 @@ class FluxAPI {
         
         commandElement.textContent = command;
         commandSection.classList.remove('hidden');
+    }
+
+    updateApiCommand() {
+        const commandElement = document.getElementById('api-command');
+        if (!commandElement) return;
+        
+        // Get current LoRA configuration
+        const loras = this.getLoraConfigs();
+        const prompt = document.getElementById('prompt').value;
+        const width = document.getElementById('width').value;
+        const height = document.getElementById('height').value;
+        const seed = document.getElementById('seed').value;
+        
+        // Build the one-liner download command
+        let command = `curl -s -X POST "${window.location.origin}/generate" -H "Content-Type: application/json" -d '{"prompt": "${prompt}", "width": ${width}, "height": ${height}`;
+        
+        if (seed) {
+            command += `, "seed": ${seed}`;
+        }
+        
+        if (loras && loras.length > 0) {
+            command += `, "loras": [`;
+            loras.forEach((lora, index) => {
+                command += `{"name": "${lora.name}", "weight": ${lora.weight}`;
+                if (index < loras.length - 1) command += `, `;
+            });
+            command += `]`;
+        }
+        
+        command += `}' | jq -r '.download_url' | xargs -I {} curl -o "generated_image.png" "${window.location.origin}{}"`;
+        
+        commandElement.textContent = command;
     }
 
     copyApiCommand() {
