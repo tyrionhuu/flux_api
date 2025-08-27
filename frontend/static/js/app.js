@@ -12,6 +12,8 @@ class FluxAPI {
     init() {
         this.setupEventListeners();
         this.addLoraEntry('21j3h123/realEarthKontext/blob/main/lora_emoji.safetensors', 1.0);
+        // Ensure API command reflects the default LoRA immediately
+        this.updateApiCommand();
         
         // Ensure DOM is fully loaded before updating button visibility
         setTimeout(() => {
