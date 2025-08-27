@@ -724,6 +724,10 @@ class FluxAPI {
         // Store file for later use
         this.uploadedImageFile = file;
         
+        // Try to get the full file path (browsers may not expose this for security)
+        // We'll show a helpful message about using the full path
+        this.uploadedImagePath = file.name;
+        
         // Update button visibility
         this.updateButtonVisibility();
         
@@ -999,9 +1003,10 @@ class FluxAPI {
         
         if (hasImage) {
             // Build command for generate-with-image-and-return endpoint
-            // Use actual filename if available, otherwise use a descriptive placeholder
+            // Show the filename but remind user to use full local path
             const imageFileName = this.uploadedImageFile ? this.uploadedImageFile.name : 'your_image.jpg';
-            command = `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@${imageFileName}" -F "prompt=${this.escapeForShell(prompt)}" -F "width=${width}" -F "height=${height}"`;
+            command = `# Replace 'your_image.jpg' with the full path to your image file\n`;
+            command += `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@/full/path/to/${imageFileName}" -F "prompt=${this.escapeForShell(prompt)}" -F "width=${width}" -F "height=${height}"`;
             
             // Add image strength and guidance if available
             const imageStrength = document.getElementById('image-strength');
@@ -1055,6 +1060,16 @@ class FluxAPI {
         const commandSection = document.getElementById('api-command-section');
         if (commandSection) {
             commandSection.classList.remove('hidden');
+        }
+        
+        // Show/hide the help message for image-to-image commands
+        const helpElement = document.getElementById('api-command-help');
+        if (helpElement) {
+            if (hasImage) {
+                helpElement.style.display = 'block';
+            } else {
+                helpElement.style.display = 'none';
+            }
         }
         
         // Hide loading state and show command after a brief delay
@@ -1137,25 +1152,6 @@ class FluxAPI {
         } catch (err) {
             console.error('Fallback copy error:', err);
             this.showError('Failed to copy API command: ' + err.message);
-        }
-    }
-    
-    testCopyFunction() {
-        console.log('Testing copy function with simple text');
-        const testText = 'This is a test string for copying';
-        
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(testText)
-                .then(() => {
-                    console.log('Test copy successful');
-                    this.showSuccess('Test copy successful!');
-                })
-                .catch((err) => {
-                    console.error('Test copy failed:', err);
-                    this.showError('Test copy failed: ' + err.message);
-                });
-        } else {
-            this.showError('Clipboard API not available');
         }
     }
     
