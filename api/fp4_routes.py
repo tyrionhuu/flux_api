@@ -492,7 +492,7 @@ async def submit_generation_request(request: GenerateRequest):
                 else None
             ),
             num_inference_steps=10,  # Fixed value
-            guidance_scale=4.0,  # Fixed value
+            guidance_scale=0,  # Fixed value
             width=request.width or 512,
             height=request.height or 512,
             seed=request.seed,
@@ -641,7 +641,7 @@ def generate_image_internal(
         result = model_manager.generate_image(
             enhanced_prompt,
             10,  # Fixed num_inference_steps
-            4.0,  # Fixed guidance_scale
+            0,  # Fixed guidance_scale
             width,
             height,
             seed,

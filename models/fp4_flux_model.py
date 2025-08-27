@@ -180,7 +180,7 @@ class FluxModelManager:
                 for i in range(2):
                     logger.info(f"CUDA Graph warm-up iteration {i+1}/2")
                     _ = self.pipe(
-                        "warmup prompt", num_inference_steps=5, guidance_scale=1.0
+                        "warmup prompt", num_inference_steps=10, guidance_scale=0
                     )
 
                     # Clear CUDA cache between warm-up iterations
@@ -268,8 +268,8 @@ class FluxModelManager:
     def generate_image(
         self,
         prompt: str,
-        num_inference_steps: int = 25,
-        guidance_scale: float = 3.5,
+        num_inference_steps: int = 10,
+        guidance_scale: float = 0,
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,

@@ -138,8 +138,6 @@ class FluxAPI {
             }
         });
         
-
-
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey || e.metaKey) {
@@ -153,92 +151,6 @@ class FluxAPI {
             }
         });
     }
-
-    setupSliders() {
-        console.log('Setting up sliders...');
-        
-        // Steps slider
-        const stepsSlider = document.getElementById('steps');
-        const stepsValue = document.getElementById('steps-value');
-        
-        console.log('Steps slider element:', stepsSlider);
-        console.log('Steps value element:', stepsValue);
-        
-        if (stepsSlider && stepsValue) {
-            // Set initial value
-            stepsValue.textContent = stepsSlider.value;
-            console.log('Initial steps value set to:', stepsSlider.value);
-            
-            // Test direct manipulation first
-            stepsSlider.oninput = function() {
-                console.log('Steps oninput fired, value:', this.value);
-                stepsValue.textContent = this.value;
-                console.log('Steps value updated to:', this.value);
-            };
-            
-            // Add event listener for real-time updates
-            stepsSlider.addEventListener('input', function() {
-                console.log('Steps input event fired, value:', this.value);
-                stepsValue.textContent = this.value;
-                console.log('Steps value updated to:', this.value);
-            });
-            
-            // Also add change event as backup
-            stepsSlider.addEventListener('change', function() {
-                console.log('Steps change event fired, value:', this.value);
-                stepsValue.textContent = this.value;
-                console.log('Steps value updated to:', this.value);
-            });
-            
-            console.log('Steps slider initialized with value:', stepsSlider.value);
-        } else {
-            console.error('Steps slider elements not found');
-        }
-
-        // Guidance slider
-        const guidanceSlider = document.getElementById('guidance');
-        const guidanceValue = document.getElementById('guidance-value');
-        
-        console.log('Guidance slider element:', guidanceSlider);
-        console.log('Guidance value element:', guidanceValue);
-        
-        if (guidanceSlider && guidanceValue) {
-            // Set initial value
-            guidanceValue.textContent = parseFloat(guidanceSlider.value).toFixed(1);
-            console.log('Initial guidance value set to:', parseFloat(guidanceSlider.value).toFixed(1));
-            
-            // Test direct manipulation first
-            guidanceSlider.oninput = function() {
-                console.log('Guidance oninput fired, value:', this.value);
-                guidanceValue.textContent = parseFloat(this.value).toFixed(1);
-                console.log('Guidance value updated to:', parseFloat(this.value).toFixed(1));
-            };
-            
-            // Add event listener for real-time updates
-            guidanceSlider.addEventListener('input', function() {
-                console.log('Guidance input event fired, value:', this.value);
-                guidanceValue.textContent = parseFloat(this.value).toFixed(1);
-                console.log('Guidance value updated to:', parseFloat(this.value).toFixed(1));
-            });
-            
-            // Also add change event as backup
-            guidanceSlider.addEventListener('change', function() {
-                console.log('Guidance change event fired, value:', this.value);
-                guidanceValue.textContent = parseFloat(this.value).toFixed(1);
-                console.log('Guidance value updated to:', parseFloat(this.value).toFixed(1));
-            });
-            
-            console.log('Guidance slider initialized with value:', guidanceSlider.value);
-        } else {
-            console.error('Guidance slider elements not found');
-        }
-    }
-    
-
-
-
-
-
 
     randomSeed() {
         const seedInput = document.getElementById('seed');
