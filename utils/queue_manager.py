@@ -277,8 +277,15 @@ class QueueManager:
 
         while True:
             req = await self.get_request_status(request_id)
-            if req and req.status in (RequestStatus.COMPLETED, RequestStatus.FAILED, RequestStatus.CANCELLED):
+            if req and req.status in (
+                RequestStatus.COMPLETED,
+                RequestStatus.FAILED,
+                RequestStatus.CANCELLED,
+            ):
                 if req.status == RequestStatus.COMPLETED:
                     return req.result
-                raise RuntimeError(req.error or f"Request {request_id} ended with status {req.status.value}")
+                raise RuntimeError(
+                    req.error
+                    or f"Request {request_id} ended with status {req.status.value}"
+                )
             await asyncio.sleep(poll_interval)
