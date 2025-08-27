@@ -21,7 +21,7 @@ from models.flux_model import FluxModelManager
 from models.upscaler import apply_upscaling
 from utils.cleanup_service import (cleanup_after_generation,
                                    cleanup_after_upload)
-from utils.image_utils import (extract_image_from_result, image_to_base64,
+from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name,
                                save_uploaded_image, validate_uploaded_image)
 from utils.queue_manager import QueueManager
@@ -971,20 +971,12 @@ async def generate_with_image(
                 detail=f"Failed to save generated image: {str(save_error)}",
             )
 
-        # Convert image to base64 for direct response
-        try:
-            image_base64 = image_to_base64(generated_image, "PNG")
-        except Exception as base64_error:
-            logger.warning(f"Failed to convert image to base64: {base64_error}")
-            image_base64 = None
-
         # Return the result with download URL and base64
         return {
             "status": "success",
             "message": f"Image generated successfully for prompt: {enhanced_prompt}",
             "download_url": f"/download/{image_filename}",
             "filename": image_filename,
-            "image_base64": image_base64,  # Base64 encoded image data
             "generation_time": f"{generation_time:.2f}s",
         }
 
@@ -1335,19 +1327,11 @@ def generate_image_internal(
         filename = os.path.basename(image_filename)
         download_url = f"/download/{filename}"
 
-        # Convert image to base64 for direct response
-        try:
-            image_base64 = image_to_base64(image, "PNG")
-        except Exception as base64_error:
-            logger.warning(f"Failed to convert image to base64: {base64_error}")
-            image_base64 = None
-
         return {
             "message": f"Generated {model_type_name} image for prompt: {enhanced_prompt}",
             "image_url": image_filename,
             "download_url": download_url,
             "filename": filename,
-            "image_base64": image_base64,  # Base64 encoded image data
             "generation_time": f"{generation_time:.2f}s",
             "lora_applied": actual_lora_info.get("name") if actual_lora_info else None,
             "lora_weight": actual_lora_info.get("weight") if actual_lora_info else None,
