@@ -40,7 +40,7 @@ class QueueRequest:
     loras: Optional[list[dict]] = None  # New multiple LoRA support
     # Generation parameters
     num_inference_steps: int = 10  # Fixed value
-    guidance_scale: float = 0  # Fixed value
+    guidance_scale: float = 0.0  # Default value, can be overridden
     width: int = 512
     height: int = 512
     seed: Optional[int] = None
@@ -92,7 +92,7 @@ class QueueManager:
         loras: Optional[list[dict]] = None,  # New multiple LoRA support
         priority: int = 0,
         num_inference_steps: int = 10,  # Fixed value
-        guidance_scale: float = 0,  # Fixed value
+        guidance_scale: float = 0.0,  # Default value, can be overridden
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,

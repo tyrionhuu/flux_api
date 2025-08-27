@@ -63,20 +63,29 @@ def debug_version():
 
 @router.get("/")
 def read_root():
-    """Root endpoint for testing"""
-    return {
-        "message": "FLUX API is running!",
-        "endpoints": [
-            "/static-image",
-            "/generate",
-            "/loras",
-            "/apply-lora",
-            "/remove-lora",
-            "/lora-status",
-        ],
-        "model_loaded": model_manager.is_loaded(),
-        "model_type": model_manager.model_type,
-    }
+    """Serve the frontend HTML"""
+    from fastapi.responses import HTMLResponse
+    import os
+    
+    html_path = "frontend/templates/index.html"
+    if os.path.exists(html_path):
+        with open(html_path, 'r') as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    else:
+        return {
+            "message": "FLUX API is running!",
+            "endpoints": [
+                "/static-image",
+                "/generate",
+                "/loras",
+                "/apply-lora",
+                "/remove-lora",
+                "/lora-status",
+            ],
+            "model_loaded": model_manager.is_loaded(),
+            "model_type": model_manager.model_type,
+        }
 
 
 @router.get("/static-image")
@@ -298,6 +307,7 @@ async def generate_image(request: GenerateRequest):
             request.seed,
             request.upscale or False,
             request.upscale_factor or 2,
+            request.guidance_scale or 0.0,
         )
 
         # Trigger cleanup after successful image generation
@@ -492,7 +502,7 @@ async def submit_generation_request(request: GenerateRequest):
                 else None
             ),
             num_inference_steps=10,  # Fixed value
-            guidance_scale=0,  # Fixed value
+            guidance_scale=request.guidance_scale or 0.0,
             width=request.width or 512,
             height=request.height or 512,
             seed=request.seed,
@@ -590,6 +600,7 @@ def generate_image_internal(
     seed: Optional[int] = None,
     upscale: bool = False,
     upscale_factor: int = 2,
+    guidance_scale: float = 0.0,
 ):
     """Internal function to generate images - used by both endpoints"""
     # Append "Use GHIBLISTYLE" to the start of the user prompt
@@ -641,7 +652,7 @@ def generate_image_internal(
         result = model_manager.generate_image(
             enhanced_prompt,
             10,  # Fixed num_inference_steps
-            0,  # Fixed guidance_scale
+            guidance_scale,  # Use parameter value
             width,
             height,
             seed,

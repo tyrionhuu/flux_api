@@ -80,6 +80,17 @@ class FluxAPI {
             });
         }
         
+        // Guidance scale slider
+        const guidanceScaleSlider = document.getElementById('guidance_scale');
+        if (guidanceScaleSlider) {
+            guidanceScaleSlider.addEventListener('input', (e) => {
+                const valueDisplay = document.getElementById('guidance_scale_value');
+                if (valueDisplay) {
+                    valueDisplay.textContent = parseFloat(e.target.value).toFixed(1);
+                }
+            });
+        }
+        
         // LoRA info tooltip
         const loraInfoIcon = document.getElementById('lora-info-icon');
         const loraInfoTooltip = document.getElementById('lora-info-tooltip');
@@ -333,7 +344,8 @@ class FluxAPI {
         const params = {
             prompt: document.getElementById('prompt').value.trim(),
             width: parseInt(document.getElementById('width').value),
-            height: parseInt(document.getElementById('height').value)
+            height: parseInt(document.getElementById('height').value),
+            guidance_scale: parseFloat(document.getElementById('guidance_scale').value)
         };
         
         // Always include LoRA configurations (empty list means remove any applied LoRA)
