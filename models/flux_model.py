@@ -15,8 +15,8 @@ from PIL import Image
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 
-from config.fp4_settings import (DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT,
-                                 MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
+from config.settings import (DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT,
+                             MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
 from utils.gpu_manager import GPUManager
 
 # Configure logging

@@ -11,8 +11,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.routes import router
-from config.fp4_settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
-                                 FP4_API_PORT)
+from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
+                             FP4_API_PORT)
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
 
 # Ensure logs directory exists

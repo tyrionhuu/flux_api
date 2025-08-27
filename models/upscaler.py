@@ -7,8 +7,7 @@ import logging
 import os
 import time
 from collections import OrderedDict
-from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -451,7 +450,6 @@ def apply_upscaling(
     """
     # Convert PIL Image to numpy array if needed
     if hasattr(image, "size"):  # PIL Image
-        import numpy as np
 
         image_array = np.array(image)
         # Convert RGB to BGR for OpenCV compatibility
