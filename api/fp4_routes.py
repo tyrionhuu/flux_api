@@ -2,12 +2,13 @@
 API routes for the FLUX API
 """
 
+import json
 import logging
 import os
 import time
-import json
-from typing import Optional
 from pathlib import Path
+from typing import Optional
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
@@ -52,8 +53,8 @@ queue_manager = QueueManager(max_concurrent=2, max_queue_size=100)
 @router.get("/debug-version")
 def debug_version():
     """Debug endpoint to check code version"""
-    import time
     import os
+    import time
     from pathlib import Path
 
     # Get current working directory and file paths
@@ -62,11 +63,11 @@ def debug_version():
     base_dir = os.path.dirname(script_dir)
     generated_images_dir = Path(base_dir) / "generated_images"
     static_dir = Path(base_dir) / "static"
-    
+
     # Check if directories exist
     generated_exists = generated_images_dir.exists()
     static_exists = static_dir.exists()
-    
+
     # List files in generated_images if it exists
     generated_files = []
     if generated_exists:
@@ -86,13 +87,13 @@ def debug_version():
             "script_directory": script_dir,
             "base_directory": base_dir,
             "generated_images_dir": str(generated_images_dir),
-            "static_dir": str(static_dir)
+            "static_dir": str(static_dir),
         },
         "directories": {
             "generated_images_exists": generated_exists,
             "static_exists": static_exists,
-            "generated_images_files": generated_files
-        }
+            "generated_images_files": generated_files,
+        },
     }
 
 
@@ -101,27 +102,28 @@ def test_file_operations():
     """Test file operations to debug path issues"""
     import os
     from pathlib import Path
+
     from PIL import Image
-    
+
     try:
         # Get base directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.dirname(script_dir)
         generated_images_dir = Path(base_dir) / "generated_images"
-        
+
         # Create a test image
-        test_image = Image.new('RGB', (100, 100), color='red')
-        
+        test_image = Image.new("RGB", (100, 100), color="red")
+
         # Save test image
         test_filename = f"test_{int(time.time())}.png"
         test_path = generated_images_dir / test_filename
         test_image.save(test_path)
-        
+
         # Try to read it back
         if test_path.exists():
             # Clean up test file
             test_path.unlink()
-            
+
             return {
                 "status": "success",
                 "message": "File operations test passed",
@@ -129,7 +131,7 @@ def test_file_operations():
                 "test_file_deleted": True,
                 "base_dir": str(base_dir),
                 "generated_images_dir": str(generated_images_dir),
-                "test_path": str(test_path)
+                "test_path": str(test_path),
             }
         else:
             return {
@@ -137,15 +139,15 @@ def test_file_operations():
                 "message": "Test file was not created",
                 "base_dir": str(base_dir),
                 "generated_images_dir": str(generated_images_dir),
-                "test_path": str(test_path)
+                "test_path": str(test_path),
             }
-            
+
     except Exception as e:
         return {
             "status": "error",
             "message": f"File operations test failed: {str(e)}",
             "error_type": type(e).__name__,
-            "base_dir": str(base_dir) if 'base_dir' in locals() else "unknown"
+            "base_dir": str(base_dir) if "base_dir" in locals() else "unknown",
         }
 
 
@@ -193,17 +195,19 @@ def get_static_image():
     """Serve static images"""
     import os
     from pathlib import Path
-    
+
     # Use absolute path to avoid working directory issues
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     image_path = Path(base_dir) / STATIC_IMAGES_DIR / "sample.jpg"
-    
-    logger.info(f"Static image request - base_dir: {base_dir}, image_path: {image_path}")
-    
+
+    logger.info(
+        f"Static image request - base_dir: {base_dir}, image_path: {image_path}"
+    )
+
     if not image_path.exists():
         logger.error(f"Static image not found: {image_path}")
         raise HTTPException(status_code=404, detail="Static image not found")
-    
+
     return FileResponse(image_path)
 
 
@@ -215,11 +219,11 @@ def download_image(filename: str):
 
     # Security: only allow files from generated_images directory
     safe_filename = os.path.basename(filename)  # Remove any path traversal
-    
+
     # Use absolute path to avoid working directory issues
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     file_path = Path(base_dir) / "generated_images" / safe_filename
-    
+
     logger.info(f"Download request for filename: {filename}")
     logger.info(f"Safe filename: {safe_filename}")
     logger.info(f"Base directory: {base_dir}")
@@ -231,9 +235,13 @@ def download_image(filename: str):
         generated_images_dir = Path(base_dir) / "generated_images"
         if generated_images_dir.exists():
             files = list(generated_images_dir.glob("*.png"))
-            logger.error(f"File not found. Available files in {generated_images_dir}: {[f.name for f in files]}")
+            logger.error(
+                f"File not found. Available files in {generated_images_dir}: {[f.name for f in files]}"
+            )
         else:
-            logger.error(f"Generated images directory does not exist: {generated_images_dir}")
+            logger.error(
+                f"Generated images directory does not exist: {generated_images_dir}"
+            )
         raise HTTPException(status_code=404, detail="Image not found")
 
     if not file_path.suffix.lower() in [
@@ -447,38 +455,41 @@ async def generate_and_return_image(request: GenerateRequest):
 
         # Extract the download URL from the result
         download_url = result.get("download_url")
-        
+
         if not download_url:
-            raise HTTPException(status_code=500, detail="No download URL received from generate endpoint")
-        
+            raise HTTPException(
+                status_code=500,
+                detail="No download URL received from generate endpoint",
+            )
+
         # Read the image file and return it directly
         import os
         from pathlib import Path
-        
+
         # Get the file path from the download URL
         filename = download_url.split("/")[-1]
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         file_path = Path(base_dir) / "generated_images" / filename
-        
+
         if not file_path.exists():
-            raise HTTPException(status_code=404, detail="Generated image file not found")
-        
+            raise HTTPException(
+                status_code=404, detail="Generated image file not found"
+            )
+
         # Read the image file
         with open(file_path, "rb") as f:
             image_bytes = f.read()
-        
+
         # Clean up the file after reading
         try:
             os.remove(file_path)
         except Exception as cleanup_error:
             logger.warning(f"Failed to cleanup temporary image file: {cleanup_error}")
-        
+
         # Return the image directly as binary data
         from fastapi.responses import Response
-        return Response(
-            content=image_bytes,
-            media_type="image/png"
-        )
+
+        return Response(content=image_bytes, media_type="image/png")
 
     except Exception as e:
         logger.error(f"Error in generate_and_return_image: {e}")
@@ -847,26 +858,26 @@ async def generate_with_image_and_return(
             )
 
         file_path = image_filename
-            
+
         if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="Generated image file not found")
-        
+            raise HTTPException(
+                status_code=404, detail="Generated image file not found"
+            )
+
         # Read the image file
         with open(file_path, "rb") as f:
             image_bytes = f.read()
-        
+
         # Clean up the file after reading
         try:
             os.remove(file_path)
         except Exception as cleanup_error:
             logger.warning(f"Failed to cleanup temporary image file: {cleanup_error}")
-        
+
         # Return the image directly as binary data
         from fastapi.responses import Response
-        return Response(
-            content=image_bytes,
-            media_type="image/png"
-        )
+
+        return Response(content=image_bytes, media_type="image/png")
 
     except Exception as e:
         logger.error(f"Error in generate_with_image_and_return: {e}")

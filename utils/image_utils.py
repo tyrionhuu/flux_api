@@ -72,12 +72,12 @@ def save_image_with_unique_name(
     # Use absolute path to avoid working directory issues
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     abs_directory = Path(base_dir) / directory
-    
+
     os.makedirs(abs_directory, exist_ok=True)
     unique_id = str(uuid.uuid4())
     filename = f"{abs_directory}/{unique_id}.png"
     image.save(filename)
-    
+
     # Return relative path for API compatibility
     return f"{directory}/{unique_id}.png"
 
@@ -106,11 +106,11 @@ def save_uploaded_image(file: UploadFile, directory: str = "uploads/images") -> 
     """Save uploaded image and return the file path"""
     import os
     from pathlib import Path
-    
+
     # Use absolute path to avoid working directory issues
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     abs_directory = Path(base_dir) / directory
-    
+
     # Create directory if it doesn't exist
     os.makedirs(abs_directory, exist_ok=True)
 

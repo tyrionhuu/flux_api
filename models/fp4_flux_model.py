@@ -2,11 +2,11 @@
 FLUX model management for the FLUX API
 """
 
+import hashlib
 import logging
 import os
 import shutil
 import tempfile
-import hashlib
 from typing import Any, Optional, Union
 
 import torch
@@ -243,11 +243,17 @@ class FluxModelManager:
                 )
                 try:
                     # Try to load cached nunchaku conversion first
-                    if self._load_cached_nunchaku_conversion(DEFAULT_LORA_NAME, transformer):
-                        logger.info("   - Using cached nunchaku conversion for default LoRA")
+                    if self._load_cached_nunchaku_conversion(
+                        DEFAULT_LORA_NAME, transformer
+                    ):
+                        logger.info(
+                            "   - Using cached nunchaku conversion for default LoRA"
+                        )
                     else:
                         # No cache hit, perform the conversion
-                        logger.info("   - Converting default LoRA to nunchaku format...")
+                        logger.info(
+                            "   - Converting default LoRA to nunchaku format..."
+                        )
                         transformer.update_lora_params(DEFAULT_LORA_NAME)
                         # Cache the conversion result for future use
                         self._cache_nunchaku_conversion(DEFAULT_LORA_NAME, transformer)
@@ -672,7 +678,7 @@ class FluxModelManager:
                 return False
 
             logger.info(f"   - Loading LoRA parameters from: {lora_path}")
-            
+
             # Try to load cached nunchaku conversion first
             if self._load_cached_nunchaku_conversion(lora_path, transformer):
                 logger.info("   - Using cached nunchaku conversion")
@@ -682,7 +688,7 @@ class FluxModelManager:
                 transformer.update_lora_params(lora_path)
                 # Cache the conversion result for future use
                 self._cache_nunchaku_conversion(lora_path, transformer)
-            
+
             logger.info(f"   - Setting LoRA strength to {weight}")
             transformer.set_lora_strength(weight)
             logger.info("   - LoRA applied successfully")
@@ -905,7 +911,9 @@ class FluxModelManager:
                 lora_data_list = []
                 lora_weights_list = []
 
-                for i, (lora_config, lora_path) in enumerate(zip(lora_configs, resolved_paths)):
+                for i, (lora_config, lora_path) in enumerate(
+                    zip(lora_configs, resolved_paths)
+                ):
                     lora_name = lora_config["name"]
                     weight = lora_config["weight"]
 
@@ -1157,10 +1165,12 @@ class FluxModelManager:
         try:
             if not os.path.isdir(self._nunchaku_cache_dir):
                 return None
-            
+
             # Create cache key from file path and modification time
             stat = os.stat(lora_path)
-            cache_key = f"{os.path.basename(lora_path)}_{int(stat.st_mtime)}_{stat.st_size}"
+            cache_key = (
+                f"{os.path.basename(lora_path)}_{int(stat.st_mtime)}_{stat.st_size}"
+            )
             # Make filename safe
             cache_key = "".join(c for c in cache_key if c.isalnum() or c in "._-")
             return os.path.join(self._nunchaku_cache_dir, f"{cache_key}.nunchaku")
@@ -1173,10 +1183,13 @@ class FluxModelManager:
             cache_path = self._get_nunchaku_cache_path(lora_path)
             if not cache_path:
                 return False
-            
+
             # Get the converted LoRA parameters from the transformer
             # This is a bit hacky but we need to extract the converted format
-            if hasattr(transformer, '_lora_params') and transformer._lora_params is not None:
+            if (
+                hasattr(transformer, "_lora_params")
+                and transformer._lora_params is not None
+            ):
                 # Save the converted parameters
                 torch.save(transformer._lora_params, cache_path)
                 logger.info(f"   - Cached nunchaku conversion: {cache_path}")
@@ -1194,7 +1207,7 @@ class FluxModelManager:
             cache_path = self._get_nunchaku_cache_path(lora_path)
             if not cache_path or not os.path.exists(cache_path):
                 return False
-            
+
             # Check if cache is still valid (file hasn't changed)
             if os.path.exists(lora_path):
                 stat = os.stat(lora_path)
@@ -1203,10 +1216,10 @@ class FluxModelManager:
                     # Cache is stale, remove it
                     os.remove(cache_path)
                     return False
-            
+
             # Load cached conversion
-            cached_params = torch.load(cache_path, map_location='cpu')
-            if hasattr(transformer, '_lora_params'):
+            cached_params = torch.load(cache_path, map_location="cpu")
+            if hasattr(transformer, "_lora_params"):
                 transformer._lora_params = cached_params
                 logger.info(f"   - Loaded cached nunchaku conversion: {cache_path}")
                 return True

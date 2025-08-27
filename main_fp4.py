@@ -37,9 +37,13 @@ try:
         f.write("API startup test")
     if os.path.exists(test_file_path):
         os.remove(test_file_path)
-        logging.info("File operations test passed - generated_images directory is writable")
+        logging.info(
+            "File operations test passed - generated_images directory is writable"
+        )
     else:
-        logging.warning("File operations test failed - generated_images directory may have permission issues")
+        logging.warning(
+            "File operations test failed - generated_images directory may have permission issues"
+        )
 except Exception as e:
     logging.error(f"File operations test failed: {e}")
 
@@ -95,27 +99,31 @@ async def lifespan(app: FastAPI):
     try:
         start_cleanup_service()
         logging.info("FP4 FLUX API started with cleanup service")
-        
+
         # Auto-load the FLUX model
         logging.info("Auto-loading FLUX model...")
         from api.fp4_routes import get_model_manager
+
         model_manager = get_model_manager()
-        
+
         if model_manager.load_model():
             logging.info("FLUX model loaded successfully during startup")
         else:
             logging.error("Failed to load FLUX model during startup")
-            
+
         # Wait a moment for model to fully initialize
         import time
+
         time.sleep(2)
-        
+
         # Verify model is ready
         if model_manager.is_loaded():
             logging.info("FLUX model verified and ready for requests")
         else:
-            logging.warning("FLUX model may not be fully ready - some requests may fail")
-            
+            logging.warning(
+                "FLUX model may not be fully ready - some requests may fail"
+            )
+
     except Exception as e:
         logging.error(f"Failed to start services: {e}")
 
@@ -203,11 +211,16 @@ if os.path.exists("frontend/static"):
 
 # Mount generated images directory for downloads
 if os.path.exists("generated_images"):
-    app.mount("/generated_images", StaticFiles(directory="generated_images"), name="generated_images")
+    app.mount(
+        "/generated_images",
+        StaticFiles(directory="generated_images"),
+        name="generated_images",
+    )
     logging.info("Mounted generated_images directory for static file serving")
-    
+
     # List contents for debugging
     import os
+
     files = os.listdir("generated_images")
     logging.info(f"Generated images directory contains: {files}")
 else:
@@ -240,21 +253,22 @@ def health_check():
     """Health check endpoint"""
     try:
         from api.fp4_routes import get_model_manager
+
         model_manager = get_model_manager()
         model_loaded = model_manager.is_loaded()
-        
+
         return {
             "status": "healthy" if model_loaded else "model_loading",
             "service": "FP4 FLUX API",
             "model_loaded": model_loaded,
-            "model_ready": model_loaded
+            "model_ready": model_loaded,
         }
     except Exception as e:
         return {
             "status": "error",
             "service": "FP4 FLUX API",
             "error": str(e),
-            "model_loaded": False
+            "model_loaded": False,
         }
 
 
