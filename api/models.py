@@ -92,19 +92,6 @@ class ImageUploadGenerateRequest(BaseModel):
     upscale_factor: Optional[int] = Field(
         2, ge=2, le=4, description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
     )
-    # Image upload specific parameters
-    image_strength: Optional[float] = Field(
-        0.8,
-        ge=0.0,
-        le=1.0,
-        description="Strength of the uploaded image influence (0.0 to 1.0)",
-    )
-    image_guidance_scale: Optional[float] = Field(
-        1.5,
-        ge=1.0,
-        le=20.0,
-        description="Guidance scale for image conditioning (1.0 to 20.0)",
-    )
 
 
 class GenerateResponse(BaseModel):
@@ -130,24 +117,3 @@ class GenerateResponse(BaseModel):
     width: int = Field(..., description="Image width generated")
     height: int = Field(..., description="Image height generated")
     seed: Optional[int] = Field(None, description="Random seed used (if any)")
-
-
-class LoRAInfo(BaseModel):
-    """Model for LoRA information"""
-
-    name: str = Field(..., description="LoRA file name")
-    weight: float = Field(..., description="LoRA weight applied")
-    status: str = Field(..., description="Status of LoRA application")
-
-
-class ModelStatusResponse(BaseModel):
-    """Response model for model status"""
-
-    model_loaded: bool = Field(..., description="Whether the model is loaded")
-    model_type: str = Field(..., description="Type of model loaded")
-    selected_gpu: Optional[int] = Field(None, description="Selected GPU ID")
-    vram_usage_gb: str = Field(..., description="VRAM usage in GB")
-    system_memory_used_gb: str = Field(..., description="System memory used in GB")
-    system_memory_total_gb: str = Field(..., description="Total system memory in GB")
-    lora_loaded: Optional[str] = Field(None, description="Currently loaded LoRA file")
-    lora_weight: Optional[float] = Field(None, description="Current LoRA weight")

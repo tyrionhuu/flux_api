@@ -201,12 +201,6 @@ class FluxAPI {
             });
         }
         
-        // Update API command when image strength/guidance changes
-        const imageStrength = document.getElementById('image-strength');
-        const imageGuidance = document.getElementById('image-guidance');
-        if (imageStrength) imageStrength.addEventListener('input', () => this.updateApiCommand());
-        if (imageGuidance) imageGuidance.addEventListener('input', () => this.updateApiCommand());
-        
         // Update API command when LoRAs change (add/remove/modify)
         const addLoraBtn = document.getElementById('add-lora');
         if (addLoraBtn) {
@@ -487,10 +481,6 @@ class FluxAPI {
             const upscaleFactor = document.getElementById('upscale-factor');
             if (upscaleFactor) formData.append('upscale_factor', upscaleFactor.value);
         }
-        const imageParams = this.getImageUploadParams();
-        if (imageParams) {
-            // image_strength and image_guidance removed
-        }
         
         return fetch(`${this.hostBase}/upload-image-generate`, { method: 'POST', body: formData });
     }
@@ -633,8 +623,6 @@ class FluxAPI {
             this.updateApiCommand();
         });
         
-
-        
         // Drag and drop
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -655,38 +643,11 @@ class FluxAPI {
             }
         });
         
-        // Setup slider event listeners
-        this.setupImageUploadSliders();
         
         // Add event listener for upscale factor changes
         const upscaleFactorSelect = document.getElementById('upscale-factor');
         if (upscaleFactorSelect) {
             upscaleFactorSelect.addEventListener('change', () => this.updateApiCommand());
-        }
-    }
-    
-    setupImageUploadSliders() {
-        const imageStrengthSlider = document.getElementById('image-strength');
-        const imageStrengthValue = document.getElementById('image-strength-value');
-        const imageGuidanceSlider = document.getElementById('image-guidance');
-        const imageGuidanceValue = document.getElementById('image-guidance-value');
-        
-        if (imageStrengthSlider && imageStrengthValue) {
-            imageStrengthValue.textContent = imageStrengthSlider.value;
-            imageStrengthSlider.addEventListener('input', (e) => {
-                imageStrengthValue.textContent = e.target.value;
-                // Update API command when image strength changes
-                this.updateApiCommand();
-            });
-        }
-        
-        if (imageGuidanceSlider && imageGuidanceValue) {
-            imageGuidanceValue.textContent = imageGuidanceSlider.value;
-            imageGuidanceSlider.addEventListener('input', (e) => {
-                imageGuidanceValue.textContent = e.target.value;
-                // Update API command when image guidance changes
-                this.updateApiCommand();
-            });
         }
     }
     
@@ -850,15 +811,6 @@ class FluxAPI {
         }
     }
     
-    getImageUploadParams() {
-        if (!this.hasUploadedImage()) return null;
-        
-        return {
-            // image_strength and image_guidance removed
-        };
-    }
-
-
     showSingleImage(result, params) {
         const gallery = document.getElementById('image-gallery');
         
@@ -993,11 +945,6 @@ class FluxAPI {
             const imageFileName = this.uploadedImageFile ? this.uploadedImageFile.name : 'your_image.jpg';
             command = `# Replace 'your_image.jpg' with the full path to your image file\n`;
             command += `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@/full/path/to/${imageFileName}" -F "prompt=${this.escapeForShell(prompt)}" -F "width=${width}" -F "height=${height}"`;
-            
-            // Add image strength and guidance if available
-            const imageStrength = document.getElementById('image-strength');
-            const imageGuidance = document.getElementById('image-guidance');
-            // image_strength and image_guidance removed from curl
             
             if (seed) {
                 command += ` -F "seed=${seed}"`;
