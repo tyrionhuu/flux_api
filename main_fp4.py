@@ -56,7 +56,7 @@ logging.basicConfig(
 
 # Configure specific loggers for better error visibility
 logging.getLogger("api.routes").setLevel(logging.INFO)
-logging.getLogger("models.fp4_flux_model").setLevel(logging.INFO)
+logging.getLogger("models.flux_model").setLevel(logging.INFO)
 logging.getLogger("utils.cleanup_service").setLevel(logging.INFO)
 
 # Add a single enhanced console handler for better formatting

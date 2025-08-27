@@ -194,7 +194,7 @@ tail -f logs/flux_api.log
 
 1. **Frontend**: Modify `frontend/static/js/app.js`
 2. **API**: Add routes in `api/routes.py`
-3. **Models**: Extend `models/fp4_flux_model.py`
+3. **Models**: Extend `models/flux_model.py`
 
 ### Testing
 
@@ -203,7 +203,7 @@ tail -f logs/flux_api.log
 python -c "import requests; print(requests.get('http://localhost:8000/').json())"
 
 # Test model imports
-python -c "from models.fp4_flux_model import FluxModelManager; print('✅ FP4 model imports successfully')"
+python -c "from models.flux_model import FluxModelManager; print('✅ FP4 model imports successfully')"
 ```
 
 ## License

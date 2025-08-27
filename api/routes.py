@@ -17,7 +17,7 @@ from PIL import Image
 
 from api.models import GenerateRequest
 from config.fp4_settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
-from models.fp4_flux_model import FluxModelManager
+from models.flux_model import FluxModelManager
 from models.upscaler import apply_upscaling
 from utils.cleanup_service import (cleanup_after_generation,
                                    cleanup_after_upload)
