@@ -6,6 +6,7 @@ This script starts the FLUX API service directly using the flux_env virtual envi
 
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -134,7 +135,6 @@ def cleanup_port(port: int = 8000):
 
 def check_port_available(port: int = 8000) -> bool:
     """Check if a port is available by attempting to bind to it"""
-    import socket
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
