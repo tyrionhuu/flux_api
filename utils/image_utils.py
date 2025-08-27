@@ -2,8 +2,12 @@
 Image utilities for the FLUX API
 """
 
+import base64
+import io
+import logging
 import os
 import uuid
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import HTTPException, UploadFile
@@ -14,7 +18,6 @@ from config.fp4_settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
 
 def extract_image_from_result(result: Any) -> Image.Image:
     """Extract image from FLUX pipeline result"""
-    import logging
 
     logger = logging.getLogger(__name__)
 
@@ -61,9 +64,6 @@ def save_image_with_unique_name(
     image: Image.Image, directory: str = "generated_images"
 ) -> str:
     """Save image with a unique filename and return the filename"""
-    import os
-    import uuid
-    from pathlib import Path
 
     # Use absolute path to avoid working directory issues
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -100,9 +100,6 @@ def validate_uploaded_image(file: UploadFile) -> None:
 
 def save_uploaded_image(file: UploadFile, directory: str = "uploads/images") -> str:
     """Save uploaded image and return the file path"""
-    import os
-    from pathlib import Path
-
     # Use absolute path to avoid working directory issues
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     abs_directory = Path(base_dir) / directory
@@ -171,8 +168,6 @@ def image_to_base64(image: Image.Image, format: str = "PNG") -> str:
     Returns:
         Base64 encoded string with data URI prefix
     """
-    import base64
-    import io
 
     # Convert image to bytes
     buffer = io.BytesIO()
