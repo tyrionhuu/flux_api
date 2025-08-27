@@ -848,10 +848,6 @@ class FluxAPI {
         gallery.appendChild(singleItem);
     }
 
-
-
-
-
     showImageModal(result, params, imageUrl) {
         const modal = document.getElementById('image-modal');
         const modalImage = document.getElementById('modal-image');
@@ -887,6 +883,8 @@ class FluxAPI {
         const width = document.getElementById('width').value;
         const height = document.getElementById('height').value;
         const seed = document.getElementById('seed').value;
+        const upscaleCheckbox = document.getElementById('upscale');
+        const upscaleFactorEl = document.getElementById('upscale-factor');
         
         // Build the one-liner download command
         // Build the JSON payload first, then escape it properly for shell
@@ -898,6 +896,13 @@ class FluxAPI {
         
         if (seed) {
             jsonPayload.seed = parseInt(seed);
+        }
+        
+        if (upscaleCheckbox && upscaleCheckbox.checked) {
+            jsonPayload.upscale = true;
+            if (upscaleFactorEl && upscaleFactorEl.value) {
+                jsonPayload.upscale_factor = parseInt(upscaleFactorEl.value);
+            }
         }
         
         if (loras && loras.length > 0) {
@@ -932,6 +937,8 @@ class FluxAPI {
         const width = document.getElementById('width').value;
         const height = document.getElementById('height').value;
         const seed = document.getElementById('seed').value;
+        const upscaleCheckbox = document.getElementById('upscale');
+        const upscaleFactorEl = document.getElementById('upscale-factor');
         
         // Check if there's an uploaded image
         const uploadedImage = document.getElementById('uploaded-image-preview');
@@ -943,8 +950,7 @@ class FluxAPI {
             // Build command for generate-with-image-and-return endpoint
             // Show the filename but remind user to use full local path
             const imageFileName = this.uploadedImageFile ? this.uploadedImageFile.name : 'your_image.jpg';
-            command = `# Replace 'your_image.jpg' with the full path to your image file\n`;
-            command += `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@/full/path/to/${imageFileName}" -F "prompt=${this.escapeForShell(prompt)}" -F "width=${width}" -F "height=${height}"`;
+            command += `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@${imageFileName}" -F "prompt=${this.escapeForShell(prompt)}" -F "width=${width}" -F "height=${height}"`;
             
             if (seed) {
                 command += ` -F "seed=${seed}"`;
@@ -957,6 +963,14 @@ class FluxAPI {
                     weight: parseFloat(lora.weight)
                 })));
                 command += ` -F "loras=${this.escapeForShell(lorasJson)}"`;
+            }
+            
+            // Upscale parameters
+            if (upscaleCheckbox && upscaleCheckbox.checked) {
+                command += ` -F "upscale=true"`;
+                if (upscaleFactorEl && upscaleFactorEl.value) {
+                    command += ` -F "upscale_factor=${upscaleFactorEl.value}"`;
+                }
             }
             
             // Direct output to file - no need for jq or second curl
@@ -979,6 +993,14 @@ class FluxAPI {
                     name: lora.name,
                     weight: parseFloat(lora.weight)
                 }));
+            }
+            
+            // Upscale parameters
+            if (upscaleCheckbox && upscaleCheckbox.checked) {
+                jsonPayload.upscale = true;
+                if (upscaleFactorEl && upscaleFactorEl.value) {
+                    jsonPayload.upscale_factor = parseInt(upscaleFactorEl.value);
+                }
             }
             
             // Escape the JSON string for shell
@@ -1046,15 +1068,14 @@ class FluxAPI {
             navigator.clipboard.writeText(textToCopy)
                 .then(() => {
                     console.log('Successfully copied to clipboard');
-                    this.showSuccess('API command copied to clipboard!');
+                    this.showSuccess('API Command Copied to Clipboard');
                 })
                 .catch((err) => {
                     console.error('Modern clipboard API failed:', err);
-                    // Fallback to execCommand
                     this.fallbackCopyToClipboard(textToCopy);
                 });
         } else {
-            console.log('Modern clipboard API not available, using fallback');
+            console.error('Clipboard API not available');
             this.fallbackCopyToClipboard(textToCopy);
         }
     }
@@ -1076,7 +1097,7 @@ class FluxAPI {
             
             if (successful) {
                 console.log('Fallback copy successful');
-                this.showSuccess('API command copied to clipboard!');
+                this.showSuccess('API Command Copied to Clipboard');
             } else {
                 console.error('Fallback copy failed');
                 this.showError('Failed to copy API command (fallback method failed)');
