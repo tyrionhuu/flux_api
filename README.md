@@ -1,17 +1,17 @@
 # FLUX API - AI Image Generation Service
 
-A dual-model AI image generation API service featuring FLUX models with LoRA support.
+A high-performance AI image generation API service featuring the FLUX FP4 model with LoRA support.
 
 ## Features
 
-- **Dual Model Support**: FP4 (quantized) and BF16 (full-precision) FLUX models
+- **Model Support**: FP4 (quantized) FLUX model
 - **GPU Management**: Automatic GPU selection and load balancing
 - **LoRA Support**: Apply custom LoRA weights for style customization
 - **LoRA File Upload**: Upload local LoRA files directly through the web interface
 - **ComfyUI-style Frontend**: Modern, intuitive web interface
 - **RESTful API**: Easy integration with external applications
 
-## Model Services
+## Model Service
 
 ### FP4 Model (Port 8000)
 - **Port**: 8000 (configurable)
@@ -19,32 +19,23 @@ A dual-model AI image generation API service featuring FLUX models with LoRA sup
 - **Memory**: ~8GB VRAM
 - **Speed**: Fast inference with LoRA merging support
 
-### BF16 Model (Port 8001)
-- **Port**: 8001 (configurable)
-- **Model**: FLUX.1-schnell (full-precision)
-- **Memory**: ~16GB VRAM
-- **Speed**: High-quality inference with native LoRA support
 
 ## Quick Start
 
-### 1. Start the Services
+### 1. Start the Service
 
 ```bash
 # Start FP4 service
 ./start_fp4_api.sh
 
-# Start BF16 service
-./start_bf16_api.sh
-
 # Start frontend (optional)
 cd frontend && python -m http.server 9000
 ```
 
-### 2. Access the Services
+### 2. Access the Service
 
 - **Frontend**: http://localhost:9000
 - **FP4 API**: http://localhost:8000
-- **BF16 API**: http://localhost:8001
 
 ## LoRA Support
 
@@ -75,12 +66,7 @@ The web interface now supports uploading local LoRA files:
 
 ### Multiple LoRA Support
 
-Both models support applying multiple LoRAs simultaneously:
-
-- **FP4 Model**: Merges multiple LoRAs into a single LoRA
-- **BF16 Model**: Applies multiple LoRAs using Diffusers' native support
-- **Maximum**: 3 LoRA layers
-- **Weight Combination**: Automatic weight calculation
+The FP4 model supports applying multiple LoRAs simultaneously by merging multiple LoRAs into a single LoRA (maximum 3 layers). Weight combinations are calculated automatically.
 
 ## API Usage
 
@@ -117,11 +103,9 @@ Set custom ports using environment variables or command-line flags:
 ```bash
 # Environment variables
 export FP4_PORT=8000
-export BF16_PORT=8001
 
 # Or command-line flags
 ./start_fp4_api.sh --port 8000
-./start_bf16_api.sh --port 8001
 ```
 
 ### GPU Configuration
@@ -138,14 +122,14 @@ python -c "from utils.gpu_manager import GPUManager; gm = GPUManager(); print(gm
 ```
 flux_api/
 ├── api/                    # API routes and models
-├── models/                 # FLUX model implementations
+├── models/                 # FLUX model implementations (FP4)
 ├── utils/                  # Utility modules
 ├── config/                 # Configuration files
 ├── frontend/               # Web interface
 ├── uploads/                # Uploaded LoRA files
 │   └── lora_files/        # LoRA file storage
 ├── generated_images/       # Generated images
-└── start_*.sh             # Service startup scripts
+└── start_fp4_api.sh        # Service startup script
 ```
 
 ## Troubleshooting
@@ -182,8 +166,8 @@ tail -f logs/flux_api.log
 ### Adding New Features
 
 1. **Frontend**: Modify `frontend/static/js/app.js`
-2. **API**: Add routes in `api/fp4_routes.py` or `api/bf16_routes.py`
-3. **Models**: Extend `models/fp4_flux_model.py` or `models/bf16_flux_model.py`
+2. **API**: Add routes in `api/fp4_routes.py`
+3. **Models**: Extend `models/fp4_flux_model.py`
 
 ### Testing
 

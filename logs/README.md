@@ -7,7 +7,6 @@ This directory contains all log files for the FLUX API system.
 ### API Logs
 
 - **`flux_api.log`** - Main FLUX API log (legacy)
-- **`flux_api_bf16.log`** - BF16 FLUX API specific logs
 - **`flux_api_fp4.log`** - FP4 FLUX API specific logs (created when service starts)
 
 ### Service Logs
@@ -32,7 +31,6 @@ Create `/etc/logrotate.d/flux-api`:
     notifempty
     create 644 www-data www-data
     postrotate
-        systemctl reload flux-api-bf16
         systemctl reload flux-api-fp4
     endscript
 }
@@ -62,7 +60,6 @@ The system uses the following log levels:
 ## Configuration
 
 Log levels can be configured in the main API files:
-- `main_bf16.py` - BF16 API logging
 - `main_fp4.py` - FP4 API logging
 - `config/cleanup_settings.py` - Cleanup service logging
 
@@ -71,9 +68,6 @@ Log levels can be configured in the main API files:
 ### Real-time Log Monitoring
 
 ```bash
-# Monitor BF16 API logs
-tail -f logs/flux_api_bf16.log
-
 # Monitor FP4 API logs
 tail -f logs/flux_api_fp4.log
 

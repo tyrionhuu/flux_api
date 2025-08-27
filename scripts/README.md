@@ -169,7 +169,7 @@ Both scripts include comprehensive error handling:
 
 These scripts work with the main FLUX API components:
 
-- **Main APIs**: `main_bf16.py`, `main_fp4.py`
+- **Main API**: `main_fp4.py`
 - **Cleanup Service**: `utils/cleanup_service.py`
 - **Systemd Services**: `services/flux-cleanup.service`
 - **Log Files**: `logs/` directory
