@@ -2,20 +2,28 @@
 API routes for the FLUX API
 """
 
+import io
 import logging
 import os
+import shutil
+import threading
 import time
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from PIL import Image
 
 from api.models import GenerateRequest
-from config.fp4_settings import (DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT,
-                                 STATIC_IMAGES_DIR)
+from config.fp4_settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
 from models.fp4_flux_model import FluxModelManager
-from utils.image_utils import (extract_image_from_result,
-                               save_image_with_unique_name)
+from models.upscaler import apply_upscaling
+from utils.cleanup_service import (cleanup_after_generation,
+                                   cleanup_after_upload)
+from utils.image_utils import (extract_image_from_result, image_to_base64,
+                               save_image_with_unique_name,
+                               save_uploaded_image, validate_uploaded_image)
 from utils.queue_manager import QueueManager
 from utils.system_utils import get_system_memory
 
@@ -24,9 +32,6 @@ logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter()
-
-# Global model manager instance - singleton pattern with thread safety
-import threading
 
 _model_manager_instance = None
 _model_manager_lock = threading.Lock()
@@ -51,9 +56,6 @@ queue_manager = QueueManager(max_concurrent=2, max_queue_size=100)
 @router.get("/debug-version")
 def debug_version():
     """Debug endpoint to check code version"""
-    import os
-    import time
-    from pathlib import Path
 
     # Get current working directory and file paths
     cwd = os.getcwd()
@@ -94,6 +96,7 @@ def debug_version():
         },
     }
 
+
 @router.get("/")
 def read_root():
     """Root endpoint for testing"""
@@ -117,11 +120,10 @@ def read_root():
         "timestamp": time.time(),
     }
 
+
 @router.get("/download/{filename}")
 def download_image(filename: str):
     """Download a generated image file"""
-    import os
-    from pathlib import Path
 
     # Security: only allow files from generated_images directory
     safe_filename = os.path.basename(filename)  # Remove any path traversal
@@ -283,9 +285,6 @@ async def generate_and_return_image(request: GenerateRequest):
 
                     # Allow uploaded file paths (uploads/lora_files/...)
                     if lora_config["name"].startswith("uploaded_lora_"):
-                        # This is an uploaded file, validate it exists
-                        import os
-
                         upload_path = f"uploads/lora_files/{lora_config['name']}"
                         if not os.path.exists(upload_path):
                             raise HTTPException(
@@ -368,10 +367,6 @@ async def generate_and_return_image(request: GenerateRequest):
                 detail="No download URL received from generate endpoint",
             )
 
-        # Read the image file and return it directly
-        import os
-        from pathlib import Path
-
         # Get the file path from the download URL
         filename = download_url.split("/")[-1]
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -393,7 +388,6 @@ async def generate_and_return_image(request: GenerateRequest):
             logger.warning(f"Failed to cleanup temporary image file: {cleanup_error}")
 
         # Return the image directly as binary data
-        from fastapi.responses import Response
 
         return Response(content=image_bytes, media_type="image/png")
 
@@ -517,8 +511,6 @@ async def generate_image(request: GenerateRequest):
 
                     # Allow uploaded file paths (uploads/lora_files/...)
                     if lora_config["name"].startswith("uploaded_lora_"):
-                        # This is an uploaded file, validate it exists
-                        import os
 
                         upload_path = f"uploads/lora_files/{lora_config['name']}"
                         if not os.path.exists(upload_path):
@@ -595,7 +587,6 @@ async def generate_image(request: GenerateRequest):
 
         # Trigger cleanup after successful image generation
         try:
-            from utils.cleanup_service import cleanup_after_generation
 
             cleanup_after_generation()
         except Exception as cleanup_error:
@@ -625,9 +616,6 @@ async def generate_with_image_and_return(
 ):
     """Generate image from uploaded image and return it directly as binary data"""
     try:
-        import io
-
-        from PIL import Image
 
         # Debug logging for form parameters
         logger.info(
@@ -780,9 +768,6 @@ async def generate_with_image_and_return(
         except Exception as cleanup_error:
             logger.warning(f"Failed to cleanup temporary image file: {cleanup_error}")
 
-        # Return the image directly as binary data
-        from fastapi.responses import Response
-
         return Response(content=image_bytes, media_type="image/png")
 
     except Exception as e:
@@ -804,10 +789,6 @@ async def generate_with_image(
 ):
     """Generate image using image + text input (image-to-image generation)"""
     try:
-        import io
-
-        from PIL import Image
-
         # Debug logging for form parameters
         logger.info(
             f"Received generate-with-image request - prompt: {prompt}, num_inference_steps: {num_inference_steps}, guidance_scale: {guidance_scale}, width: {width}, height: {height}, seed: {seed}"
@@ -944,8 +925,6 @@ async def generate_with_image(
 
         # Convert image to base64 for direct response
         try:
-            from utils.image_utils import image_to_base64
-
             image_base64 = image_to_base64(generated_image, "PNG")
         except Exception as base64_error:
             logger.warning(f"Failed to convert image to base64: {base64_error}")
@@ -1021,6 +1000,7 @@ def get_model_status():
     )
 
     return status
+
 
 @router.post("/apply-lora")
 async def apply_lora(lora_name: str, weight: float = 1.0):
@@ -1283,7 +1263,6 @@ def generate_image_internal(
 
         # Apply upscaling if requested
         try:
-            from models.upscaler import apply_upscaling
 
             image_filename, upscaled_image_path, final_width, final_height = (
                 apply_upscaling(
@@ -1305,17 +1284,11 @@ def generate_image_internal(
 
         # Get the actual LoRA status from the model manager
         actual_lora_info = model_manager.get_lora_info()
-
-        # Create download URL for the generated image
-        import os
-
         filename = os.path.basename(image_filename)
         download_url = f"/download/{filename}"
 
         # Convert image to base64 for direct response
         try:
-            from utils.image_utils import image_to_base64
-
             image_base64 = image_to_base64(image, "PNG")
         except Exception as base64_error:
             logger.warning(f"Failed to convert image to base64: {base64_error}")
@@ -1348,8 +1321,6 @@ def generate_image_internal(
 @router.post("/upload-lora")
 async def upload_lora_file(file: UploadFile = File(...)):
     """Upload a LoRA file to the server"""
-    import shutil
-    from pathlib import Path
 
     # Check file type
     allowed_extensions = [".safetensors", ".bin", ".pt", ".pth"]
@@ -1389,8 +1360,6 @@ async def upload_lora_file(file: UploadFile = File(...)):
 
         # Trigger cleanup after upload
         try:
-            from utils.cleanup_service import cleanup_after_upload
-
             cleanup_after_upload()
         except Exception as cleanup_error:
             logger.warning(f"Failed to trigger cleanup after upload: {cleanup_error}")
@@ -1413,13 +1382,8 @@ async def upload_lora_file(file: UploadFile = File(...)):
 async def upload_image(file: UploadFile = File(...)):
     """Upload a reference image to the server without generating."""
     try:
-        from utils.image_utils import (save_uploaded_image,
-                                       validate_uploaded_image)
-
         validate_uploaded_image(file)
         file_path = save_uploaded_image(file)  # saves to uploads/images by default
-
-        import os
 
         filename = os.path.basename(file_path)
 

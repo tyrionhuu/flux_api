@@ -39,9 +39,7 @@ def extract_image_from_result(result: Any) -> Image.Image:
             logger.info("Result is already a PIL Image")
             return result
 
-        raise HTTPException(
-            status_code=500, detail="No image found in result"
-        )
+        raise HTTPException(status_code=500, detail="No image found in result")
 
     except Exception as e:
         logger.error(f"Error extracting image from result: {e}")
