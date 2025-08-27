@@ -4,17 +4,20 @@ Main FastAPI application for the FP4 FLUX API (Port 8002)
 
 import logging
 import os
-
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-
+from api.routes import get_model_manager
 from api.routes import router
 from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
                              FP4_API_PORT)
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
-
+from contextlib import asynccontextmanager
+from api.routes import get_model_manager
+import time
+import traceback
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
 
@@ -30,28 +33,11 @@ logging.info(f"Current working directory: {current_dir}")
 logging.info(f"Script directory: {script_dir}")
 logging.info(f"Generated images absolute path: {generated_images_abs}")
 
-# Test file operations
-try:
-    test_file_path = os.path.join(generated_images_abs, "test_startup.txt")
-    with open(test_file_path, "w") as f:
-        f.write("API startup test")
-    if os.path.exists(test_file_path):
-        os.remove(test_file_path)
-        logging.info(
-            "File operations test passed - generated_images directory is writable"
-        )
-    else:
-        logging.warning(
-            "File operations test failed - generated_images directory may have permission issues"
-        )
-except Exception as e:
-    logging.error(f"File operations test failed: {e}")
-
-# Configure logging
+# Configure logging (base setup; uvicorn log_config below ensures file logging too)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("logs/flux_api_fp4.log")],
+    handlers=[logging.StreamHandler(), logging.FileHandler("logs/flux_api.log")],
 )
 
 # Configure specific loggers for better error visibility
@@ -88,10 +74,6 @@ for handler in root_logger.handlers[:]:
 # Add our enhanced handler
 root_logger.addHandler(console_handler)
 
-# Create FastAPI app with lifespan context manager
-from contextlib import asynccontextmanager
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
@@ -102,7 +84,6 @@ async def lifespan(app: FastAPI):
 
         # Auto-load the FLUX model
         logging.info("Auto-loading FLUX model...")
-        from api.routes import get_model_manager
 
         model_manager = get_model_manager()
 
@@ -111,8 +92,6 @@ async def lifespan(app: FastAPI):
         else:
             logging.error("Failed to load FLUX model during startup")
 
-        # Wait a moment for model to fully initialize
-        import time
 
         time.sleep(2)
 
@@ -158,8 +137,6 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler to catch any unhandled errors"""
-    import traceback
-
     # Log the full error with traceback
     logging.error(f"Unhandled exception in {request.url}: {exc}")
     logging.error(f"Traceback: {traceback.format_exc()}")
@@ -216,10 +193,7 @@ if os.path.exists("generated_images"):
         StaticFiles(directory="generated_images"),
         name="generated_images",
     )
-    logging.info("Mounted generated_images directory for static file serving")
-
-    # List contents for debugging
-    import os
+    logging.info("Mounted generated_images directory for static file serving")    
 
     files = os.listdir("generated_images")
     logging.info(f"Generated images directory contains: {files}")
@@ -252,8 +226,6 @@ async def serve_frontend():
 def health_check():
     """Health check endpoint"""
     try:
-        from api.routes import get_model_manager
-
         model_manager = get_model_manager()
         model_loaded = model_manager.is_loaded()
 
@@ -273,6 +245,43 @@ def health_check():
 
 
 if __name__ == "__main__":
-    import uvicorn
+    # Ensure uvicorn also writes to our file
+    LOG_CONFIG = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "default": {
+                "()": "uvicorn.logging.DefaultFormatter",
+                "fmt": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            },
+            "access": {
+                "()": "uvicorn.logging.AccessFormatter",
+                "fmt": "%(asctime)s - %(levelprefix)s %(client_addr)s - \"%(request_line)s\" %(status_code)s",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "default",
+                "level": "INFO",
+                "stream": "ext://sys.stdout",
+            },
+            "file": {
+                "class": "logging.FileHandler",
+                "formatter": "default",
+                "level": "INFO",
+                "filename": "logs/flux_api_fp4.log",
+            },
+        },
+        "loggers": {
+            "uvicorn": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+            "uvicorn.error": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+            "uvicorn.access": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+            "api.routes": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+            "models.flux_model": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+            "utils.cleanup_service": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+            "": {"handlers": ["console", "file"], "level": "INFO"},
+        },
+    }
 
-    uvicorn.run(app, host="0.0.0.0", port=FP4_API_PORT)
+    uvicorn.run(app, host="0.0.0.0", port=FP4_API_PORT, log_config=LOG_CONFIG)
