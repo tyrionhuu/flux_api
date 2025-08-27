@@ -39,10 +39,8 @@ def extract_image_from_result(result: Any) -> Image.Image:
             logger.info("Result is already a PIL Image")
             return result
 
-        # Fallback: create a simple placeholder image
-        logger.warning("Could not extract image from result, using placeholder")
-        return Image.new(
-            "RGB", DEFAULT_IMAGE_SIZE, color=PLACEHOLDER_COLORS["placeholder"]
+        raise HTTPException(
+            status_code=500, detail="No image found in result"
         )
 
     except Exception as e:
