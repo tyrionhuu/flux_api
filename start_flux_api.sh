@@ -119,9 +119,9 @@ fi
 
 
 
-# Check if start_fp4_service.py exists
-if [ ! -f "start_fp4_service.py" ]; then
-    echo "❌ start_fp4_service.py not found!"
+# Check if start_flux_service.py exists
+if [ ! -f "start_flux_service.py" ]; then
+    echo "❌ start_flux_service.py not found!"
     echo "   Please ensure the service starter script exists."
     exit 1
 fi
@@ -153,4 +153,4 @@ fi
 export FP4_API_PORT="$PORT"
 echo "🔧 Using FP4_API_PORT=${FP4_API_PORT}"
 
-python start_fp4_service.py
+python start_flux_service.py
