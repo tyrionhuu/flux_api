@@ -346,16 +346,31 @@ async def generate_and_return_image(request: GenerateRequest):
                 lora_applied = current_lora.get("name")
                 lora_weight_applied = current_lora.get("weight")
 
-        result = generate_image_internal(
-            prompt,
-            "FLUX",
-            lora_applied,
-            lora_weight_applied,
-            request.width or 512,
-            request.height or 512,
-            request.seed,
-            request.upscale or False,
-            request.upscale_factor or 2,
+        # Define processor to run inside queue worker
+        def processor(_req, _ctx):
+            return generate_image_internal(
+                prompt,
+                "FLUX",
+                lora_applied,
+                lora_weight_applied,
+                request.width or 512,
+                request.height or 512,
+                request.seed,
+                request.upscale or False,
+                request.upscale_factor or 2,
+            )
+
+        # Enqueue and wait synchronously for completion
+        result = await queue_manager.submit_and_wait(
+            prompt=prompt,
+            loras=loras_to_apply if loras_to_apply else None,
+            lora_name=lora_applied,
+            lora_weight=lora_weight_applied or 1.0,
+            width=request.width or 512,
+            height=request.height or 512,
+            seed=request.seed,
+            processor=processor,
+            context={},
         )
 
         # Extract the download URL from the result
@@ -573,16 +588,29 @@ async def generate_image(request: GenerateRequest):
                 lora_applied = current_lora.get("name")
                 lora_weight_applied = current_lora.get("weight")
 
-        result = generate_image_internal(
-            prompt,
-            "FLUX",
-            lora_applied,
-            lora_weight_applied,
-            request.width or 512,
-            request.height or 512,
-            request.seed,
-            request.upscale or False,
-            request.upscale_factor or 2,
+        def processor(_req, _ctx):
+            return generate_image_internal(
+                prompt,
+                "FLUX",
+                lora_applied,
+                lora_weight_applied,
+                request.width or 512,
+                request.height or 512,
+                request.seed,
+                request.upscale or False,
+                request.upscale_factor or 2,
+            )
+
+        result = await queue_manager.submit_and_wait(
+            prompt=prompt,
+            loras=loras_to_apply if loras_to_apply else None,
+            lora_name=lora_applied,
+            lora_weight=lora_weight_applied or 1.0,
+            width=request.width or 512,
+            height=request.height or 512,
+            seed=request.seed,
+            processor=processor,
+            context={},
         )
 
         # Trigger cleanup after successful image generation
@@ -699,12 +727,12 @@ async def generate_with_image_and_return(
         # Start timing
         generation_start_time = time.time()
 
-        # Generate image using the new method
-        try:
+        # Generate image via queue processor
+        def processor(_req, _ctx):
             logger.info(
                 f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}"
             )
-            result = model_manager.generate_image_with_image(
+            return model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
                 image=img,
                 num_inference_steps=num_inference_steps or 25,
@@ -713,6 +741,16 @@ async def generate_with_image_and_return(
                 height=height or 512,
                 seed=seed,
                 negative_prompt=negative_prompt,
+            )
+
+        try:
+            result = await queue_manager.submit_and_wait(
+                prompt=enhanced_prompt,
+                width=width or 512,
+                height=height or 512,
+                seed=seed,
+                processor=processor,
+                context={},
             )
             logger.info(
                 f"Model generation completed successfully, result type: {type(result)}"
@@ -872,11 +910,11 @@ async def generate_with_image(
         generation_start_time = time.time()
 
         # Generate image using the new method
-        try:
+        def processor(_req, _ctx):
             logger.info(
                 f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}"
             )
-            result = model_manager.generate_image_with_image(
+            return model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
                 image=img,
                 num_inference_steps=num_inference_steps or 25,
@@ -885,6 +923,16 @@ async def generate_with_image(
                 height=height or 512,
                 seed=seed,
                 negative_prompt=negative_prompt,
+            )
+
+        try:
+            result = await queue_manager.submit_and_wait(
+                prompt=enhanced_prompt,
+                width=width or 512,
+                height=height or 512,
+                seed=seed,
+                processor=processor,
+                context={},
             )
             logger.info(
                 f"Model generation completed successfully, result type: {type(result)}"

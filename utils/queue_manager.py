@@ -8,7 +8,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,9 @@ class QueueRequest:
     width: int = 512
     height: int = 512
     seed: Optional[int] = None
+    # Processing
+    processor: Optional[Callable[["QueueRequest", Dict[str, Any]], Any]] = None
+    context: Optional[Dict[str, Any]] = None
 
 
 class QueueManager:
@@ -96,6 +99,8 @@ class QueueManager:
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,
+        processor: Optional[Callable[["QueueRequest", Dict[str, Any]], Any]] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Submit a new request to the queue"""
         if self.queue.qsize() >= self.max_queue_size:
@@ -116,6 +121,8 @@ class QueueManager:
             width=width,
             height=height,
             seed=seed,
+            processor=processor,
+            context=context or {},
         )
 
         await self.queue.put((priority, request))
@@ -186,14 +193,23 @@ class QueueManager:
 
                 logger.info(f"Processing request {request.id}: {request.prompt}")
 
-                # Here we would call the actual image generation
-                # For now, we'll simulate processing
-                await asyncio.sleep(1)  # Simulate processing time
+                # Execute the processor if provided
+                result: Any = None
+                if request.processor is not None:
+                    maybe_result = request.processor(request, request.context or {})
+                    if asyncio.iscoroutine(maybe_result):
+                        result = await maybe_result
+                    else:
+                        result = maybe_result
+                else:
+                    # Fallback simulation
+                    await asyncio.sleep(1)
+                    result = {"message": "Request processed successfully"}
 
                 # Mark as completed
                 request.status = RequestStatus.COMPLETED
                 request.completed_at = time.time()
-                request.result = {"message": "Request processed successfully"}
+                request.result = result
 
                 # Move to completed requests
                 self.completed_requests[request.id] = request
@@ -222,3 +238,47 @@ class QueueManager:
             "max_concurrent": self.max_concurrent,
             "max_queue_size": self.max_queue_size,
         }
+
+    async def submit_and_wait(
+        self,
+        *,
+        prompt: str,
+        lora_name: Optional[str] = None,
+        lora_weight: float = 1.0,
+        loras: Optional[list[dict]] = None,
+        priority: int = 0,
+        num_inference_steps: int = 10,
+        guidance_scale: float = 4.0,
+        width: int = 512,
+        height: int = 512,
+        seed: Optional[int] = None,
+        processor: Optional[Callable[["QueueRequest", Dict[str, Any]], Any]] = None,
+        context: Optional[Dict[str, Any]] = None,
+        poll_interval: float = 0.25,
+    ) -> Any:
+        """Submit a request and wait for completion, returning the result."""
+        if not self.is_running:
+            await self.start()
+
+        request_id = await self.submit_request(
+            prompt=prompt,
+            lora_name=lora_name,
+            lora_weight=lora_weight,
+            loras=loras,
+            priority=priority,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=guidance_scale,
+            width=width,
+            height=height,
+            seed=seed,
+            processor=processor,
+            context=context,
+        )
+
+        while True:
+            req = await self.get_request_status(request_id)
+            if req and req.status in (RequestStatus.COMPLETED, RequestStatus.FAILED, RequestStatus.CANCELLED):
+                if req.status == RequestStatus.COMPLETED:
+                    return req.result
+                raise RuntimeError(req.error or f"Request {request_id} ended with status {req.status.value}")
+            await asyncio.sleep(poll_interval)
