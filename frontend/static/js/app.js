@@ -516,16 +516,9 @@ class FluxAPI {
         try {
             const formData = new FormData();
             
-            // Decide endpoint and payload based on image source
-            let endpoint = '/generate-with-image';
-            if (this.serverUploadedImagePath) {
-                // Use previously uploaded image path -> dedicated endpoint
-                endpoint = '/upload-image-generate';
-                formData.append('uploaded_image_path', this.serverUploadedImagePath);
-            } else if (this.uploadedImageFile) {
-                // Direct image-to-image -> field name must be 'image'
-                formData.append('image', this.uploadedImageFile);
-            }
+            // Always send direct image-to-image payload to the supported endpoint
+            const endpoint = '/generate-with-image';
+            formData.append('image', this.uploadedImageFile);
             
             formData.append('prompt', prompt);
             

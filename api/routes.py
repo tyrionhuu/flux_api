@@ -121,7 +121,7 @@ def read_root():
     }
 
 
-@router.get("/download/{filename}")
+@router.get("/download/{filename:path}")
 def download_image(filename: str):
     """Download a generated image file"""
 
