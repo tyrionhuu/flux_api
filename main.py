@@ -20,10 +20,7 @@ import time
 import traceback
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
-
-# Ensure generated_images directory exists
 os.makedirs("generated_images", exist_ok=True)
-logging.info("Ensured generated_images directory exists")
 
 # Log current working directory and absolute paths for debugging
 current_dir = os.getcwd()
