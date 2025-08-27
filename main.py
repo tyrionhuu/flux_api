@@ -4,20 +4,21 @@ Main FastAPI application for the FP4 FLUX API (Port 8002)
 
 import logging
 import os
+import time
+import traceback
+from contextlib import asynccontextmanager
+
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from api.routes import get_model_manager
-from api.routes import router
+
+from api.routes import get_model_manager, router
 from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
                              FP4_API_PORT)
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
-from contextlib import asynccontextmanager
-from api.routes import get_model_manager
-import time
-import traceback
+
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
 os.makedirs("generated_images", exist_ok=True)
@@ -71,6 +72,7 @@ for handler in root_logger.handlers[:]:
 # Add our enhanced handler
 root_logger.addHandler(console_handler)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
@@ -88,7 +90,6 @@ async def lifespan(app: FastAPI):
             logging.info("FLUX model loaded successfully during startup")
         else:
             logging.error("Failed to load FLUX model during startup")
-
 
         time.sleep(2)
 
@@ -190,7 +191,7 @@ if os.path.exists("generated_images"):
         StaticFiles(directory="generated_images"),
         name="generated_images",
     )
-    logging.info("Mounted generated_images directory for static file serving")    
+    logging.info("Mounted generated_images directory for static file serving")
 
     files = os.listdir("generated_images")
     logging.info(f"Generated images directory contains: {files}")
@@ -253,7 +254,7 @@ if __name__ == "__main__":
             },
             "access": {
                 "()": "uvicorn.logging.AccessFormatter",
-                "fmt": "%(asctime)s - %(levelprefix)s %(client_addr)s - \"%(request_line)s\" %(status_code)s",
+                "fmt": '%(asctime)s - %(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
             },
         },
         "handlers": {
@@ -271,12 +272,36 @@ if __name__ == "__main__":
             },
         },
         "loggers": {
-            "uvicorn": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
-            "uvicorn.error": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
-            "uvicorn.access": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
-            "api.routes": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
-            "models.flux_model": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
-            "utils.cleanup_service": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+            "uvicorn": {
+                "handlers": ["console", "file"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            "uvicorn.error": {
+                "handlers": ["console", "file"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            "uvicorn.access": {
+                "handlers": ["console", "file"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            "api.routes": {
+                "handlers": ["console", "file"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            "models.flux_model": {
+                "handlers": ["console", "file"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            "utils.cleanup_service": {
+                "handlers": ["console", "file"],
+                "level": "INFO",
+                "propagate": False,
+            },
             "": {"handlers": ["console", "file"], "level": "INFO"},
         },
     }
