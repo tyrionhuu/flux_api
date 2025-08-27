@@ -2,11 +2,9 @@
 API routes for the FLUX API
 """
 
-import json
 import logging
 import os
 import time
-from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -96,76 +94,6 @@ def debug_version():
         },
     }
 
-
-@router.get("/test-file-ops")
-def test_file_operations():
-    """Test file operations to debug path issues"""
-    import os
-    from pathlib import Path
-
-    from PIL import Image
-
-    try:
-        # Get base directory
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        base_dir = os.path.dirname(script_dir)
-        generated_images_dir = Path(base_dir) / "generated_images"
-
-        # Create a test image
-        test_image = Image.new("RGB", (100, 100), color="red")
-
-        # Save test image
-        test_filename = f"test_{int(time.time())}.png"
-        test_path = generated_images_dir / test_filename
-        test_image.save(test_path)
-
-        # Try to read it back
-        if test_path.exists():
-            # Clean up test file
-            test_path.unlink()
-
-            return {
-                "status": "success",
-                "message": "File operations test passed",
-                "test_file_created": True,
-                "test_file_deleted": True,
-                "base_dir": str(base_dir),
-                "generated_images_dir": str(generated_images_dir),
-                "test_path": str(test_path),
-            }
-        else:
-            return {
-                "status": "error",
-                "message": "Test file was not created",
-                "base_dir": str(base_dir),
-                "generated_images_dir": str(generated_images_dir),
-                "test_path": str(test_path),
-            }
-
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"File operations test failed: {str(e)}",
-            "error_type": type(e).__name__,
-            "base_dir": str(base_dir) if "base_dir" in locals() else "unknown",
-        }
-
-
-@router.post("/test-form")
-async def test_form_endpoint(
-    prompt: str = Form(...),
-    test_param: Optional[str] = Form(None),
-):
-    """Test endpoint to verify form handling works"""
-    return {
-        "status": "success",
-        "message": "Form test successful",
-        "prompt": prompt,
-        "test_param": test_param,
-        "timestamp": time.time(),
-    }
-
-
 @router.get("/")
 def read_root():
     """Root endpoint for testing"""
@@ -188,28 +116,6 @@ def read_root():
         "server_port": os.environ.get("FP4_API_PORT", "8000"),
         "timestamp": time.time(),
     }
-
-
-@router.get("/static-image")
-def get_static_image():
-    """Serve static images"""
-    import os
-    from pathlib import Path
-
-    # Use absolute path to avoid working directory issues
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    image_path = Path(base_dir) / STATIC_IMAGES_DIR / "sample.jpg"
-
-    logger.info(
-        f"Static image request - base_dir: {base_dir}, image_path: {image_path}"
-    )
-
-    if not image_path.exists():
-        logger.error(f"Static image not found: {image_path}")
-        raise HTTPException(status_code=404, detail="Static image not found")
-
-    return FileResponse(image_path)
-
 
 @router.get("/download/{filename}")
 def download_image(filename: str):
@@ -1116,22 +1022,6 @@ def get_model_status():
 
     return status
 
-
-@router.get("/gpu-info")
-def get_gpu_info():
-    """Get detailed GPU information"""
-    return model_manager.gpu_manager.get_device_info()
-
-
-@router.get("/loras")
-def list_loras():
-    """List all available LoRA files - only Hugging Face LoRAs supported"""
-    return {
-        "available_loras": [],
-        "note": "Only Hugging Face LoRAs are supported. Use /apply-lora with a Hugging Face repository ID.",
-    }
-
-
 @router.post("/apply-lora")
 async def apply_lora(lora_name: str, weight: float = 1.0):
     """Apply a LoRA to the current model - lora_name should be a Hugging Face repo ID (e.g., aleksa-codes/flux-ghibsky-illustration)"""
@@ -1183,15 +1073,6 @@ async def remove_lora():
     except Exception as e:
         logger.error(f"Exception during LoRA removal: {e} (Type: {type(e).__name__})")
         raise HTTPException(status_code=500, detail=f"LoRA removal failed: {str(e)}")
-
-
-@router.get("/lora-status")
-def get_lora_status():
-    """Get the current LoRA status"""
-    return {
-        "current_lora": model_manager.get_lora_info(),
-        "note": "Only Hugging Face LoRAs are supported. Use /apply-lora to apply a LoRA.",
-    }
 
 
 # Queue management endpoints
@@ -1467,7 +1348,6 @@ def generate_image_internal(
 @router.post("/upload-lora")
 async def upload_lora_file(file: UploadFile = File(...)):
     """Upload a LoRA file to the server"""
-    import os
     import shutil
     from pathlib import Path
 
@@ -1553,247 +1433,3 @@ async def upload_image(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Error uploading image: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
-
-
-@router.post("/upload-image-generate")
-async def upload_image_and_generate(
-    file: UploadFile = File(None),
-    prompt: str = Form(...),
-    loras: Optional[str] = Form(None),
-    lora_name: Optional[str] = Form(None),
-    lora_weight: Optional[float] = Form(None),
-    width: int = Form(512),
-    height: int = Form(512),
-    seed: Optional[int] = Form(None),
-    upscale: Optional[str] = Form("false"),
-    upscale_factor: int = Form(2),
-    image_strength: float = Form(0.8),
-    image_guidance_scale: float = Form(1.5),
-    uploaded_image_path: Optional[str] = Form(None),
-):
-    """Generate image using uploaded image (file or previously uploaded path) and prompt with optional LoRA support"""
-    try:
-        from utils.image_utils import (cleanup_uploaded_image,
-                                       load_and_preprocess_image,
-                                       save_uploaded_image,
-                                       validate_uploaded_image)
-
-        temp_file_to_cleanup = None
-
-        # Resolve input image source: either a freshly uploaded file or a server-side uploaded path
-        if uploaded_image_path:
-            # Use existing uploaded image on server (no validation possible here beyond path safety)
-            input_image_path = uploaded_image_path
-        else:
-            if file is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Either file or uploaded_image_path must be provided",
-                )
-            # Validate and persist temporarily
-            validate_uploaded_image(file)
-            input_image_path = save_uploaded_image(file)
-            temp_file_to_cleanup = input_image_path
-
-        try:
-            # Load and preprocess the uploaded image
-            input_image = load_and_preprocess_image(input_image_path, (width, height))
-
-            # Parse LoRA configuration
-            loras_to_apply = []
-            remove_all_loras = False
-
-            if loras:
-                import json
-
-                try:
-                    lora_configs = json.loads(loras)
-                    for lora_config in lora_configs:
-                        if (
-                            not lora_config.get("name")
-                            or not lora_config["name"].strip()
-                        ):
-                            raise HTTPException(
-                                status_code=400, detail="LoRA name cannot be empty"
-                            )
-                        if (
-                            lora_config.get("weight", 1.0) < 0
-                            or lora_config.get("weight", 1.0) > 2.0
-                        ):
-                            raise HTTPException(
-                                status_code=400,
-                                detail="LoRA weight must be between 0 and 2.0",
-                            )
-                        loras_to_apply.append(
-                            {
-                                "name": lora_config["name"].strip(),
-                                "weight": lora_config["weight"],
-                            }
-                        )
-                except json.JSONDecodeError:
-                    raise HTTPException(
-                        status_code=400, detail="Invalid LoRA configuration format"
-                    )
-            elif lora_name:
-                if not lora_name.strip():
-                    raise HTTPException(
-                        status_code=400, detail="LoRA name cannot be empty if provided"
-                    )
-                if lora_weight is None or lora_weight < 0 or lora_weight > 2.0:
-                    raise HTTPException(
-                        status_code=400, detail="LoRA weight must be between 0 and 2.0"
-                    )
-                loras_to_apply.append(
-                    {"name": lora_name.strip(), "weight": lora_weight}
-                )
-
-            # Apply default LoRA if none specified
-            if not loras_to_apply and not remove_all_loras:
-                loras_to_apply = [
-                    {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
-                ]
-
-            # Validate dimensions
-            if width < 256 or width > 1024 or height < 256 or height > 1024:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Width and height must be between 256 and 1024",
-                )
-
-            # Validate upscale factor
-            if upscale and upscale_factor not in [2, 4]:
-                raise HTTPException(
-                    status_code=400, detail="Upscale factor must be 2 or 4"
-                )
-
-            # Validate image strength and guidance
-            if image_strength < 0.0 or image_strength > 1.0:
-                raise HTTPException(
-                    status_code=400, detail="Image strength must be between 0.0 and 1.0"
-                )
-            if image_guidance_scale < 1.0 or image_guidance_scale > 20.0:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Image guidance scale must be between 1.0 and 20.0",
-                )
-
-            # Clean up input
-            prompt = prompt.strip()
-            if not prompt:
-                raise HTTPException(status_code=400, detail="Prompt cannot be empty")
-
-            # Ensure model is loaded
-            with _model_manager_lock:
-                if not model_manager.is_loaded():
-                    logger.info("Model not loaded, loading it first...")
-                    model_manager.load_model()
-
-                if not model_manager.is_loaded():
-                    raise HTTPException(status_code=500, detail="Failed to load model")
-
-            # Apply LoRAs if specified
-            if loras_to_apply:
-                for lora_config in loras_to_apply:
-                    model_manager.apply_lora(lora_config["name"], lora_config["weight"])
-            elif remove_all_loras:
-                if model_manager.get_lora_info():
-                    logger.info(
-                        "Removing all LoRAs as requested by client (empty list)"
-                    )
-                    model_manager.remove_lora()
-
-            # Generate image using the model (placeholder: regular generate with prompt)
-            logger.info(
-                f"Starting image generation with uploaded image and prompt: {prompt}"
-            )
-
-            pipeline = model_manager.get_pipeline()
-            if not pipeline:
-                raise HTTPException(
-                    status_code=500, detail="Model pipeline not available"
-                )
-
-            if seed is not None:
-                import torch
-
-                torch.manual_seed(seed)
-
-            generation_start_time = time.time()
-
-            # Use image-to-image generation with the uploaded image
-            result = model_manager.generate_image_with_image(
-                prompt=prompt,
-                image=input_image,  # Use the loaded input image
-                num_inference_steps=10,
-                guidance_scale=image_guidance_scale,
-                seed=seed,
-            )
-
-            generation_time = time.time() - generation_start_time
-
-            generated_image = extract_image_from_result(result)
-
-            image_filename = save_image_with_unique_name(generated_image)
-
-            if upscale and upscale.lower() in ["true", "1", "yes", "on"]:
-                try:
-                    from models.upscaler import apply_upscaling
-
-                    image_filename, upscaled_image_path, final_width, final_height = (
-                        apply_upscaling(
-                            generated_image,
-                            upscale,
-                            upscale_factor,
-                            save_image_with_unique_name,
-                        )
-                    )
-                    logger.info(
-                        f"Image upscaled by {upscale_factor}x: {image_filename}"
-                    )
-                except Exception as upscale_error:
-                    logger.warning(f"Upscaling failed: {upscale_error}")
-                    image_filename = save_image_with_unique_name(generated_image)
-
-            # Create download URL
-            import os
-
-            filename = os.path.basename(image_filename)
-            download_url = f"/download/{filename}"
-
-            # Convert image to base64 for direct response
-            try:
-                from utils.image_utils import image_to_base64
-
-                image_base64 = image_to_base64(generated_image, "PNG")
-            except Exception as base64_error:
-                logger.warning(f"Failed to convert image to base64: {base64_error}")
-                image_base64 = None
-
-            return {
-                "message": f"Generated image from uploaded image and prompt: {prompt}",
-                "image_url": image_filename,
-                "download_url": download_url,
-                "filename": filename,
-                "image_base64": image_base64,  # Base64 encoded image data
-                "generation_time": f"{generation_time:.2f}s",
-                "width": width,
-                "height": height,
-                "seed": seed,
-                "image_strength": image_strength,
-                "image_guidance_scale": image_guidance_scale,
-                "upscaled": upscale and upscale.lower() in ["true", "1", "yes", "on"],
-                "upscale_factor": upscale_factor if upscale else None,
-            }
-
-        finally:
-            # Only cleanup if we created a temp file in this request
-            if temp_file_to_cleanup:
-                cleanup_uploaded_image(temp_file_to_cleanup)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in upload-image-generate: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Image generation failed: {str(e)}"
-        )

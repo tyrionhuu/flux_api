@@ -144,15 +144,6 @@ export FP4_PORT=8000
 ./start_fp4_api.sh --port 8000
 ```
 
-### GPU Configuration
-
-The service automatically detects and uses available GPUs:
-
-```bash
-# Check GPU status
-python -c "from utils.gpu_manager import GPUManager; gm = GPUManager(); print(gm.get_gpu_info())"
-```
-
 ## File Structure
 
 ```
