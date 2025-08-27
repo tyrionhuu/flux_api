@@ -193,7 +193,7 @@ tail -f logs/flux_api.log
 ### Adding New Features
 
 1. **Frontend**: Modify `frontend/static/js/app.js`
-2. **API**: Add routes in `api/fp4_routes.py`
+2. **API**: Add routes in `api/routes.py`
 3. **Models**: Extend `models/fp4_flux_model.py`
 
 ### Testing
