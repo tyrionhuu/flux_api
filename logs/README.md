@@ -62,8 +62,8 @@ The system uses the following log levels:
 ## Configuration
 
 Log levels can be configured in the main API files:
-- `main_fp4.py` - FP4 API logging
-- `main_fp4.py` - FP4 API logging
+- `main.py` - FP4 API logging
+- `main.py` - FP4 API logging
 - `config/cleanup_settings.py` - Cleanup service logging
 
 ## Monitoring

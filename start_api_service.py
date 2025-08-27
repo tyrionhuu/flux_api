@@ -226,7 +226,7 @@ def start_service():
             print("⚠️  CUDA_VISIBLE_DEVICES not set; default visible GPU will be used")
 
         process = subprocess.Popen(
-            [python_exec, "main_fp4.py"],
+            [python_exec, "main.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -268,8 +268,8 @@ def main():
     print("=" * 30)
 
     # Check if we're in the right directory
-    if not Path("main_fp4.py").exists():
-        print("❌ main_fp4.py not found in current directory!")
+    if not Path("main.py").exists():
+        print("❌ main.py not found in current directory!")
         print("   Please run this script from the flux_api directory.")
         sys.exit(1)
 
