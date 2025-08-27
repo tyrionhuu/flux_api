@@ -711,7 +711,6 @@ def generate_image_internal(
 @router.post("/upload-lora")
 async def upload_lora_file(file: UploadFile = File(...)):
     """Upload a LoRA file to the server"""
-    import os
     import shutil
     from pathlib import Path
 
