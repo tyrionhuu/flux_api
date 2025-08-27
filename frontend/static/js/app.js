@@ -489,8 +489,7 @@ class FluxAPI {
         }
         const imageParams = this.getImageUploadParams();
         if (imageParams) {
-            formData.append('image_strength', imageParams.image_strength);
-            formData.append('image_guidance_scale', imageParams.image_guidance_scale);
+            // image_strength and image_guidance removed
         }
         
         return fetch(`${this.hostBase}/upload-image-generate`, { method: 'POST', body: formData });
@@ -797,16 +796,14 @@ class FluxAPI {
         const uploadPlaceholder = document.getElementById('upload-placeholder');
         const imagePreview = document.getElementById('uploaded-image-preview');
         const uploadControls = document.getElementById('upload-controls');
-        const uploadParams = document.getElementById('image-upload-params');
         
         if (uploadPlaceholder) uploadPlaceholder.classList.add('hidden');
         if (imagePreview) {
             imagePreview.src = imageDataUrl;
             imagePreview.classList.remove('hidden');
         }
-        // Show only remove button and parameters since upload is automatic
+        // Show only remove button since upload is automatic
         if (uploadControls) uploadControls.style.display = 'block';
-        if (uploadParams) uploadParams.style.display = 'block';
         
         // Update upload area text
         if (uploadArea) {
@@ -819,7 +816,6 @@ class FluxAPI {
         const uploadPlaceholder = document.getElementById('upload-placeholder');
         const imagePreview = document.getElementById('uploaded-image-preview');
         const uploadControls = document.getElementById('upload-controls');
-        const uploadParams = document.getElementById('image-upload-params');
         const fileInput = document.getElementById('image-upload');
         
         // Clear file input
@@ -829,9 +825,7 @@ class FluxAPI {
         if (uploadPlaceholder) uploadPlaceholder.classList.remove('hidden');
         if (imagePreview) imagePreview.classList.add('hidden');
         if (uploadControls) uploadControls.style.display = 'none';
-        if (uploadParams) uploadParams.style.display = 'none';
         
-        // Clear stored file
         this.uploadedImageFile = null;
         
         // Reset upload area
@@ -867,8 +861,7 @@ class FluxAPI {
         if (!this.hasUploadedImage()) return null;
         
         return {
-            image_strength: parseFloat(document.getElementById('image-strength').value),
-            image_guidance_scale: parseFloat(document.getElementById('image-guidance').value)
+            // image_strength and image_guidance removed
         };
     }
 
@@ -1011,8 +1004,7 @@ class FluxAPI {
             // Add image strength and guidance if available
             const imageStrength = document.getElementById('image-strength');
             const imageGuidance = document.getElementById('image-guidance');
-            if (imageStrength) command += ` -F "image_strength=${imageStrength.value}"`;
-            if (imageGuidance) command += ` -F "image_guidance=${imageGuidance.value}"`;
+            // image_strength and image_guidance removed from curl
             
             if (seed) {
                 command += ` -F "seed=${seed}"`;
