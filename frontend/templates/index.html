@@ -59,19 +59,6 @@
                         
                         <!-- Hidden file input for LoRA upload -->
                         <input type="file" id="lora-file-input" accept=".safetensors,.bin,.pt,.pth" style="display: none;">
-                        
-                        <!-- API Command Display -->
-                        <div id="api-command-section" class="api-command-section">
-                            <div class="api-command-header">
-                                <h4><i class="fas fa-terminal"></i> API Command</h4>
-                                <button id="copy-command" class="btn btn-secondary copy-btn">
-                                    <i class="fas fa-copy"></i> Copy
-                                </button>
-                            </div>
-                            <div class="api-command-container">
-                                <code id="api-command" class="api-command"></code>
-                            </div>
-                        </div>
                     </div>
                     
                     <div class="parameter-group">
@@ -178,6 +165,16 @@
                             </div>
                         </div>
 
+                    </div>
+
+                    <!-- API Command Display -->
+                    <div id="api-command-section" class="api-command-section">
+                        <div class="api-command-header">
+                            <h4><i class="fas fa-terminal"></i> API Command</h4>
+                        </div>
+                        <div class="api-command-container">
+                            <code id="api-command" class="api-command"></code>
+                        </div>
                     </div>
 
                     <!-- Generation Buttons -->

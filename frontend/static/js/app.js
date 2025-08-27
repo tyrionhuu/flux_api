@@ -21,18 +21,26 @@ class FluxAPI {
 
     setupEventListeners() {
         // Generate buttons
-        document.getElementById('generate-btn').addEventListener('click', () => this.generateImage());
-        document.getElementById('generate-with-image-btn').addEventListener('click', () => this.generateImageWithImage());
+        const generateBtn = document.getElementById('generate-btn');
+        const generateWithImageBtn = document.getElementById('generate-with-image-btn');
+        
+        if (generateBtn) generateBtn.addEventListener('click', () => this.generateImage());
+        if (generateWithImageBtn) generateWithImageBtn.addEventListener('click', () => this.generateImageWithImage());
 
         // Random seed button
-        document.getElementById('random-seed').addEventListener('click', () => this.randomSeed());
+        const randomSeedBtn = document.getElementById('random-seed');
+        if (randomSeedBtn) randomSeedBtn.addEventListener('click', () => this.randomSeed());
         
         // LoRA controls
-        document.getElementById('add-lora').addEventListener('click', () => this.addLoraEntry());
+        const addLoraBtnMain = document.getElementById('add-lora');
+        if (addLoraBtnMain) addLoraBtnMain.addEventListener('click', () => this.addLoraEntry());
         
         // LoRA file upload
-        document.getElementById('upload-lora').addEventListener('click', () => this.triggerFileUpload());
-        document.getElementById('lora-file-input').addEventListener('change', (e) => this.handleFileUpload(e));
+        const uploadLoraBtn = document.getElementById('upload-lora');
+        const loraFileInput = document.getElementById('lora-file-input');
+        
+        if (uploadLoraBtn) uploadLoraBtn.addEventListener('click', () => this.triggerFileUpload());
+        if (loraFileInput) loraFileInput.addEventListener('change', (e) => this.handleFileUpload(e));
         
         // Apply LoRA button
         const applyLoraBtn = document.getElementById('apply-lora-btn');
@@ -48,21 +56,23 @@ class FluxAPI {
 
         // Drag-and-drop reordering for LoRA list
         const loraList = document.getElementById('lora-list');
-        loraList.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const afterElement = this.getDragAfterElement(loraList, e.clientY);
-            const dragging = document.querySelector('.lora-entry.dragging');
-            if (!dragging) return;
-            if (afterElement == null) {
-                loraList.appendChild(dragging);
-            } else {
-                loraList.insertBefore(dragging, afterElement);
-            }
-        });
-        loraList.addEventListener('drop', () => {
-            // Re-sync internal order with DOM order
-            this.loraEntries = Array.from(loraList.children);
-        });
+        if (loraList) {
+            loraList.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const afterElement = this.getDragAfterElement(loraList, e.clientY);
+                const dragging = document.querySelector('.lora-entry.dragging');
+                if (!dragging) return;
+                if (afterElement == null) {
+                    loraList.appendChild(dragging);
+                } else {
+                    loraList.insertBefore(dragging, afterElement);
+                }
+            });
+            loraList.addEventListener('drop', () => {
+                // Re-sync internal order with DOM order
+                this.loraEntries = Array.from(loraList.children);
+            });
+        }
 
         // Clear history (optional element)
         const clearHistoryBtn = document.getElementById('clear-history');
@@ -131,16 +141,21 @@ class FluxAPI {
         }
         
         // Modal controls
-        document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
-        document.getElementById('download-image').addEventListener('click', () => this.downloadCurrentImage());
-        document.getElementById('copy-command').addEventListener('click', () => this.copyApiCommand());
+        const closeModalBtn = document.getElementById('close-modal');
+        const downloadImageBtn = document.getElementById('download-image');
+        
+        if (closeModalBtn) closeModalBtn.addEventListener('click', () => this.closeModal());
+        if (downloadImageBtn) downloadImageBtn.addEventListener('click', () => this.downloadCurrentImage());
 
         // Close modal on backdrop click
-        document.getElementById('image-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'image-modal') {
-                this.closeModal();
-            }
-        });
+        const imageModal = document.getElementById('image-modal');
+        if (imageModal) {
+            imageModal.addEventListener('click', (e) => {
+                if (e.target.id === 'image-modal') {
+                    this.closeModal();
+                }
+            });
+        }
         
 
 
@@ -167,6 +182,39 @@ class FluxAPI {
         if (widthSelect) widthSelect.addEventListener('change', () => this.updateApiCommand());
         if (heightSelect) heightSelect.addEventListener('change', () => this.updateApiCommand());
         if (seedInput) seedInput.addEventListener('input', () => this.updateApiCommand());
+        
+        // Also update API command when image upload changes
+        const imageUpload = document.getElementById('image-upload');
+        if (imageUpload) {
+            imageUpload.addEventListener('change', () => {
+                // Wait a bit for the image preview to update, then update API command
+                setTimeout(() => this.updateApiCommand(), 100);
+            });
+        }
+        
+        // Update API command when image is removed
+        const removeImageBtn = document.getElementById('remove-image');
+        if (removeImageBtn) {
+            removeImageBtn.addEventListener('click', () => {
+                // Wait a bit for the image preview to update, then update API command
+                setTimeout(() => this.updateApiCommand(), 100);
+            });
+        }
+        
+        // Update API command when image strength/guidance changes
+        const imageStrength = document.getElementById('image-strength');
+        const imageGuidance = document.getElementById('image-guidance');
+        if (imageStrength) imageStrength.addEventListener('input', () => this.updateApiCommand());
+        if (imageGuidance) imageGuidance.addEventListener('input', () => this.updateApiCommand());
+        
+        // Update API command when LoRAs change (add/remove/modify)
+        const addLoraBtn = document.getElementById('add-lora');
+        if (addLoraBtn) {
+            addLoraBtn.addEventListener('click', () => {
+                // Wait a bit for the LoRA to be added, then update API command
+                setTimeout(() => this.updateApiCommand(), 100);
+            });
+        }
         
         // Initial API command display
         this.updateApiCommand();
@@ -882,35 +930,57 @@ class FluxAPI {
         const height = document.getElementById('height').value;
         const seed = document.getElementById('seed').value;
         
-        // Build the one-liner download command
-        let command = `curl -s -X POST "${window.location.origin}/generate" -H "Content-Type: application/json" -d '{"prompt": "${prompt}", "width": ${width}, "height": ${height}`;
+        // Check if there's an uploaded image
+        const uploadedImage = document.getElementById('uploaded-image-preview');
+        const hasImage = uploadedImage && !uploadedImage.classList.contains('hidden');
         
-        if (seed) {
-            command += `, "seed": ${seed}`;
+        let command;
+        
+        if (hasImage) {
+            // Build command for generate-with-image endpoint
+            command = `curl -s -X POST "${window.location.origin}/generate-with-image" -F "image=@your_image.jpg" -F "prompt="${prompt}" -F "width=${width}" -F "height=${height}"`;
+            
+            // Add image strength and guidance if available
+            const imageStrength = document.getElementById('image-strength');
+            const imageGuidance = document.getElementById('image-guidance');
+            if (imageStrength) command += ` -F "image_strength=${imageStrength.value}"`;
+            if (imageGuidance) command += ` -F "image_guidance=${imageGuidance.value}"`;
+            
+            if (seed) {
+                command += ` -F "seed=${seed}"`;
+            }
+            
+            if (loras && loras.length > 0) {
+                loras.forEach((lora, index) => {
+                    command += ` -F "loras[${index}][name]=${lora.name}" -F "loras[${index}][weight]=${lora.weight}"`;
+                });
+            }
+            
+            command += ` | jq -r '.download_url' | xargs -I {} curl -o "generated_image.png" "${window.location.origin}{}"`;
+        } else {
+            // Build command for regular generate endpoint
+            command = `curl -s -X POST "${window.location.origin}/generate" -H "Content-Type: application/json" -d '{"prompt": "${prompt}", "width": ${width}, "height": ${height}`;
+            
+            if (seed) {
+                command += `, "seed": ${seed}`;
+            }
+            
+            if (loras && loras.length > 0) {
+                command += `, "loras": [`;
+                loras.forEach((lora, index) => {
+                    command += `{"name": "${lora.name}", "weight": ${lora.weight}}`;
+                    if (index < loras.length - 1) command += `, `;
+                });
+                command += `]`;
+            }
+            
+            command += `}' | jq -r '.download_url' | xargs -I {} curl -o "generated_image.png" "${window.location.origin}{}"`;
         }
-        
-        if (loras && loras.length > 0) {
-            command += `, "loras": [`;
-            loras.forEach((lora, index) => {
-                command += `{"name": "${lora.name}", "weight": ${lora.weight}`;
-                if (index < loras.length - 1) command += `, `;
-            });
-            command += `]`;
-        }
-        
-        command += `}' | jq -r '.download_url' | xargs -I {} curl -o "generated_image.png" "${window.location.origin}{}"`;
         
         commandElement.textContent = command;
     }
 
-    copyApiCommand() {
-        const commandElement = document.getElementById('api-command');
-        navigator.clipboard.writeText(commandElement.textContent).then(() => {
-            this.showSuccess('API command copied to clipboard!');
-        }).catch(() => {
-            this.showError('Failed to copy API command');
-        });
-    }
+
 
     async downloadCurrentImage() {
         if (!this.currentModalData) return;
