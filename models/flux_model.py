@@ -197,8 +197,8 @@ class FluxModelManager:
                     _ = self.pipe(
                         image=dummy_image,
                         prompt="warmup prompt",
-                        num_inference_steps=5,
-                        guidance_scale=1.0,
+                        num_inference_steps=10,
+                        guidance_scale=0,
                     )
 
                     # Clear CUDA cache between warm-up iterations
@@ -300,8 +300,8 @@ class FluxModelManager:
     def generate_image(
         self,
         prompt: str,
-        num_inference_steps: int = 25,
-        guidance_scale: float = 3.5,
+        num_inference_steps: int = 10,
+        guidance_scale: float = 0,
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,
@@ -413,8 +413,8 @@ class FluxModelManager:
         self,
         prompt: str,
         image: Union[str, Image.Image],
-        num_inference_steps: int = 25,
-        guidance_scale: float = 2.5,
+        num_inference_steps: int = 10,
+        guidance_scale: float = 0,
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,

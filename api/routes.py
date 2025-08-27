@@ -479,7 +479,7 @@ async def generate_with_image_and_return(
     prompt: str = Form(...),
     image: UploadFile = File(...),
     num_inference_steps: Optional[int] = Form(10),
-    guidance_scale: Optional[float] = Form(4.0),
+    guidance_scale: Optional[float] = Form(0),
     width: Optional[int] = Form(512),
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
@@ -564,7 +564,7 @@ async def generate_with_image_and_return(
                 prompt=enhanced_prompt,
                 image=img,
                 num_inference_steps=num_inference_steps or 10,
-                guidance_scale=guidance_scale or 4.0,
+                guidance_scale=guidance_scale or 0,
                 width=width or 512,
                 height=height or 512,
                 seed=seed,
@@ -646,7 +646,7 @@ async def generate_with_image(
     prompt: str = Form(...),
     image: UploadFile = File(...),
     num_inference_steps: Optional[int] = Form(10),
-    guidance_scale: Optional[float] = Form(4.0),
+    guidance_scale: Optional[float] = Form(0),
     width: Optional[int] = Form(512),
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
@@ -672,18 +672,6 @@ async def generate_with_image(
         # Validate parameters
         if not prompt or not prompt.strip():
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
-
-        if num_inference_steps and (
-            num_inference_steps < 1 or num_inference_steps > 100
-        ):
-            raise HTTPException(
-                status_code=400, detail="num_inference_steps must be between 1 and 100"
-            )
-
-        if guidance_scale and (guidance_scale < 0.1 or guidance_scale > 20.0):
-            raise HTTPException(
-                status_code=400, detail="guidance_scale must be between 0.1 and 20.0"
-            )
 
         if width and (width < 256 or width > 1024):
             raise HTTPException(
@@ -745,7 +733,7 @@ async def generate_with_image(
                 prompt=enhanced_prompt,
                 image=img,
                 num_inference_steps=num_inference_steps or 10,
-                guidance_scale=guidance_scale or 4.0,
+                guidance_scale=guidance_scale or 0,
                 width=width or 512,
                 height=height or 512,
                 seed=seed,
@@ -961,7 +949,7 @@ async def submit_generation_request(request: GenerateRequest):
                 else None
             ),
             num_inference_steps=10,  # Fixed value
-            guidance_scale=4.0,  # Fixed value
+            guidance_scale=0,  # Fixed value
             width=request.width or 512,
             height=request.height or 512,
             seed=request.seed,
@@ -1114,7 +1102,7 @@ def generate_image_internal(
         result = model_manager.generate_image(
             enhanced_prompt,
             10,  # Fixed num_inference_steps
-            4.0,  # Fixed guidance_scale
+            0,  # Fixed guidance_scale
             width,
             height,
             seed,
