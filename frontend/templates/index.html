@@ -171,8 +171,14 @@
                     <div id="api-command-section" class="api-command-section">
                         <div class="api-command-header">
                             <h4><i class="fas fa-terminal"></i> API Command</h4>
+                            <button id="copy-api-command" class="btn btn-secondary btn-sm" title="Copy to clipboard">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
                         </div>
                         <div class="api-command-container">
+                            <div id="api-command-loading" class="api-command-loading" style="display: none;">
+                                <i class="fas fa-spinner fa-spin"></i> Updating API command...
+                            </div>
                             <code id="api-command" class="api-command"></code>
                         </div>
                     </div>

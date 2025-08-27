@@ -88,6 +88,8 @@ class FluxAPI {
                 if (upscaleFactorContainer) {
                     upscaleFactorContainer.style.display = e.target.checked ? 'block' : 'none';
                 }
+                // Update API command when upscaler changes
+                this.updateApiCommand();
             });
         }
         
@@ -157,8 +159,6 @@ class FluxAPI {
             });
         }
         
-
-
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey || e.metaKey) {
@@ -218,19 +218,38 @@ class FluxAPI {
         
         // Initial API command display
         this.updateApiCommand();
+        
+        // Copy API command button
+        const copyApiCommandBtn = document.getElementById('copy-api-command');
+        if (copyApiCommandBtn) {
+            console.log('Copy button found, adding event listener');
+            copyApiCommandBtn.addEventListener('click', (e) => {
+                console.log('Copy button clicked!');
+                e.preventDefault();
+                this.copyApiCommand();
+            });
+        } else {
+            console.error('Copy button not found!');
+        }
+        
+        // Test if API command element exists
+        setTimeout(() => {
+            const commandElement = document.getElementById('api-command');
+            if (commandElement) {
+                console.log('API command element found, content:', commandElement.textContent);
+            } else {
+                console.error('API command element not found');
+            }
+        }, 1000);
+
     }
-
-
-    
-
-
-
-
-
 
     randomSeed() {
         const seedInput = document.getElementById('seed');
         seedInput.value = Math.floor(Math.random() * 4294967295);
+        
+        // Update API command when seed changes
+        this.updateApiCommand();
     }
 
     addLoraEntry(name = '', weight = 1.0, isUploaded = false) {
@@ -269,6 +288,10 @@ class FluxAPI {
         const removeBtn = loraEntry.querySelector('.remove-lora');
         removeBtn.addEventListener('click', () => this.removeLoraEntry(loraEntry));
 
+        // Add event listeners for name and weight changes to update API command
+        nameInput.addEventListener('input', () => this.updateApiCommand());
+        weightInput.addEventListener('input', () => this.updateApiCommand());
+
         // Drag events
         loraEntry.addEventListener('dragstart', () => {
             loraEntry.classList.add('dragging');
@@ -277,6 +300,8 @@ class FluxAPI {
             loraEntry.classList.remove('dragging');
             // Re-sync array with DOM order
             this.loraEntries = Array.from(loraList.children);
+            // Update API command after reordering
+            this.updateApiCommand();
         });
         
         loraList.appendChild(loraEntry);
@@ -337,6 +362,9 @@ class FluxAPI {
         
         // Update Add LoRA button state after removal
         this.updateAddLoraButtonState();
+        
+        // Update API command after removal
+        this.updateApiCommand();
     }
 
     getLoraConfigs() {
@@ -609,6 +637,8 @@ class FluxAPI {
             this.removeUploadedImage();
             this.serverUploadedImagePath = null;
             if (uploadStatusLabel) uploadStatusLabel.style.display = 'none';
+            // Update API command when image is removed
+            this.updateApiCommand();
         });
         
 
@@ -635,6 +665,12 @@ class FluxAPI {
         
         // Setup slider event listeners
         this.setupImageUploadSliders();
+        
+        // Add event listener for upscale factor changes
+        const upscaleFactorSelect = document.getElementById('upscale-factor');
+        if (upscaleFactorSelect) {
+            upscaleFactorSelect.addEventListener('change', () => this.updateApiCommand());
+        }
     }
     
     setupImageUploadSliders() {
@@ -645,15 +681,19 @@ class FluxAPI {
         
         if (imageStrengthSlider && imageStrengthValue) {
             imageStrengthValue.textContent = imageStrengthSlider.value;
-            imageStrengthSlider.addEventListener('input', function() {
-                imageStrengthValue.textContent = this.value;
+            imageStrengthSlider.addEventListener('input', (e) => {
+                imageStrengthValue.textContent = e.target.value;
+                // Update API command when image strength changes
+                this.updateApiCommand();
             });
         }
         
         if (imageGuidanceSlider && imageGuidanceValue) {
             imageGuidanceValue.textContent = imageGuidanceSlider.value;
-            imageGuidanceSlider.addEventListener('input', function() {
-                imageGuidanceValue.textContent = this.value;
+            imageGuidanceSlider.addEventListener('input', (e) => {
+                imageGuidanceValue.textContent = e.target.value;
+                // Update API command when image guidance changes
+                this.updateApiCommand();
             });
         }
     }
@@ -689,6 +729,9 @@ class FluxAPI {
         
         // Auto-upload to server after selection
         this.autoUploadSelectedImage();
+        
+        // Update API command to show image generation command
+        this.updateApiCommand();
     }
     
     async autoUploadSelectedImage() {
@@ -735,6 +778,9 @@ class FluxAPI {
             this.serverUploadedImagePath = json.file_path;
             if (uploadStatusLabel) uploadStatusLabel.textContent = 'Uploaded';
             this.showSuccess('Image uploaded to server');
+            
+            // Update API command after successful upload
+            this.updateApiCommand();
         } catch (err) {
             console.error('Upload error:', err);
             if (uploadStatusLabel) uploadStatusLabel.textContent = 'Upload failed';
@@ -791,6 +837,9 @@ class FluxAPI {
         
         // Update button visibility
         this.updateButtonVisibility();
+        
+        // Update API command when image is removed
+        this.updateApiCommand();
     }
     
     hasUploadedImage() {
@@ -898,22 +947,27 @@ class FluxAPI {
         const seed = document.getElementById('seed').value;
         
         // Build the one-liner download command
-        let command = `curl -s -X POST "${window.location.origin}/generate" -H "Content-Type: application/json" -d '{"prompt": "${prompt}", "width": ${width}, "height": ${height}`;
+        // Build the JSON payload first, then escape it properly for shell
+        const jsonPayload = {
+            prompt: prompt,
+            width: parseInt(width),
+            height: parseInt(height)
+        };
         
         if (seed) {
-            command += `, "seed": ${seed}`;
+            jsonPayload.seed = parseInt(seed);
         }
         
         if (loras && loras.length > 0) {
-            command += `, "loras": [`;
-            loras.forEach((lora, index) => {
-                command += `{"name": "${lora.name}", "weight": ${lora.weight}}`;
-                if (index < loras.length - 1) command += `, `;
-            });
-            command += `]`;
+            jsonPayload.loras = loras.map(lora => ({
+                name: lora.name,
+                weight: parseFloat(lora.weight)
+            }));
         }
         
-        command += `}' | jq -r '.download_url' | xargs -I {} curl -o "generated_image.png" "${window.location.origin}{}"`;
+        // Escape the JSON string for shell
+        const escapedJson = JSON.stringify(jsonPayload).replace(/"/g, '\\"');
+        const command = `curl -s -X POST "${window.location.origin}/generate-and-return-image" -H "Content-Type: application/json" -d "${escapedJson}" -o "generated_image.png"`;
         
         commandElement.textContent = command;
         commandSection.classList.remove('hidden');
@@ -921,7 +975,14 @@ class FluxAPI {
 
     updateApiCommand() {
         const commandElement = document.getElementById('api-command');
+        const loadingElement = document.getElementById('api-command-loading');
         if (!commandElement) return;
+        
+        // Show loading state briefly
+        if (loadingElement) {
+            loadingElement.style.display = 'flex';
+            commandElement.style.display = 'none';
+        }
         
         // Get current LoRA configuration
         const loras = this.getLoraConfigs();
@@ -937,8 +998,10 @@ class FluxAPI {
         let command;
         
         if (hasImage) {
-            // Build command for generate-with-image endpoint
-            command = `curl -s -X POST "${window.location.origin}/generate-with-image" -F "image=@your_image.jpg" -F "prompt="${prompt}" -F "width=${width}" -F "height=${height}"`;
+            // Build command for generate-with-image-and-return endpoint
+            // Use actual filename if available, otherwise use a descriptive placeholder
+            const imageFileName = this.uploadedImageFile ? this.uploadedImageFile.name : 'your_image.jpg';
+            command = `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@${imageFileName}" -F "prompt=${this.escapeForShell(prompt)}" -F "width=${width}" -F "height=${height}"`;
             
             // Add image strength and guidance if available
             const imageStrength = document.getElementById('image-strength');
@@ -951,34 +1014,158 @@ class FluxAPI {
             }
             
             if (loras && loras.length > 0) {
-                loras.forEach((lora, index) => {
-                    command += ` -F "loras[${index}][name]=${lora.name}" -F "loras[${index}][weight]=${lora.weight}"`;
-                });
+                // Convert LoRAs to JSON string for form data
+                const lorasJson = JSON.stringify(loras.map(lora => ({
+                    name: lora.name,
+                    weight: parseFloat(lora.weight)
+                })));
+                command += ` -F "loras=${this.escapeForShell(lorasJson)}"`;
             }
             
-            command += ` | jq -r '.download_url' | xargs -I {} curl -o "generated_image.png" "${window.location.origin}{}"`;
+            // Direct output to file - no need for jq or second curl
+            command += ` -o "generated_image.png"`;
         } else {
-            // Build command for regular generate endpoint
-            command = `curl -s -X POST "${window.location.origin}/generate" -H "Content-Type: application/json" -d '{"prompt": "${prompt}", "width": ${width}, "height": ${height}`;
+            // Build command for generate-and-return-image-simple endpoint
+            // Build the JSON payload first, then escape it properly for shell
+            const jsonPayload = {
+                prompt: prompt,
+                width: parseInt(width),
+                height: parseInt(height)
+            };
             
             if (seed) {
-                command += `, "seed": ${seed}`;
+                jsonPayload.seed = parseInt(seed);
             }
             
             if (loras && loras.length > 0) {
-                command += `, "loras": [`;
-                loras.forEach((lora, index) => {
-                    command += `{"name": "${lora.name}", "weight": ${lora.weight}}`;
-                    if (index < loras.length - 1) command += `, `;
-                });
-                command += `]`;
+                jsonPayload.loras = loras.map(lora => ({
+                    name: lora.name,
+                    weight: parseFloat(lora.weight)
+                }));
             }
             
-            command += `}' | jq -r '.download_url' | xargs -I {} curl -o "generated_image.png" "${window.location.origin}{}"`;
+            // Escape the JSON string for shell
+            const escapedJson = JSON.stringify(jsonPayload).replace(/"/g, '\\"');
+            command = `curl -s -X POST "${window.location.origin}/generate-and-return-image" -H "Content-Type: application/json" -d "${escapedJson}" -o "generated_image.png"`;
         }
         
         commandElement.textContent = command;
+        
+        // Ensure the API command section is visible
+        const commandSection = document.getElementById('api-command-section');
+        if (commandSection) {
+            commandSection.classList.remove('hidden');
+        }
+        
+        // Hide loading state and show command after a brief delay
+        setTimeout(() => {
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            if (commandElement) {
+                commandElement.style.display = 'block';
+            }
+        }, 100);
     }
+    
+    escapeForShell(text) {
+        if (!text) return '';
+        // Escape special characters for shell form data
+        return text.replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\$/g, '\\$');
+    }
+    
+    copyApiCommand() {
+        console.log('Copy API command function called');
+        
+        const commandElement = document.getElementById('api-command');
+        if (!commandElement) {
+            console.error('API command element not found');
+            this.showError('API command element not found');
+            return;
+        }
+        
+        if (!commandElement.textContent || commandElement.textContent.trim() === '') {
+            console.error('No API command text to copy');
+            this.showError('No API command to copy');
+            return;
+        }
+        
+        const textToCopy = commandElement.textContent.trim();
+        console.log('Text to copy:', textToCopy);
+        
+        // Try modern clipboard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            console.log('Using modern clipboard API');
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => {
+                    console.log('Successfully copied to clipboard');
+                    this.showSuccess('API command copied to clipboard!');
+                })
+                .catch((err) => {
+                    console.error('Modern clipboard API failed:', err);
+                    // Fallback to execCommand
+                    this.fallbackCopyToClipboard(textToCopy);
+                });
+        } else {
+            console.log('Modern clipboard API not available, using fallback');
+            this.fallbackCopyToClipboard(textToCopy);
+        }
+    }
+    
+    fallbackCopyToClipboard(text) {
+        try {
+            console.log('Using fallback copy method');
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            if (successful) {
+                console.log('Fallback copy successful');
+                this.showSuccess('API command copied to clipboard!');
+            } else {
+                console.error('Fallback copy failed');
+                this.showError('Failed to copy API command (fallback method failed)');
+            }
+        } catch (err) {
+            console.error('Fallback copy error:', err);
+            this.showError('Failed to copy API command: ' + err.message);
+        }
+    }
+    
+    testCopyFunction() {
+        console.log('Testing copy function with simple text');
+        const testText = 'This is a test string for copying';
+        
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(testText)
+                .then(() => {
+                    console.log('Test copy successful');
+                    this.showSuccess('Test copy successful!');
+                })
+                .catch((err) => {
+                    console.error('Test copy failed:', err);
+                    this.showError('Test copy failed: ' + err.message);
+                });
+        } else {
+            this.showError('Clipboard API not available');
+        }
+    }
+    
+
+    
+    
+    
+
+    
+
 
 
 

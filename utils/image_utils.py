@@ -67,11 +67,19 @@ def save_image_with_unique_name(
     """Save image with a unique filename and return the filename"""
     import os
     import uuid
+    from pathlib import Path
 
-    os.makedirs(directory, exist_ok=True)
-    filename = f"{directory}/{uuid.uuid4()}.png"
+    # Use absolute path to avoid working directory issues
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    abs_directory = Path(base_dir) / directory
+    
+    os.makedirs(abs_directory, exist_ok=True)
+    unique_id = str(uuid.uuid4())
+    filename = f"{abs_directory}/{unique_id}.png"
     image.save(filename)
-    return filename
+    
+    # Return relative path for API compatibility
+    return f"{directory}/{unique_id}.png"
 
 
 def validate_uploaded_image(file: UploadFile) -> None:
@@ -96,8 +104,15 @@ def validate_uploaded_image(file: UploadFile) -> None:
 
 def save_uploaded_image(file: UploadFile, directory: str = "uploads/images") -> str:
     """Save uploaded image and return the file path"""
+    import os
+    from pathlib import Path
+    
+    # Use absolute path to avoid working directory issues
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    abs_directory = Path(base_dir) / directory
+    
     # Create directory if it doesn't exist
-    os.makedirs(directory, exist_ok=True)
+    os.makedirs(abs_directory, exist_ok=True)
 
     # Generate unique filename
     file_extension = os.path.splitext(file.filename or "")[1].lower()
@@ -105,7 +120,7 @@ def save_uploaded_image(file: UploadFile, directory: str = "uploads/images") -> 
         file_extension = ".png"
 
     unique_filename = f"{uuid.uuid4()}{file_extension}"
-    file_path = os.path.join(directory, unique_filename)
+    file_path = os.path.join(abs_directory, unique_filename)
 
     # Save the file
     try:

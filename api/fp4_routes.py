@@ -5,8 +5,9 @@ API routes for the FLUX API
 import logging
 import os
 import time
+import json
 from typing import Optional
-
+from pathlib import Path
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
@@ -52,6 +53,27 @@ queue_manager = QueueManager(max_concurrent=2, max_queue_size=100)
 def debug_version():
     """Debug endpoint to check code version"""
     import time
+    import os
+    from pathlib import Path
+
+    # Get current working directory and file paths
+    cwd = os.getcwd()
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = os.path.dirname(script_dir)
+    generated_images_dir = Path(base_dir) / "generated_images"
+    static_dir = Path(base_dir) / "static"
+    
+    # Check if directories exist
+    generated_exists = generated_images_dir.exists()
+    static_exists = static_dir.exists()
+    
+    # List files in generated_images if it exists
+    generated_files = []
+    if generated_exists:
+        try:
+            generated_files = [f.name for f in generated_images_dir.glob("*.png")]
+        except Exception as e:
+            generated_files = [f"Error listing files: {e}"]
 
     return {
         "status": "debug",
@@ -59,7 +81,72 @@ def debug_version():
         "code_version": "enhanced_v2",
         "timestamp": time.time(),
         "thread_safe_model_check": True,
+        "paths": {
+            "current_working_directory": cwd,
+            "script_directory": script_dir,
+            "base_directory": base_dir,
+            "generated_images_dir": str(generated_images_dir),
+            "static_dir": str(static_dir)
+        },
+        "directories": {
+            "generated_images_exists": generated_exists,
+            "static_exists": static_exists,
+            "generated_images_files": generated_files
+        }
     }
+
+
+@router.get("/test-file-ops")
+def test_file_operations():
+    """Test file operations to debug path issues"""
+    import os
+    from pathlib import Path
+    from PIL import Image
+    
+    try:
+        # Get base directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.dirname(script_dir)
+        generated_images_dir = Path(base_dir) / "generated_images"
+        
+        # Create a test image
+        test_image = Image.new('RGB', (100, 100), color='red')
+        
+        # Save test image
+        test_filename = f"test_{int(time.time())}.png"
+        test_path = generated_images_dir / test_filename
+        test_image.save(test_path)
+        
+        # Try to read it back
+        if test_path.exists():
+            # Clean up test file
+            test_path.unlink()
+            
+            return {
+                "status": "success",
+                "message": "File operations test passed",
+                "test_file_created": True,
+                "test_file_deleted": True,
+                "base_dir": str(base_dir),
+                "generated_images_dir": str(generated_images_dir),
+                "test_path": str(test_path)
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Test file was not created",
+                "base_dir": str(base_dir),
+                "generated_images_dir": str(generated_images_dir),
+                "test_path": str(test_path)
+            }
+            
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"File operations test failed: {str(e)}",
+            "error_type": type(e).__name__,
+            "base_dir": str(base_dir) if 'base_dir' in locals() else "unknown"
+        }
 
 
 @router.post("/test-form")
@@ -86,7 +173,9 @@ def read_root():
         "endpoints": [
             "/static-image",
             "/generate",
+            "/generate-and-return-image",
             "/generate-with-image",
+            "/generate-with-image-and-return",
             "/loras",
             "/apply-lora",
             "/remove-lora",
@@ -102,7 +191,19 @@ def read_root():
 @router.get("/static-image")
 def get_static_image():
     """Serve static images"""
-    image_path = f"{STATIC_IMAGES_DIR}/sample.jpg"
+    import os
+    from pathlib import Path
+    
+    # Use absolute path to avoid working directory issues
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    image_path = Path(base_dir) / STATIC_IMAGES_DIR / "sample.jpg"
+    
+    logger.info(f"Static image request - base_dir: {base_dir}, image_path: {image_path}")
+    
+    if not image_path.exists():
+        logger.error(f"Static image not found: {image_path}")
+        raise HTTPException(status_code=404, detail="Static image not found")
+    
     return FileResponse(image_path)
 
 
@@ -114,9 +215,25 @@ def download_image(filename: str):
 
     # Security: only allow files from generated_images directory
     safe_filename = os.path.basename(filename)  # Remove any path traversal
-    file_path = Path("generated_images") / safe_filename
+    
+    # Use absolute path to avoid working directory issues
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    file_path = Path(base_dir) / "generated_images" / safe_filename
+    
+    logger.info(f"Download request for filename: {filename}")
+    logger.info(f"Safe filename: {safe_filename}")
+    logger.info(f"Base directory: {base_dir}")
+    logger.info(f"Full file path: {file_path}")
+    logger.info(f"File exists: {file_path.exists()}")
 
     if not file_path.exists():
+        # Log the directory contents for debugging
+        generated_images_dir = Path(base_dir) / "generated_images"
+        if generated_images_dir.exists():
+            files = list(generated_images_dir.glob("*.png"))
+            logger.error(f"File not found. Available files in {generated_images_dir}: {[f.name for f in files]}")
+        else:
+            logger.error(f"Generated images directory does not exist: {generated_images_dir}")
         raise HTTPException(status_code=404, detail="Image not found")
 
     if not file_path.suffix.lower() in [
@@ -135,6 +252,237 @@ def download_image(filename: str):
         filename=safe_filename,
         headers={"Content-Disposition": f"attachment; filename={safe_filename}"},
     )
+
+
+@router.post("/generate-and-return-image")
+async def generate_and_return_image(request: GenerateRequest):
+    """Generate image and return it directly as binary data"""
+    try:
+        # Debug logging for incoming requests
+        logger.info(f"=== GENERATE ENDPOINT CALLED ===")
+        logger.info(f"Request received: {request}")
+        logger.info(f"Prompt: {request.prompt}")
+        logger.info(f"Dimensions: {request.width}x{request.height}")
+        logger.info(f"LoRAs: {request.loras}")
+        logger.info(f"Seed: {request.seed}")
+
+        # Validate request parameters
+        if not request.prompt or request.prompt.strip() == "":
+            raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+
+        # Handle multiple LoRA support
+        loras_to_apply = []
+        remove_all_loras = False
+
+        # Check for new multiple LoRA format first
+        if request.loras is not None:
+            if len(request.loras) == 0:
+                # Explicitly requested to use NO LoRA
+                remove_all_loras = True
+            else:
+                for lora_config in request.loras:
+                    if not lora_config.name or not lora_config.name.strip():
+                        raise HTTPException(
+                            status_code=400, detail="LoRA name cannot be empty"
+                        )
+                    if lora_config.weight < 0 or lora_config.weight > 2.0:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="LoRA weight must be between 0 and 2.0",
+                        )
+                    loras_to_apply.append(
+                        {"name": lora_config.name.strip(), "weight": lora_config.weight}
+                    )
+        # Legacy support for single LoRA
+        elif request.lora_name:
+            if not request.lora_name.strip():
+                raise HTTPException(
+                    status_code=400, detail="LoRA name cannot be empty if provided"
+                )
+            if (
+                request.lora_weight is None
+                or request.lora_weight < 0
+                or request.lora_weight > 2.0
+            ):
+                raise HTTPException(
+                    status_code=400, detail="LoRA weight must be between 0 and 2.0"
+                )
+            loras_to_apply.append(
+                {"name": request.lora_name.strip(), "weight": request.lora_weight}
+            )
+
+        # Apply default LoRA only when client did not send loras at all (None) and no legacy fields
+        if (
+            not loras_to_apply
+            and not remove_all_loras
+            and request.loras is None
+            and not request.lora_name
+        ):
+            loras_to_apply = [
+                {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
+            ]
+
+        # Clean up input
+        prompt = request.prompt.strip()
+
+        # First, ensure the model is loaded with thread safety and force check
+        with _model_manager_lock:
+            # Force a more thorough check - sometimes the state gets inconsistent
+            model_actually_loaded = (
+                model_manager.is_loaded()
+                and model_manager.get_pipeline() is not None
+                and hasattr(model_manager.get_pipeline(), "transformer")
+            )
+
+            if not model_actually_loaded:
+                logger.info(
+                    "Model not properly loaded or pipeline unavailable, loading it first..."
+                )
+                # Check again if another thread loaded it while we were waiting
+                if not (
+                    model_manager.is_loaded()
+                    and model_manager.get_pipeline() is not None
+                ):
+                    if not model_manager.load_model():
+                        raise HTTPException(
+                            status_code=500, detail="Failed to load FLUX model"
+                        )
+                    logger.info("Model loaded successfully")
+                else:
+                    logger.info("Model was loaded by another thread while waiting")
+
+        # Now check if LoRAs are already applied
+        current_lora = model_manager.get_lora_info()
+        lora_applied = None
+        lora_weight_applied = None
+
+        if loras_to_apply:
+            # Apply multiple LoRAs simultaneously
+            logger.info(f"Applying {len(loras_to_apply)} LoRAs to loaded model")
+            try:
+                # Validate all LoRA names first
+                for lora_config in loras_to_apply:
+                    if not lora_config["name"]:
+                        raise HTTPException(
+                            status_code=400, detail="LoRA name cannot be empty"
+                        )
+
+                    # Allow uploaded file paths (uploads/lora_files/...)
+                    if lora_config["name"].startswith("uploaded_lora_"):
+                        # This is an uploaded file, validate it exists
+                        import os
+
+                        upload_path = f"uploads/lora_files/{lora_config['name']}"
+                        if not os.path.exists(upload_path):
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Uploaded LoRA file not found: {lora_config['name']}",
+                            )
+                    elif "/" not in lora_config["name"]:
+                        # Must be a Hugging Face repository ID or local path
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name'), local path, or uploaded file path",
+                        )
+
+                # Apply all LoRAs at once using the new method
+                if not model_manager.apply_multiple_loras(loras_to_apply):
+                    logger.error(
+                        f"Multiple LoRA application failed - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is None}"
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to apply LoRAs. Please check if the LoRAs exist and are compatible.",
+                    )
+                else:
+                    logger.info(f"All {len(loras_to_apply)} LoRAs applied successfully")
+
+                # Get the updated LoRA info
+                current_lora = model_manager.get_lora_info()
+                if current_lora:
+                    lora_applied = current_lora.get("name")
+                    lora_weight_applied = current_lora.get("weight")
+                    logger.info(
+                        f"Multiple LoRAs applied successfully. Current LoRAs: {lora_applied} with total weight {lora_weight_applied}"
+                    )
+            except Exception as lora_error:
+                logger.error(
+                    f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})"
+                )
+                if "not found" in str(lora_error).lower() or "404" in str(lora_error):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"One or more LoRAs not found. Please check the repository IDs.",
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to apply LoRAs: {str(lora_error)}",
+                    )
+        elif remove_all_loras:
+            # Explicit removal requested
+            if model_manager.get_lora_info():
+                logger.info("Removing all LoRAs as requested by client (empty list)")
+                model_manager.remove_lora()
+                current_lora = None
+                lora_applied = None
+                lora_weight_applied = None
+        else:
+            # No-op
+            if current_lora:
+                lora_applied = current_lora.get("name")
+                lora_weight_applied = current_lora.get("weight")
+
+        result = generate_image_internal(
+            prompt,
+            "FLUX",
+            lora_applied,
+            lora_weight_applied,
+            request.width or 512,
+            request.height or 512,
+            request.seed,
+            request.upscale or False,
+            request.upscale_factor or 2,
+        )
+
+        # Extract the download URL from the result
+        download_url = result.get("download_url")
+        
+        if not download_url:
+            raise HTTPException(status_code=500, detail="No download URL received from generate endpoint")
+        
+        # Read the image file and return it directly
+        import os
+        from pathlib import Path
+        
+        # Get the file path from the download URL
+        filename = download_url.split("/")[-1]
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        file_path = Path(base_dir) / "generated_images" / filename
+        
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Generated image file not found")
+        
+        # Read the image file
+        with open(file_path, "rb") as f:
+            image_bytes = f.read()
+        
+        # Clean up the file after reading
+        try:
+            os.remove(file_path)
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to cleanup temporary image file: {cleanup_error}")
+        
+        # Return the image directly as binary data
+        from fastapi.responses import Response
+        return Response(
+            content=image_bytes,
+            media_type="image/png"
+        )
+
+    except Exception as e:
+        logger.error(f"Error in generate_and_return_image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/generate")
@@ -344,6 +692,185 @@ async def generate_image(request: GenerateRequest):
         raise HTTPException(
             status_code=500, detail=f"Request processing failed: {str(e)}"
         )
+
+
+@router.post("/generate-with-image-and-return")
+async def generate_with_image_and_return(
+    prompt: str = Form(...),
+    image: UploadFile = File(...),
+    num_inference_steps: Optional[int] = Form(25),
+    guidance_scale: Optional[float] = Form(2.5),
+    width: Optional[int] = Form(512),
+    height: Optional[int] = Form(512),
+    seed: Optional[int] = Form(None),
+    negative_prompt: Optional[str] = Form(None),
+    prompt_prefix: Optional[str] = Form(None),
+):
+    """Generate image from uploaded image and return it directly as binary data"""
+    try:
+        import io
+
+        from PIL import Image
+
+        # Debug logging for form parameters
+        logger.info(
+            f"Received generate-with-image request - prompt: {prompt}, num_inference_steps: {num_inference_steps}, guidance_scale: {guidance_scale}, width: {width}, height: {height}, seed: {seed}"
+        )
+        logger.info(
+            f"Image file: {image.filename}, content_type: {image.content_type}, size: {image.size}"
+        )
+
+        # Apply prompt prefix if provided, otherwise use the original prompt
+        if prompt_prefix:
+            enhanced_prompt = f"{prompt_prefix}, {prompt}"
+        else:
+            enhanced_prompt = prompt
+
+        # Validate parameters
+        if not prompt or not prompt.strip():
+            raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+
+        if num_inference_steps and (
+            num_inference_steps < 1 or num_inference_steps > 100
+        ):
+            raise HTTPException(
+                status_code=400, detail="num_inference_steps must be between 1 and 100"
+            )
+
+        if guidance_scale and (guidance_scale < 0.1 or guidance_scale > 20.0):
+            raise HTTPException(
+                status_code=400, detail="guidance_scale must be between 0.1 and 20.0"
+            )
+
+        if width and (width < 256 or width > 1024):
+            raise HTTPException(
+                status_code=400, detail="width must be between 256 and 1024"
+            )
+
+        if height and (height < 256 or height > 1024):
+            raise HTTPException(
+                status_code=400, detail="height must be between 256 and 1024"
+            )
+
+        # Load input image
+        if not image.filename:
+            raise HTTPException(status_code=400, detail="No image file provided")
+
+        # Validate image file type
+        if not image.content_type or not image.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="File must be an image")
+
+        # Check file size (max 10MB)
+        if image.size and image.size > 10 * 1024 * 1024:
+            raise HTTPException(
+                status_code=400, detail="Image file too large (max 10MB)"
+            )
+
+        # Check file extension
+        allowed_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
+        file_extension = os.path.splitext(image.filename)[1].lower()
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported image format. Allowed: {', '.join(allowed_extensions)}",
+            )
+
+        try:
+            raw = await image.read()
+            img = Image.open(io.BytesIO(raw)).convert("RGB")
+        except Exception as img_error:
+            logger.error(f"Failed to load image: {img_error}")
+            raise HTTPException(
+                status_code=400, detail=f"Failed to load image: {str(img_error)}"
+            )
+
+        # Ensure model is loaded
+        with _model_manager_lock:
+            if not model_manager.is_loaded():
+                logger.info("Model not loaded, loading it first...")
+                if not model_manager.load_model():
+                    raise HTTPException(status_code=500, detail="Failed to load model")
+
+        # Start timing
+        generation_start_time = time.time()
+
+        # Generate image using the new method
+        try:
+            logger.info(
+                f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}"
+            )
+            result = model_manager.generate_image_with_image(
+                prompt=enhanced_prompt,
+                image=img,
+                num_inference_steps=num_inference_steps or 25,
+                guidance_scale=guidance_scale or 2.5,
+                width=width or 512,
+                height=height or 512,
+                seed=seed,
+                negative_prompt=negative_prompt,
+            )
+            logger.info(
+                f"Model generation completed successfully, result type: {type(result)}"
+            )
+        except Exception as gen_error:
+            logger.error(f"Model generation failed: {gen_error}")
+            raise HTTPException(
+                status_code=500, detail=f"Image generation failed: {str(gen_error)}"
+            )
+
+        # Calculate generation time
+        generation_time = time.time() - generation_start_time
+
+        # Extract and save the generated image
+        try:
+            generated_image = extract_image_from_result(result)
+            if generated_image is None:
+                raise RuntimeError("Failed to extract image from generation result")
+            logger.info(
+                f"Successfully extracted generated image: {type(generated_image)}"
+            )
+        except Exception as extract_error:
+            logger.error(f"Failed to extract image from result: {extract_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to extract generated image: {str(extract_error)}",
+            )
+
+        try:
+            image_filename = save_image_with_unique_name(generated_image)
+            logger.info(f"Successfully saved image to: {image_filename}")
+        except Exception as save_error:
+            logger.error(f"Failed to save generated image: {save_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to save generated image: {str(save_error)}",
+            )
+
+        file_path = image_filename
+            
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Generated image file not found")
+        
+        # Read the image file
+        with open(file_path, "rb") as f:
+            image_bytes = f.read()
+        
+        # Clean up the file after reading
+        try:
+            os.remove(file_path)
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to cleanup temporary image file: {cleanup_error}")
+        
+        # Return the image directly as binary data
+        from fastapi.responses import Response
+        return Response(
+            content=image_bytes,
+            media_type="image/png"
+        )
+
+    except Exception as e:
+        logger.error(f"Error in generate_with_image_and_return: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/generate-with-image")
