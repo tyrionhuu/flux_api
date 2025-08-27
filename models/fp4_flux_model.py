@@ -3,19 +3,18 @@ FLUX model management for the FLUX API
 """
 
 import logging
-import torch
 import os
-import tempfile
 import shutil
-from typing import Optional, Any, Union
+import tempfile
+from typing import Any, Optional, Union
+
+import torch
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
-from safetensors.torch import load_file as safe_load_file, save_file as safe_save_file
-from config.fp4_settings import (
-    NUNCHAKU_MODEL_ID,
-    MODEL_TYPE_QUANTIZED_GPU,
-    DEFAULT_LORA_NAME,
-    DEFAULT_LORA_WEIGHT,
-)
+from safetensors.torch import load_file as safe_load_file
+from safetensors.torch import save_file as safe_save_file
+
+from config.fp4_settings import (DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT,
+                                 MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
 from utils.gpu_manager import GPUManager
 
 # Configure logging
@@ -833,7 +832,8 @@ class FluxModelManager:
                     temp_dir = tempfile.mkdtemp(prefix="hf_lora_")
 
                     # Use huggingface_hub to download the LoRA
-                    from huggingface_hub import hf_hub_download, list_repo_files
+                    from huggingface_hub import (hf_hub_download,
+                                                 list_repo_files)
 
                     logger.info(f"   - Downloading to temp dir: {temp_dir}")
 

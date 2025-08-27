@@ -5,18 +5,18 @@ API routes for the FLUX API
 import logging
 import time
 from typing import Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from models.fp4_flux_model import FluxModelManager
-from utils.image_utils import extract_image_from_result, save_image_with_unique_name
-from utils.system_utils import get_system_memory
-from utils.queue_manager import QueueManager
-from config.fp4_settings import (
-    STATIC_IMAGES_DIR,
-    DEFAULT_LORA_NAME,
-    DEFAULT_LORA_WEIGHT,
-)
+
 from api.models import GenerateRequest
+from config.fp4_settings import (DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT,
+                                 STATIC_IMAGES_DIR)
+from models.fp4_flux_model import FluxModelManager
+from utils.image_utils import (extract_image_from_result,
+                               save_image_with_unique_name)
+from utils.queue_manager import QueueManager
+from utils.system_utils import get_system_memory
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -64,12 +64,13 @@ def debug_version():
 @router.get("/")
 def read_root():
     """Serve the frontend HTML"""
-    from fastapi.responses import HTMLResponse
     import os
-    
+
+    from fastapi.responses import HTMLResponse
+
     html_path = "frontend/templates/index.html"
     if os.path.exists(html_path):
-        with open(html_path, 'r') as f:
+        with open(html_path, "r") as f:
             html_content = f.read()
         return HTMLResponse(content=html_content)
     else:

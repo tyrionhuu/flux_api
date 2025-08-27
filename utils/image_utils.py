@@ -2,8 +2,10 @@
 Image utilities for the FLUX API
 """
 
-from PIL import Image
 from typing import Any, Optional
+
+from PIL import Image
+
 from config.fp4_settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
 
 

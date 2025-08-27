@@ -4,20 +4,18 @@ Standalone script for manual directory cleanup.
 Run this script to manually clean up directories and maintain size limits.
 """
 
-import sys
-import os
 import argparse
 import logging
+import os
+import sys
 from pathlib import Path
 
 # Add the project root to Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
+from config.cleanup_settings import (GENERATED_IMAGES_SIZE_LIMIT_GB,
+                                     UPLOADS_SIZE_LIMIT_GB)
 from utils.directory_cleanup import DirectoryCleanup
-from config.cleanup_settings import (
-    GENERATED_IMAGES_SIZE_LIMIT_GB,
-    UPLOADS_SIZE_LIMIT_GB,
-)
 
 
 def setup_logging(verbose: bool = False):
