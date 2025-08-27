@@ -2,7 +2,6 @@
 Background cleanup service for automatic directory maintenance.
 """
 
-import asyncio
 import logging
 import threading
 import time
@@ -10,10 +9,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from config.cleanup_settings import (CLEANUP_ENABLED, CLEANUP_INTERVAL_SECONDS,
-                                     CLEANUP_ON_GENERATION, CLEANUP_ON_UPLOAD,
-                                     MIN_FILE_AGE_HOURS,
-                                     PRIORITY_FILE_EXTENSIONS)
+from config.cleanup_settings import (CLEANUP_INTERVAL_SECONDS,
+                                     CLEANUP_ON_GENERATION, CLEANUP_ON_UPLOAD)
 
 from .directory_cleanup import DirectoryCleanup
 

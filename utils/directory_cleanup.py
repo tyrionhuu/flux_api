@@ -4,8 +4,6 @@ Directory cleanup utility for maintaining size limits on generated images and up
 
 import logging
 import os
-import shutil
-import time
 from pathlib import Path
 from typing import List, Tuple
 
