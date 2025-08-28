@@ -13,7 +13,7 @@ from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 
-from config.fp4_settings import MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID
+from config.fp4_settings import (MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
 from utils.gpu_manager import GPUManager
 
 # Configure logging
@@ -103,7 +103,7 @@ class FluxModelManager:
 
                 # Load the Nunchaku transformer on the same device
                 transformer_result = NunchakuFluxTransformer2dModel.from_pretrained(
-                    f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-schnell.safetensors"
+                    f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-dev.safetensors"
                 )
 
                 # Handle the tuple return: (transformer, config_dict)
@@ -121,7 +121,7 @@ class FluxModelManager:
                     # Multi-GPU balanced mode
                     logger.info("Loading pipeline with balanced device map")
                     self.pipe = FluxPipeline.from_pretrained(
-                        "black-forest-labs/FLUX.1-schnell",
+                        "black-forest-labs/FLUX.1-dev",
                         transformer=transformer,
                         torch_dtype=torch.bfloat16,
                         device_map=device_map,
@@ -129,7 +129,7 @@ class FluxModelManager:
                 else:
                     # Single GPU mode
                     self.pipe = FluxPipeline.from_pretrained(
-                        "black-forest-labs/FLUX.1-schnell",
+                        "black-forest-labs/FLUX.1-dev",
                         transformer=transformer,
                         torch_dtype=torch.bfloat16,
                     ).to(device)
@@ -193,6 +193,10 @@ class FluxModelManager:
             logger.warning(
                 f"CUDA Graph warm-up failed: {e} - continuing without warm-up"
             )
+
+
+
+
 
     # Removed _integrate_quantized_weights - now using Nunchaku pipeline directly
 

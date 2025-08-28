@@ -12,7 +12,7 @@ import os
 from api.models import GenerateRequest
 from config.fp4_settings import (MAX_TRIGGER_WORD_LENGTH,
                                  STATIC_IMAGES_DIR)
-from models.fp4_flux_model import FluxModelManager
+from models.flux_model import FluxModelManager
 from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name)
 from utils.queue_manager import QueueManager

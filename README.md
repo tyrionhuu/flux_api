@@ -15,7 +15,7 @@ A high-performance AI image generation API service featuring the FLUX FP4 model 
 
 ### FP4 Model (Port 8000)
 - **Port**: 8000 (configurable)
-- **Model**: FLUX.1-schnell (quantized)
+- **Model**: FLUX.1-dev (quantized)
 - **Memory**: ~8GB VRAM
 - **Speed**: Fast inference with LoRA merging support
 
@@ -197,7 +197,7 @@ tail -f logs/flux_api.log
 
 1. **Frontend**: Modify `frontend/static/js/app.js`
 2. **API**: Add routes in `api/routes.py`
-3. **Models**: Extend `models/fp4_flux_model.py`
+3. **Models**: Extend `models/flux_model.py`
 
 ### Testing
 
@@ -206,7 +206,7 @@ tail -f logs/flux_api.log
 python -c "import requests; print(requests.get('http://localhost:8000/').json())"
 
 # Test model imports
-python -c "from models.fp4_flux_model import FluxModelManager; print('✅ FP4 model imports successfully')"
+python -c "from models.flux_model import FluxModelManager; print('✅ FP4 model imports successfully')"
 ```
 
 ## License
