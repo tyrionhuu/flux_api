@@ -68,6 +68,36 @@ The web interface now supports uploading local LoRA files:
 
 The FP4 model supports applying multiple LoRAs simultaneously by merging multiple LoRAs into a single LoRA (maximum 3 layers). Weight combinations are calculated automatically.
 
+### Trigger Word Support
+
+Each LoRA can now have its own custom trigger word that will be automatically prepended to your prompt when the LoRA is applied. This gives you fine-grained control over how each LoRA affects your image generation.
+
+**Features**:
+- **Custom trigger words**: Set a specific trigger word for each LoRA
+- **Automatic prompt enhancement**: Trigger words are automatically added to your prompt
+- **Length validation**: Trigger words are limited to 50 characters maximum
+- **Flexible usage**: Use trigger words only when needed
+
+**Example**:
+```json
+{
+  "loras": [
+    {
+      "name": "username/ghibli-style", 
+      "weight": 1.0, 
+      "trigger_word": "ghibli style"
+    },
+    {
+      "name": "username/anime-style", 
+      "weight": 0.8, 
+      "trigger_word": "anime"
+    }
+  ]
+}
+```
+
+With the above configuration, your prompt "A beautiful landscape" would automatically become "anime, ghibli style, A beautiful landscape" during generation.
+
 ## API Usage
 
 ### Generate Image
@@ -81,8 +111,8 @@ curl -X POST "http://localhost:8000/generate" \
     "height": 512,
     "seed": 42,
     "loras": [
-      {"name": "username/style-lora", "weight": 1.0},
-      {"name": "uploads/lora_files/uploaded_lora_123.safetensors", "weight": 0.8}
+      {"name": "username/style-lora", "weight": 1.0, "trigger_word": "artistic style"},
+      {"name": "uploads/lora_files/uploaded_lora_123.safetensors", "weight": 0.8, "trigger_word": "detailed"}
     ]
   }'
 ```

@@ -1149,7 +1149,7 @@ body {
 /* LoRA UI minimal look */
 .lora-entry {
     display: grid;
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: auto 1fr auto 1fr auto;
     gap: 0.5rem;
     align-items: center;
     padding: 0.5rem;
@@ -1187,6 +1187,15 @@ body {
     font-size: 0.85rem;
     text-align: center;
     flex-shrink: 0;
+}
+
+.lora-entry input.lora-trigger {
+    font-size: 0.85rem;
+    min-width: 0; /* Allow shrinking */
+    /* Ensure long trigger words wrap properly */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    text-overflow: ellipsis;
 }
 
 .lora-entry .remove-lora {

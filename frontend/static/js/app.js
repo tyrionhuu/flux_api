@@ -11,12 +11,6 @@ class FluxAPI {
 
     init() {
         this.setupEventListeners();
-        this.addLoraEntry('/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors', 1.0);
-        
-        // Ensure DOM is fully loaded before setting up sliders
-        setTimeout(() => {
-            this.setupSliders();
-        }, 500);
     }
 
     setupEventListeners() {
@@ -168,7 +162,7 @@ class FluxAPI {
         seedInput.value = Math.floor(Math.random() * 4294967295);
     }
 
-    addLoraEntry(name = '', weight = 1.0, isUploaded = false) {
+    addLoraEntry(name = '', weight = 1.0, triggerWord = '', isUploaded = false) {
         // Check maximum LoRA limit
         if (this.loraEntries.length >= 3) {
             console.warn('Maximum of 3 LoRAs allowed');
@@ -189,6 +183,7 @@ class FluxAPI {
             <span class="drag-handle" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
             <input type="text" placeholder="username/model-name or /path/to/lora.safetensors" class="lora-name" ${isUploaded ? 'readonly' : ''}>
             <input type="number" placeholder="1.0" min="0.0" max="2.0" step="0.1" value="1.0" class="lora-weight">
+            <input type="text" placeholder="trigger word (optional)" class="lora-trigger" maxlength="50" value="${triggerWord}">
             <button class="remove-lora" title="Remove LoRA">
                 <i class="fas fa-times"></i>
             </button>
@@ -197,8 +192,10 @@ class FluxAPI {
         // Set initial values if provided
         const nameInput = loraEntry.querySelector('.lora-name');
         const weightInput = loraEntry.querySelector('.lora-weight');
+        const triggerInput = loraEntry.querySelector('.lora-trigger');
         if (name) nameInput.value = name;
         if (typeof weight === 'number') weightInput.value = String(weight);
+        if (triggerWord) triggerInput.value = triggerWord;
         
         // Remove functionality
         const removeBtn = loraEntry.querySelector('.remove-lora');
@@ -279,12 +276,15 @@ class FluxAPI {
         for (const entry of this.loraEntries) {
             const name = entry.querySelector('.lora-name').value.trim();
             const weight = parseFloat(entry.querySelector('.lora-weight').value);
+            const triggerWord = entry.querySelector('.lora-trigger').value.trim();
+            
             if (name && !isNaN(weight)) {
                 // Check if this is an uploaded file
                 const isUploaded = entry.classList.contains('uploaded-lora');
                 configs.push({ 
                     name, 
                     weight, 
+                    trigger_word: triggerWord || null,
                     isUploaded,
                     file: isUploaded && this.uploadedFiles ? this.uploadedFiles.get(name) : null
                 });
@@ -687,7 +687,7 @@ class FluxAPI {
                 this.hideUploadProgress();
                 
                 // Add the uploaded file to the LoRA list with the server filename
-                this.addLoraEntry(uploadResult.filename, 1.0, true); // true indicates it's an uploaded file
+                this.addLoraEntry(uploadResult.filename, 1.0, '', true); // true indicates it's an uploaded file
                 
                 this.showSuccess(`LoRA file "${file.name}" uploaded successfully!`);
                 
