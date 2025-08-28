@@ -4,20 +4,21 @@ class FluxAPI {
         // Use current origin (protocol + host + port) so UI works on any served port
         this.hostBase = window.location.origin;
         this.isGenerating = false;
-        this.loraEntries = [];
+        this.appliedLoras = []; // 已应用的LoRA列表
+        this.availableLoras = []; // 可选择的LoRA列表
+        this.uploadedFiles = new Map(); // 存储上传的文件映射
         
         this.init();
     }
 
     init() {
         this.setupEventListeners();
-        this.addLoraEntry('21j3h123/realEarthKontext/blob/main/lora_emoji.safetensors', 1.0);
-        // Ensure API command reflects the default LoRA immediately
+        this.loadAvailableLoras();
+        this.addDefaultLora();
         this.updateApiCommand();
         
-        // Ensure DOM is fully loaded before updating button visibility
         setTimeout(() => {
-            this.updateButtonVisibility(); // Set initial button state
+            this.updateButtonVisibility();
         }, 500);
     }
 
@@ -34,8 +35,8 @@ class FluxAPI {
         if (randomSeedBtn) randomSeedBtn.addEventListener('click', () => this.randomSeed());
         
         // LoRA controls
-        const addLoraBtnMain = document.getElementById('add-lora');
-        if (addLoraBtnMain) addLoraBtnMain.addEventListener('click', () => this.addLoraEntry());
+        const addLoraBtnMain = document.getElementById('add-custom-lora');
+        if (addLoraBtnMain) addLoraBtnMain.addEventListener('click', () => this.addCustomLora());
         
         // LoRA file upload
         const uploadLoraBtn = document.getElementById('upload-lora');
@@ -43,6 +44,27 @@ class FluxAPI {
         
         if (uploadLoraBtn) uploadLoraBtn.addEventListener('click', () => this.triggerFileUpload());
         if (loraFileInput) loraFileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+        
+        // 添加选中的LoRA按钮
+        const addSelectedBtn = document.getElementById('add-selected-lora');
+        if (addSelectedBtn) {
+            addSelectedBtn.addEventListener('click', () => this.addSelectedLora());
+        }
+        
+        // 清空所有LoRA按钮
+        const clearAllBtn = document.getElementById('clear-all-loras');
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', () => this.clearAllLoras());
+        }
+        
+        // 刷新LoRA列表按钮
+        const refreshBtn = document.getElementById('refresh-loras');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                console.log('Refreshing LoRA list...');
+                this.loadAvailableLoras();
+            });
+        }
         
         // Apply LoRA button
         const applyLoraBtn = document.getElementById('apply-lora-btn');
@@ -56,25 +78,7 @@ class FluxAPI {
             console.error('Apply LoRA button not found!');
         }
 
-        // Drag-and-drop reordering for LoRA list
-        const loraList = document.getElementById('lora-list');
-        if (loraList) {
-            loraList.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                const afterElement = this.getDragAfterElement(loraList, e.clientY);
-                const dragging = document.querySelector('.lora-entry.dragging');
-                if (!dragging) return;
-                if (afterElement == null) {
-                    loraList.appendChild(dragging);
-                } else {
-                    loraList.insertBefore(dragging, afterElement);
-                }
-            });
-            loraList.addEventListener('drop', () => {
-                // Re-sync internal order with DOM order
-                this.loraEntries = Array.from(loraList.children);
-            });
-        }
+
 
         // Clear history (optional element)
         const clearHistoryBtn = document.getElementById('clear-history');
@@ -248,138 +252,237 @@ class FluxAPI {
         this.updateApiCommand();
     }
 
-    addLoraEntry(name = '', weight = 1.0, isUploaded = false) {
-        // Check maximum LoRA limit
-        if (this.loraEntries.length >= 3) {
-            console.warn('Maximum of 3 LoRAs allowed');
+    // 加载可用的LoRA列表
+    async loadAvailableLoras() {
+        // 清空现有列表，避免重复
+        this.availableLoras = [];
+        
+        // 添加默认LoRA
+        this.availableLoras.push({
+            name: '21j3h123/realEarthKontext/blob/main/lora_emoji.safetensors',
+            weight: 1.0,
+            type: 'default',
+            displayName: '21j3h123/realEarthKontext/lora_emoji.safetensors (Default)'
+        });
+        
+        // 从服务器加载上传的LoRA
+        try {
+            const resp = await fetch(`${this.hostBase}/loras`);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.uploaded && Array.isArray(data.uploaded)) {
+                    data.uploaded.forEach(item => {
+                        this.availableLoras.push({
+                            name: item.original_name || item.stored_name,
+                            weight: 1.0,
+                            type: 'uploaded',
+                            storedName: item.stored_name,
+                            displayName: `${item.original_name || item.stored_name} (Uploaded)`
+                        });
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load server LoRAs:', e);
+        }
+        
+        // 清理重复项
+        this.removeDuplicateLoras();
+        this.populateLoraDropdown();
+    }
+
+    // 移除重复的LoRA条目
+    removeDuplicateLoras() {
+        const seen = new Set();
+        this.availableLoras = this.availableLoras.filter(lora => {
+            const key = lora.storedName || lora.name;
+            if (seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
+    }
+
+    // 清空LoRA列表
+    clearLoraList() {
+        this.availableLoras = [];
+        this.populateLoraDropdown();
+        this.showSuccess('LoRA list cleared');
+    }
+
+    // 调试：显示当前LoRA状态
+    debugLoraState() {
+        console.log('=== LoRA Debug Info ===');
+        console.log('Available LoRAs:', this.availableLoras);
+        console.log('Applied LoRAs:', this.appliedLoras);
+        console.log('Dropdown options:', document.getElementById('lora-dropdown')?.options?.length || 'No dropdown found');
+        console.log('=======================');
+    }
+
+    // 填充LoRA下拉列表
+    populateLoraDropdown() {
+        const dropdown = document.getElementById('lora-dropdown');
+        if (!dropdown) return;
+        
+        // 清空现有选项（保留第一个提示选项）
+        while (dropdown.options.length > 1) {
+            dropdown.remove(1);
+        }
+        
+        // 添加调试信息
+        console.log(`Populating LoRA dropdown with ${this.availableLoras.length} items:`, this.availableLoras);
+        
+        // 添加所有可用的LoRA
+        this.availableLoras.forEach((lora, index) => {
+            const option = document.createElement('option');
+            option.value = lora.name;
+            option.textContent = lora.displayName;
+            option.dataset.loraData = JSON.stringify(lora);
+            dropdown.appendChild(option);
+        });
+        
+        console.log(`Dropdown now has ${dropdown.options.length} options`);
+    }
+
+    // 渲染已应用的LoRA列表
+    renderAppliedLoras() {
+        const container = document.getElementById('applied-lora-list');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        this.appliedLoras.forEach((lora, index) => {
+            const item = document.createElement('div');
+            item.className = 'lora-item applied-lora-item';
+            item.innerHTML = `
+                <div class="lora-info">
+                    <span class="lora-name">${lora.name}</span>
+                    <span class="lora-type">${lora.type}</span>
+                </div>
+                <div class="lora-actions">
+                    <input type="number" class="weight-input" value="${lora.weight}" min="0" max="2" step="0.1" data-index="${index}">
+                    <button class="btn btn-sm btn-danger remove-from-applied" data-index="${index}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            // 添加事件监听器
+            const weightInput = item.querySelector('.weight-input');
+            const removeBtn = item.querySelector('.remove-from-applied');
+            
+            weightInput.addEventListener('input', (e) => {
+                const newWeight = parseFloat(e.target.value);
+                if (!isNaN(newWeight)) {
+                    this.appliedLoras[index].weight = newWeight;
+                    this.updateApiCommand();
+                }
+            });
+            
+            removeBtn.addEventListener('click', () => this.removeFromApplied(index));
+            
+            container.appendChild(item);
+        });
+    }
+
+    // 添加选中的LoRA到应用列表
+    addSelectedLora() {
+        const dropdown = document.getElementById('lora-dropdown');
+        if (!dropdown || !dropdown.value) {
+            this.showError('Please select a LoRA first');
             return;
         }
-
-        const loraList = document.getElementById('lora-list');
-        const loraEntry = document.createElement('div');
-        loraEntry.className = 'lora-entry';
-        loraEntry.setAttribute('draggable', 'true');
         
-        // Add special class for uploaded files
-        if (isUploaded) {
-            loraEntry.classList.add('uploaded-lora');
+        const selectedOption = dropdown.options[dropdown.selectedIndex];
+        const loraData = JSON.parse(selectedOption.dataset.loraData);
+        
+        // 检查是否已经在应用列表中
+        const exists = this.appliedLoras.find(item => item.name === loraData.name);
+        if (exists) {
+            this.showError('This LoRA is already applied');
+            return;
         }
         
-        loraEntry.innerHTML = `
-            <span class="drag-handle" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
-            <input type="text" placeholder="username/model-name or /path/to/lora.safetensors" class="lora-name" ${isUploaded ? 'readonly' : ''}>
-            <input type="number" placeholder="1.0" min="0.0" max="2.0" step="0.1" value="1.0" class="lora-weight">
-            <button class="remove-lora" title="Remove LoRA">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        
-        // Set initial values if provided
-        const nameInput = loraEntry.querySelector('.lora-name');
-        const weightInput = loraEntry.querySelector('.lora-weight');
-        if (name) nameInput.value = name;
-        if (typeof weight === 'number') weightInput.value = String(weight);
-        
-        // Remove functionality
-        const removeBtn = loraEntry.querySelector('.remove-lora');
-        removeBtn.addEventListener('click', () => this.removeLoraEntry(loraEntry));
-
-        // Add event listeners for name and weight changes to update API command
-        nameInput.addEventListener('input', () => this.updateApiCommand());
-        weightInput.addEventListener('input', () => this.updateApiCommand());
-
-        // Drag events
-        loraEntry.addEventListener('dragstart', () => {
-            loraEntry.classList.add('dragging');
-        });
-        loraEntry.addEventListener('dragend', () => {
-            loraEntry.classList.remove('dragging');
-            // Re-sync array with DOM order
-            this.loraEntries = Array.from(loraList.children);
-            // Update API command after reordering
-            this.updateApiCommand();
+        // 添加到应用列表
+        this.appliedLoras.push({
+            name: loraData.name,
+            weight: loraData.weight,
+            type: loraData.type,
+            storedName: loraData.storedName
         });
         
-        loraList.appendChild(loraEntry);
-        this.loraEntries.push(loraEntry);
-        
-        // Update Add LoRA button state
-        this.updateAddLoraButtonState();
-    }
-
-    updateAddLoraButtonState() {
-        const addLoraBtn = document.getElementById('add-lora');
-        if (addLoraBtn) {
-            if (this.loraEntries.length >= 3) {
-                addLoraBtn.disabled = true;
-                addLoraBtn.title = 'Maximum of 3 LoRAs reached';
-                addLoraBtn.style.opacity = '0.5';
-                addLoraBtn.style.cursor = 'not-allowed';
-            } else {
-                addLoraBtn.disabled = false;
-                addLoraBtn.title = 'Add LoRA';
-                addLoraBtn.style.opacity = '1';
-                addLoraBtn.style.cursor = 'pointer';
-            }
-        }
-    }
-
-    getDragAfterElement(container, y) {
-        const draggableElements = [...container.querySelectorAll('.lora-entry:not(.dragging)')];
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
-    }
-
-    removeLoraEntry(loraEntry) {
-        const index = this.loraEntries.indexOf(loraEntry);
-        if (index > -1) {
-            this.loraEntries.splice(index, 1);
-        }
-        
-        // Clean up uploaded file data if this was an uploaded LoRA
-        if (loraEntry.classList.contains('uploaded-lora')) {
-            const nameInput = loraEntry.querySelector('.lora-name');
-            if (nameInput && this.uploadedFiles) {
-                this.uploadedFiles.delete(nameInput.value);
-            }
-        }
-        
-        loraEntry.remove();
-        // Ensure the array matches DOM after removal
-        const loraList = document.getElementById('lora-list');
-        this.loraEntries = Array.from(loraList.children);
-        
-        // Update Add LoRA button state after removal
-        this.updateAddLoraButtonState();
-        
-        // Update API command after removal
+        this.renderAppliedLoras();
         this.updateApiCommand();
+        
+        // 重置下拉选择
+        dropdown.value = '';
+        
+        this.showSuccess(`LoRA "${loraData.name}" added to applied list`);
     }
 
-    getLoraConfigs() {
-        const configs = [];
-        for (const entry of this.loraEntries) {
-            const name = entry.querySelector('.lora-name').value.trim();
-            const weight = parseFloat(entry.querySelector('.lora-weight').value);
-            if (name && !isNaN(weight)) {
-                // Check if this is an uploaded file
-                const isUploaded = entry.classList.contains('uploaded-lora');
-                configs.push({ 
-                    name, 
-                    weight, 
-                    isUploaded,
-                    file: isUploaded && this.uploadedFiles ? this.uploadedFiles.get(name) : null
-                });
-            }
+    // 从已应用列表移除
+    removeFromApplied(index) {
+        const removed = this.appliedLoras[index];
+        this.appliedLoras.splice(index, 1);
+        this.renderAppliedLoras();
+        this.updateApiCommand();
+        this.showSuccess(`LoRA "${removed.name}" removed from applied list`);
+    }
+
+    // 添加默认LoRA
+    addDefaultLora() {
+        const defaultLora = this.availableLoras.find(l => l.type === 'default');
+        if (defaultLora) {
+            this.appliedLoras.push({
+                name: defaultLora.name,
+                weight: defaultLora.weight,
+                type: defaultLora.type,
+                storedName: defaultLora.storedName
+            });
+            this.renderAppliedLoras();
         }
-        return configs;
+    }
+
+    // 清空所有已应用的LoRA
+    clearAllLoras() {
+        this.appliedLoras = [];
+        this.renderAppliedLoras();
+        this.updateApiCommand();
+        this.showSuccess('All LoRAs cleared');
+    }
+
+    // 获取LoRA配置（用于API调用）
+    getLoraConfigs() {
+        return this.appliedLoras.map(lora => ({
+            name: lora.storedName || lora.name,
+            weight: lora.weight,
+            isUploaded: lora.type === 'uploaded'
+        }));
+    }
+
+    // 添加自定义LoRA
+    addCustomLora() {
+        const customName = prompt('Enter LoRA name (Hugging Face repo ID or local path):');
+        if (!customName || !customName.trim()) return;
+        
+        // 检查是否已经在应用列表中
+        const exists = this.appliedLoras.find(item => item.name === customName.trim());
+        if (exists) {
+            this.showError('This LoRA is already applied');
+            return;
+        }
+        
+        // 添加到应用列表
+        this.appliedLoras.push({
+            name: customName.trim(),
+            weight: 1.0,
+            type: 'custom'
+        });
+        
+        this.renderAppliedLoras();
+        this.updateApiCommand();
+        this.showSuccess(`Custom LoRA "${customName.trim()}" added`);
     }
 
     async generateImage() {
@@ -1317,9 +1420,19 @@ class FluxAPI {
             setTimeout(() => {
                 this.hideUploadProgress();
                 
-                // Add the uploaded file to the LoRA list with the server filename
-                this.addLoraEntry(uploadResult.filename, 1.0, true); // true indicates it's an uploaded file
+                // 上传成功后添加到可用列表（避免重复）
+                const existingIndex = this.availableLoras.findIndex(lora => lora.storedName === uploadResult.filename);
+                if (existingIndex === -1) {
+                    this.availableLoras.push({
+                        name: uploadResult.filename,
+                        weight: 1.0,
+                        type: 'uploaded',
+                        storedName: uploadResult.filename,
+                        displayName: `${uploadResult.filename} (Uploaded)`
+                    });
+                }
                 
+                this.populateLoraDropdown();
                 this.showSuccess(`LoRA file "${file.name}" uploaded successfully!`);
                 
                 // Reset the file input

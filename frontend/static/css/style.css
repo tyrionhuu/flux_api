@@ -562,6 +562,33 @@ textarea {
     background: #e5e7eb;
 }
 
+.btn-danger {
+    background: #ef4444;
+    color: white;
+    border: 1px solid #ef4444;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+}
+
+.btn-info {
+    background: #06b6d4;
+    color: white;
+    border: 1px solid #06b6d4;
+}
+
+.btn-info:hover {
+    background: #0891b2;
+    border-color: #0891b2;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+}
+
 /* Loading states */
 .loading {
     opacity: 0.6;
@@ -758,6 +785,110 @@ textarea {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+}
+
+/* 已应用的LoRA列表样式 */
+.applied-lora-list {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0.75rem;
+    background: #f9fafb;
+    min-height: 60px;
+}
+
+.applied-lora-list:empty::after {
+    content: 'No LoRAs applied yet';
+    color: #9ca3af;
+    font-style: italic;
+    text-align: center;
+    display: block;
+    padding: 1rem;
+}
+
+.lora-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.lora-item:last-child {
+    margin-bottom: 0;
+}
+
+.lora-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.lora-name {
+    font-weight: 500;
+    color: #374151;
+    font-size: 0.875rem;
+}
+
+.lora-type {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-transform: capitalize;
+}
+
+.lora-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.weight-input {
+    width: 60px;
+    padding: 0.25rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+/* LoRA选择器样式 */
+.lora-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+}
+
+.lora-dropdown-container {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.lora-dropdown {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background: white;
+}
+
+.lora-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.lora-actions .btn {
+    flex: 1;
+    min-width: 120px;
 }
 
 .lora-buttons {
