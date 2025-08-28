@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
+from rembg import remove
 
 from api.models import GenerateRequest
 from config.settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
@@ -27,7 +28,6 @@ from utils.image_utils import (extract_image_from_result,
                                save_uploaded_image, validate_uploaded_image)
 from utils.queue_manager import QueueManager
 from utils.system_utils import get_system_memory
-from rembg import remove
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -292,10 +292,7 @@ def _extract_loras_from_request(request: GenerateRequest):
                         status_code=400, detail="LoRA weight must be between 0 and 2.0"
                     )
                 loras_to_apply.append(
-                    {
-                        "name": lora_config.name.strip(), 
-                                                "weight": lora_config.weight
-                    }
+                    {"name": lora_config.name.strip(), "weight": lora_config.weight}
                 )
     elif request.lora_name:
         if not request.lora_name.strip():
@@ -323,7 +320,6 @@ def _extract_loras_from_request(request: GenerateRequest):
         loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
 
     return loras_to_apply, remove_all_loras
-
 
 
 def _apply_loras(loras_to_apply, remove_all_loras):
@@ -486,7 +482,9 @@ async def generate_and_return_image(request: GenerateRequest):
         if getattr(request, "remove_background", False):
             download_url = _apply_background_removal_to_saved(download_url)
 
-        return Response(content=_read_and_cleanup_generated(download_url), media_type="image/png")
+        return Response(
+            content=_read_and_cleanup_generated(download_url), media_type="image/png"
+        )
 
     except Exception as e:
         logger.error(f"Error in generate_and_return_image: {e}")
@@ -550,8 +548,14 @@ async def generate_image(request: GenerateRequest):
 
         # Optionally apply background removal by mutating download_url
         try:
-            if getattr(request, "remove_background", False) and isinstance(result, dict) and result.get("download_url"):
-                new_download_url = _apply_background_removal_to_saved(result["download_url"])
+            if (
+                getattr(request, "remove_background", False)
+                and isinstance(result, dict)
+                and result.get("download_url")
+            ):
+                new_download_url = _apply_background_removal_to_saved(
+                    result["download_url"]
+                )
                 result["download_url"] = new_download_url
                 result["image_url"] = new_download_url
         except Exception as e:
@@ -721,7 +725,9 @@ async def generate_with_image_and_return(
         # Read the image file and return bytes (binary response)
         file_path = image_filename
         if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="Generated image file not found")
+            raise HTTPException(
+                status_code=404, detail="Generated image file not found"
+            )
 
         with open(file_path, "rb") as f:
             out_bytes = f.read()
@@ -738,7 +744,11 @@ async def generate_with_image_and_return(
             try:
                 # Save bytes to a temp image, process, and return processed bytes
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                tmp_path = Path(base_dir) / "generated_images" / f"tmp_{int(time.time()*1000)}.png"
+                tmp_path = (
+                    Path(base_dir)
+                    / "generated_images"
+                    / f"tmp_{int(time.time()*1000)}.png"
+                )
                 with open(tmp_path, "wb") as f:
                     f.write(out_bytes)
                 with Image.open(tmp_path).convert("RGBA") as im:
@@ -912,7 +922,9 @@ async def generate_with_image(
         # Read saved image and return as bytes
         file_path = image_filename
         if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="Generated image file not found")
+            raise HTTPException(
+                status_code=404, detail="Generated image file not found"
+            )
 
         with open(file_path, "rb") as f:
             out_bytes = f.read()
