@@ -14,9 +14,6 @@ class LoRAConfig(BaseModel):
 
     name: str = Field(..., description="Hugging Face repository ID or local path")
     weight: float = Field(1.0, ge=0.0, le=2.0, description="LoRA weight (0.0 to 2.0)")
-    trigger_word: Optional[str] = Field(
-        None, description="Custom trigger word for this LoRA"
-    )
 
 
 class GenerateRequest(BaseModel):

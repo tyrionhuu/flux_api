@@ -49,4 +49,3 @@ STATIC_IMAGES_DIR = "static"
 # Removed DEFAULT_LORA_NAME and DEFAULT_LORA_WEIGHT - now configurable per LoRA
 MIN_LORA_WEIGHT = 0.0
 MAX_LORA_WEIGHT = 2.0
-MAX_TRIGGER_WORD_LENGTH = 50  # Prevent extremely long trigger words
