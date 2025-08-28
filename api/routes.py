@@ -54,44 +54,52 @@ model_manager = get_model_manager()
 queue_manager = QueueManager(max_concurrent=2, max_queue_size=100)
 
 
-async def update_lora_index(stored_name: str, original_name: str, timestamp: int, size: int):
+async def update_lora_index(
+    stored_name: str, original_name: str, timestamp: int, size: int
+):
     """Update the LoRA index.json file with a new entry"""
     try:
         index_file = Path("uploads/lora_files/index.json")
-        
+
         # Load existing index or create new one
         if index_file.exists():
             try:
-                with open(index_file, 'r') as f:
+                with open(index_file, "r") as f:
                     index_data = json.loads(f.read())
             except (json.JSONDecodeError, FileNotFoundError):
                 index_data = {"entries": []}
         else:
             index_data = {"entries": []}
-        
+
         # Add new entry
         new_entry = {
             "stored_name": stored_name,
             "original_name": original_name,
             "timestamp": timestamp,
-            "size": size
+            "size": size,
         }
-        
+
         # Check if entry already exists (avoid duplicates)
-        existing_entry = next((entry for entry in index_data["entries"] 
-                             if entry["stored_name"] == stored_name), None)
-        
+        existing_entry = next(
+            (
+                entry
+                for entry in index_data["entries"]
+                if entry["stored_name"] == stored_name
+            ),
+            None,
+        )
+
         if not existing_entry:
             index_data["entries"].append(new_entry)
-            
+
             # Save updated index
-            with open(index_file, 'w') as f:
+            with open(index_file, "w") as f:
                 json.dump(index_data, f, indent=2)
-            
+
             logger.info(f"Updated index.json with new LoRA: {stored_name}")
         else:
             logger.info(f"LoRA entry already exists in index: {stored_name}")
-            
+
     except Exception as e:
         logger.error(f"Failed to update LoRA index: {e}")
         # Don't fail the upload if index update fails
@@ -101,23 +109,26 @@ async def remove_lora_from_index(stored_name: str):
     """Remove a LoRA entry from the index.json file"""
     try:
         index_file = Path("uploads/lora_files/index.json")
-        
+
         if not index_file.exists():
             return
-        
-        with open(index_file, 'r') as f:
+
+        with open(index_file, "r") as f:
             index_data = json.loads(f.read())
-        
+
         # Remove the entry
-        index_data["entries"] = [entry for entry in index_data["entries"] 
-                                if entry["stored_name"] != stored_name]
-        
+        index_data["entries"] = [
+            entry
+            for entry in index_data["entries"]
+            if entry["stored_name"] != stored_name
+        ]
+
         # Save updated index
-        with open(index_file, 'w') as f:
+        with open(index_file, "w") as f:
             json.dump(index_data, f, indent=2)
-        
+
         logger.info(f"Removed LoRA entry from index: {stored_name}")
-        
+
     except Exception as e:
         logger.error(f"Failed to remove LoRA from index: {e}")
 
@@ -1240,41 +1251,44 @@ async def get_available_loras():
         # Get uploaded LoRAs from index.json
         uploaded_loras = []
         index_file = Path("uploads/lora_files/index.json")
-        
+
         if index_file.exists():
             try:
-                with open(index_file, 'r') as f:
+                with open(index_file, "r") as f:
                     index_data = json.loads(f.read())
-                    if 'entries' in index_data and isinstance(index_data['entries'], list):
-                        uploaded_loras = index_data['entries']
-                        logger.info(f"Loaded {len(uploaded_loras)} LoRAs from index.json")
+                    if "entries" in index_data and isinstance(
+                        index_data["entries"], list
+                    ):
+                        uploaded_loras = index_data["entries"]
+                        logger.info(
+                            f"Loaded {len(uploaded_loras)} LoRAs from index.json"
+                        )
                     else:
                         logger.warning("Invalid index.json format")
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse index.json: {e}")
                 uploaded_loras = []
-        
+
         # Add default LoRA
         default_loras = [
             {
                 "name": "21j3h123/realEarthKontext/blob/main/lora_emoji.safetensors",
                 "display_name": "21j3h123/realEarthKontext/lora_emoji.safetensors (Default)",
                 "type": "default",
-                "weight": 1.0
+                "weight": 1.0,
             }
         ]
-        
+
         return {
             "uploaded": uploaded_loras,
             "default": default_loras,
-            "total_count": len(uploaded_loras) + len(default_loras)
+            "total_count": len(uploaded_loras) + len(default_loras),
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting available LoRAs: {e}")
         raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to get available LoRAs: {str(e)}"
+            status_code=500, detail=f"Failed to get available LoRAs: {str(e)}"
         )
 
 
@@ -1350,19 +1364,19 @@ async def remove_lora_file(filename: str):
     try:
         uploads_dir = Path("uploads/lora_files")
         file_path = uploads_dir / filename
-        
+
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="LoRA file not found")
-        
+
         # Remove the file
         file_path.unlink()
-        
+
         # Remove entry from index.json
-        await remove_lora_from_index(filename) 
-        
+        await remove_lora_from_index(filename)
+
         logger.info(f"LoRA file removed: {filename}")
         return {"message": f"LoRA file {filename} removed successfully"}
-        
+
     except Exception as e:
         logger.error(f"Error removing LoRA file: {e}")
         raise HTTPException(
