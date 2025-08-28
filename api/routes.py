@@ -297,7 +297,6 @@ async def generate_image(request: GenerateRequest):
                 lora_applied = current_lora.get("name")
                 lora_weight_applied = current_lora.get("weight")
 
-        # Use the original prompt (no trigger word processing)
         processed_prompt = prompt
 
         result = generate_image_internal(
