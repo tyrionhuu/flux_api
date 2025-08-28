@@ -27,6 +27,7 @@ from utils.image_utils import (extract_image_from_result,
                                save_uploaded_image, validate_uploaded_image)
 from utils.queue_manager import QueueManager
 from utils.system_utils import get_system_memory
+from rembg import remove
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -481,9 +482,11 @@ async def generate_and_return_image(request: GenerateRequest):
                 detail="No download URL received from generate endpoint",
             )
 
-        return Response(
-            content=_read_and_cleanup_generated(download_url), media_type="image/png"
-        )
+        # Optional background removal on the final image
+        if getattr(request, "remove_background", False):
+            download_url = _apply_background_removal_to_saved(download_url)
+
+        return Response(content=_read_and_cleanup_generated(download_url), media_type="image/png")
 
     except Exception as e:
         logger.error(f"Error in generate_and_return_image: {e}")
@@ -545,6 +548,15 @@ async def generate_image(request: GenerateRequest):
             context={},
         )
 
+        # Optionally apply background removal by mutating download_url
+        try:
+            if getattr(request, "remove_background", False) and isinstance(result, dict) and result.get("download_url"):
+                new_download_url = _apply_background_removal_to_saved(result["download_url"])
+                result["download_url"] = new_download_url
+                result["image_url"] = new_download_url
+        except Exception as e:
+            logger.error(f"Background removal (txt2img) failed: {e}")
+
         # Trigger cleanup after successful image generation
         try:
 
@@ -573,6 +585,7 @@ async def generate_with_image_and_return(
     seed: Optional[int] = Form(None),
     negative_prompt: Optional[str] = Form(None),
     prompt_prefix: Optional[str] = Form(None),
+    remove_background: Optional[bool] = Form(False),
 ):
     """Generate image from uploaded image and return it directly as binary data"""
     try:
@@ -705,16 +718,13 @@ async def generate_with_image_and_return(
                 detail=f"Failed to save generated image: {str(save_error)}",
             )
 
+        # Read the image file and return bytes (binary response)
         file_path = image_filename
-
         if not os.path.exists(file_path):
-            raise HTTPException(
-                status_code=404, detail="Generated image file not found"
-            )
+            raise HTTPException(status_code=404, detail="Generated image file not found")
 
-        # Read the image file
         with open(file_path, "rb") as f:
-            image_bytes = f.read()
+            out_bytes = f.read()
 
         # Clean up the file after reading
         try:
@@ -722,7 +732,31 @@ async def generate_with_image_and_return(
         except Exception as cleanup_error:
             logger.warning(f"Failed to cleanup temporary image file: {cleanup_error}")
 
-        return Response(content=image_bytes, media_type="image/png")
+        # If background removal requested: process bytes result via temp file path.
+        # For consistency with other endpoints, try to reuse saved file path if available in logs; otherwise return original.
+        if remove_background:
+            try:
+                # Save bytes to a temp image, process, and return processed bytes
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                tmp_path = Path(base_dir) / "generated_images" / f"tmp_{int(time.time()*1000)}.png"
+                with open(tmp_path, "wb") as f:
+                    f.write(out_bytes)
+                with Image.open(tmp_path).convert("RGBA") as im:
+                    out_im = remove(im)
+                new_rel = save_image_with_unique_name(out_im)
+                new_abs = Path(base_dir) / new_rel
+                with open(new_abs, "rb") as f:
+                    processed_bytes = f.read()
+                try:
+                    os.remove(tmp_path)
+                    os.remove(new_abs)
+                except Exception:
+                    pass
+                return Response(content=processed_bytes, media_type="image/png")
+            except Exception as e:
+                logger.error(f"Background removal failed (and-return): {e}")
+                # fallthrough to return original image_bytes
+        return Response(content=out_bytes, media_type="image/png")
 
     except Exception as e:
         logger.error(f"Error in generate_with_image_and_return: {e}")
@@ -740,6 +774,7 @@ async def generate_with_image(
     seed: Optional[int] = Form(None),
     negative_prompt: Optional[str] = Form(None),
     prompt_prefix: Optional[str] = Form(None),
+    remove_background: Optional[bool] = Form(False),
 ):
     """Generate image using image + text input (image-to-image generation)"""
     try:
@@ -874,13 +909,21 @@ async def generate_with_image(
                 detail=f"Failed to save generated image: {str(save_error)}",
             )
 
-        return {
-            "status": "success",
-            "message": f"Image generated successfully for prompt: {enhanced_prompt}",
-            "download_url": f"/download/{image_filename}",
-            "filename": image_filename,
-            "generation_time": f"{generation_time:.2f}s",
-        }
+        # Read saved image and return as bytes
+        file_path = image_filename
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Generated image file not found")
+
+        with open(file_path, "rb") as f:
+            out_bytes = f.read()
+
+        # Cleanup saved file
+        try:
+            os.remove(file_path)
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to cleanup temporary image file: {cleanup_error}")
+
+        return Response(content=out_bytes, media_type="image/png")
 
     except Exception as e:
         logger.error(f"Error in generate_with_image: {e}")
@@ -1407,3 +1450,22 @@ async def upload_image(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Error uploading image: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
+
+
+def _absolute_generated_path_from_download(download_url: str) -> Path:
+    filename = download_url.split("/")[-1]
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return Path(base_dir) / "generated_images" / filename
+
+
+def _apply_background_removal_to_saved(download_url: str) -> str:
+    """Open saved generated image by download_url, apply rembg.remove, save as new unique file, return new download_url. Leaves original file on disk; caller may clean up later."""
+    try:
+        abs_path = _absolute_generated_path_from_download(download_url)
+        with Image.open(abs_path).convert("RGBA") as im:
+            output_im = remove(im)
+        new_rel = save_image_with_unique_name(output_im)  # saves into generated_images
+        return f"/generated_images/{Path(new_rel).name}"
+    except Exception as e:
+        logger.error(f"Background removal post-process failed: {e}")
+        return download_url

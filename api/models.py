@@ -52,6 +52,9 @@ class GenerateRequest(BaseModel):
     upscale_factor: Optional[int] = Field(
         2, ge=2, le=4, description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
     )
+    remove_background: Optional[bool] = Field(
+        False, description="Whether to remove background from the final image"
+    )
 
 
 class ImageUploadGenerateRequest(BaseModel):
@@ -91,6 +94,9 @@ class ImageUploadGenerateRequest(BaseModel):
     )
     upscale_factor: Optional[int] = Field(
         2, ge=2, le=4, description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
+    )
+    remove_background: Optional[bool] = Field(
+        False, description="Whether to remove background from the final image"
     )
 
 

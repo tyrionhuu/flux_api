@@ -528,27 +528,23 @@ class FluxAPI {
 
             if (!response.ok) {
                 let detail = 'Unknown error';
+                const bodyText = await response.text();
                 try {
-                    const error = await response.json();
+                    const error = JSON.parse(bodyText);
                     detail = error.detail || JSON.stringify(error);
                 } catch (_) {
-                    const text = await response.text();
-                    detail = text?.slice(0, 500) || detail;
+                    detail = bodyText?.slice(0, 500) || detail;
                 }
                 throw new Error(`Generation failed: ${detail}`);
             }
 
             // Robust JSON parsing (handle proxies returning empty/HTML)
             let result;
+            const okText = await response.text();
             try {
-                result = await response.json();
+                result = JSON.parse(okText);
             } catch (_) {
-                const text = await response.text();
-                try {
-                    result = JSON.parse(text);
-                } catch (_) {
-                    throw new Error(`Invalid JSON response: ${text?.slice(0, 500) || 'empty body'}`);
-                }
+                throw new Error(`Invalid JSON response: ${okText?.slice(0, 500) || 'empty body'}`);
             }
             console.log('Generation completed');
             
@@ -598,6 +594,10 @@ class FluxAPI {
             const upscaleFactor = document.getElementById('upscale-factor');
             if (upscaleFactor) formData.append('upscale_factor', upscaleFactor.value);
         }
+        const removeBgCheckbox = document.getElementById('remove-background');
+        if (removeBgCheckbox && removeBgCheckbox.checked) {
+            formData.append('remove_background', 'true');
+        }
         
         return fetch(`${this.hostBase}/upload-image-generate`, { method: 'POST', body: formData });
     }
@@ -644,7 +644,11 @@ class FluxAPI {
             // Add other parameters
             const seed = document.getElementById('seed').value;
             if (seed) formData.append('seed', seed);
-            
+            const removeBgCheckbox = document.getElementById('remove-background');
+            if (removeBgCheckbox && removeBgCheckbox.checked) {
+                formData.append('remove_background', 'true');
+            }
+
             const response = await fetch(`${this.hostBase}${endpoint}`, { 
                 method: 'POST', 
                 body: formData 
@@ -652,17 +656,23 @@ class FluxAPI {
 
             if (!response.ok) {
                 let detail = 'Unknown error';
+                const bodyText = await response.text();
                 try {
-                    const error = await response.json();
+                    const error = JSON.parse(bodyText);
                     detail = error.detail || JSON.stringify(error);
                 } catch (_) {
-                    const text = await response.text();
-                    detail = text?.slice(0, 500) || detail;
+                    detail = bodyText?.slice(0, 500) || detail;
                 }
                 throw new Error(`Generation failed: ${detail}`);
             }
 
-            const result = await response.json();
+            const okText = await response.text();
+            let result;
+            try {
+                result = JSON.parse(okText);
+            } catch (_) {
+                throw new Error(`Invalid JSON response: ${okText?.slice(0, 500) || 'empty body'}`);
+            }
             console.log('Image-to-image generation completed');
             
             // Show single image
@@ -709,6 +719,12 @@ class FluxAPI {
             }
         }
 
+        // Background removal flag
+        const removeBgCheckbox = document.getElementById('remove-background');
+        if (removeBgCheckbox && removeBgCheckbox.checked) {
+            params.remove_background = true;
+        }
+ 
         return params;
     }
     
@@ -1089,6 +1105,12 @@ class FluxAPI {
                     command += ` -F "upscale_factor=${upscaleFactorEl.value}"`;
                 }
             }
+
+            // Remove background flag
+            const removeBgCheckbox = document.getElementById('remove-background');
+            if (removeBgCheckbox && removeBgCheckbox.checked) {
+                command += ` -F "remove_background=true"`;
+            }
             
             // Direct output to file - no need for jq or second curl
             command += ` -o "generated_image.png"`;
@@ -1118,6 +1140,12 @@ class FluxAPI {
                 if (upscaleFactorEl && upscaleFactorEl.value) {
                     jsonPayload.upscale_factor = parseInt(upscaleFactorEl.value);
                 }
+            }
+
+            // Remove background flag
+            const removeBgCheckbox2 = document.getElementById('remove-background');
+            if (removeBgCheckbox2 && removeBgCheckbox2.checked) {
+                jsonPayload.remove_background = true;
             }
             
             // Escape the JSON string for shell
