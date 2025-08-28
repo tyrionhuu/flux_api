@@ -12,7 +12,7 @@ NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-dev"
 
 # Generation Configuration
 DEFAULT_GUIDANCE_SCALE = 3.5
-INFERENCE_STEPS = 10
+INFERENCE_STEPS = 20
 
 # Quantized Model Files (for reference - not currently used)
 # FP4_WEIGHTS_FILE = "svdq-fp4_r32-flux.1-dev.safetensors"
