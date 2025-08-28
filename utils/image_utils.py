@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from PIL import Image
 
-from config.fp4_settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
+from config.settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
 
 
 def extract_image_from_result(result: Any) -> Image.Image:

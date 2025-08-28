@@ -13,7 +13,7 @@ from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 
-from config.fp4_settings import MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID
+from config.settings import MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID
 from utils.gpu_manager import GPUManager
 
 # Configure logging
@@ -177,7 +177,7 @@ class FluxModelManager:
                 for i in range(2):
                     logger.info(f"CUDA Graph warm-up iteration {i+1}/2")
                     _ = self.pipe(
-                        "warmup prompt", num_inference_steps=10, guidance_scale=0
+                        "warmup prompt", num_inference_steps=10, guidance_scale=3.5
                     )
 
                     # Clear CUDA cache between warm-up iterations
@@ -200,7 +200,7 @@ class FluxModelManager:
         self,
         prompt: str,
         num_inference_steps: int = 10,
-        guidance_scale: float = 0,
+        guidance_scale: float = 3.5,
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,

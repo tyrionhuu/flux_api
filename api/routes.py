@@ -11,7 +11,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from api.models import GenerateRequest
-from config.fp4_settings import MAX_TRIGGER_WORD_LENGTH, STATIC_IMAGES_DIR
+from config.settings import MAX_TRIGGER_WORD_LENGTH, STATIC_IMAGES_DIR
 from models.flux_model import FluxModelManager
 from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name)
@@ -325,7 +325,7 @@ async def generate_image(request: GenerateRequest):
             request.seed,
             request.upscale or False,
             request.upscale_factor or 2,
-            request.guidance_scale or 0.0,
+            request.guidance_scale or 3.5,
         )
 
         # Trigger cleanup after successful image generation
@@ -520,7 +520,7 @@ async def submit_generation_request(request: GenerateRequest):
                 else None
             ),
             num_inference_steps=10,  # Fixed value
-            guidance_scale=request.guidance_scale or 0.0,
+            guidance_scale=request.guidance_scale or 3.5,
             width=request.width or 512,
             height=request.height or 512,
             seed=request.seed,
@@ -636,7 +636,7 @@ def generate_image_internal(
     seed: Optional[int] = None,
     upscale: bool = False,
     upscale_factor: int = 2,
-    guidance_scale: float = 0.0,
+    guidance_scale: float = 3.5,
 ):
     """Internal function to generate images - used by both endpoints"""
     logger.info(f"Starting image generation for prompt: {prompt}")

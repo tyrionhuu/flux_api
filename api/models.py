@@ -56,7 +56,7 @@ class GenerateRequest(BaseModel):
         2, ge=2, le=4, description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
     )
     guidance_scale: Optional[float] = Field(
-        0.0,
+        3.5,
         ge=-10.0,
         le=10.0,
         description="Guidance scale for image generation (-10.0 to 10.0, default: 0.0)",
