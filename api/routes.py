@@ -1220,10 +1220,6 @@ def generate_image_internal(
             upscaled_image_path = None
             logger.info(f"Falling back to original image: {image_filename}")
 
-        # Get system information
-        vram_usage = model_manager.gpu_manager.get_vram_usage()
-        system_memory_used, system_memory_total = get_system_memory()
-
         # Get the actual LoRA status from the model manager
         actual_lora_info = model_manager.get_lora_info()
         filename = os.path.basename(image_filename)
