@@ -1,4 +1,4 @@
-# FLUX API - AI Image Generation Service
+# FLUX API - Image to Image Generation Service
 
 A dual-model AI image generation API service featuring FLUX models with LoRA support.
 
