@@ -2,11 +2,11 @@
 API routes for the FLUX API
 """
 
+import json
 import logging
 import os
-import time
-import json
 import shutil
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -577,7 +577,9 @@ async def upload_lora_file(file: UploadFile = File(...)):
             (e.get("original_name", "").lower() == original_name_lower)
             for e in current_entries.get("entries", [])
         ):
-            raise HTTPException(status_code=409, detail=f"LoRA '{file.filename}' already uploaded")
+            raise HTTPException(
+                status_code=409, detail=f"LoRA '{file.filename}' already uploaded"
+            )
 
         # Generate unique filename
         timestamp = int(time.time())
@@ -826,9 +828,6 @@ async def get_queue_stats():
         )
 
 
-
-
-
 def generate_image_internal(
     prompt: str,
     model_type_name: str = "FLUX",
@@ -947,6 +946,3 @@ def generate_image_internal(
             status_code=500,
             detail=f"{model_type_name} image generation failed: {str(e)}",
         )
-
-
-
