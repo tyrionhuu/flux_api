@@ -1083,7 +1083,7 @@ class FluxAPI {
             // Build command for generate-with-image-and-return endpoint
             // Show the filename but remind user to use full local path
             const imageFileName = this.uploadedImageFile ? this.uploadedImageFile.name : 'your_image.jpg';
-            command += `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@${imageFileName}" -F "prompt=${this.escapeForShell(prompt)}" -F "width=${width}" -F "height=${height}"`;
+            command = `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@${imageFileName}" -F "prompt=${this.escapeForShell(prompt)}" -F "width=${width}" -F "height=${height}"`;
             
             if (seed) {
                 command += ` -F "seed=${seed}"`;
