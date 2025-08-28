@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.fp4_routes import router
+from api.routes import router
 from config.fp4_settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
                                  FP4_API_PORT)
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
@@ -26,7 +26,7 @@ logging.basicConfig(
 )
 
 # Configure specific loggers for better error visibility
-logging.getLogger("api.fp4_routes").setLevel(logging.INFO)
+logging.getLogger("api.routes").setLevel(logging.INFO)
 logging.getLogger("models.fp4_flux_model").setLevel(logging.INFO)
 logging.getLogger("utils.cleanup_service").setLevel(logging.INFO)
 
