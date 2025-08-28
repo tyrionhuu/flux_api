@@ -26,7 +26,3 @@ PRIORITY_FILE_EXTENSIONS = [
 # Logging settings
 CLEANUP_LOG_LEVEL = "INFO"
 CLEANUP_LOG_FILE = "logs/cleanup.log"
-
-# Backup settings (optional)
-BACKUP_BEFORE_CLEANUP = False
-BACKUP_DIRECTORY = "backups"
