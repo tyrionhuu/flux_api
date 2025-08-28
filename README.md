@@ -1,6 +1,6 @@
 # FLUX API - Text to Image Generation Service
 
-A high-performance AI image generation API service featuring the FLUX FP4 model with LoRA support.
+A high-performance AI image generation API service featuring the FLUX FP4 model with LoRA support and automatic cleanup services.
 
 ## Features
 
@@ -10,32 +10,78 @@ A high-performance AI image generation API service featuring the FLUX FP4 model 
 - **LoRA File Upload**: Upload local LoRA files directly through the web interface
 - **ComfyUI-style Frontend**: Modern, intuitive web interface
 - **RESTful API**: Easy integration with external applications
+- **Automatic Cleanup**: Built-in directory cleanup service for maintenance
+- **Systemd Integration**: Run as system services for production deployment
 
 ## Model Service
 
 ### FP4 Model (Port 8000)
-- **Port**: 8000 (configurable)
+- **Port**: 8000 (configurable via environment variable `FP4_API_PORT`)
 - **Model**: FLUX.1-dev (quantized)
 - **Memory**: ~8GB VRAM
 - **Speed**: Fast inference with LoRA merging support
 
-
 ## Quick Start
 
-### 1. Start the Service
+### 1. Install Dependencies
 
 ```bash
-# Start FP4 service
-./start_fp4_api.sh
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Or create a virtual environment first
+python -m venv flux_env
+source flux_env/bin/activate  # On Windows: flux_env\Scripts\activate
+pip install -r requirements.txt
+pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
+pip install https://github.com/nunchaku-tech/nunchaku/releases/download/v0.3.2/nunchaku-0.3.2+torch2.8-cp312-cp312-linux_x86_64.whl
+```
+
+### 2. Start the Service
+
+```bash
+# Start the main API service
+./start_flux_api.sh
+
+# Or start with specific GPU(s)
+./start_flux_api.sh -g 0,1
+
+# Or start with custom port
+./start_flux_api.sh -p 8002
 
 # Start frontend (optional)
 cd frontend && python -m http.server 9000
 ```
 
-### 2. Access the Service
+### 3. Access the Service
 
-- **Frontend**: http://localhost:9000
-- **FP4 API**: http://localhost:8000
+- **Frontend**: http://localhost:8000
+
+## Services
+
+### Main API Service
+
+The primary service runs on port 8000 by default and handles:
+- Image generation requests
+- LoRA management
+- File uploads
+- GPU load balancing
+
+### Cleanup Service
+
+An automatic cleanup service that maintains directory size limits:
+
+```bash
+# Start cleanup service manually
+python utils/cleanup_service.py
+
+# Or install as systemd service
+sudo cp services/flux-cleanup.service /etc/systemd/system/
+sudo systemctl enable flux-cleanup.service
+sudo systemctl start flux-cleanup.service
+```
+
+For detailed service configuration, see [services/README.md](services/README.md).
 
 ## LoRA Support
 
@@ -50,7 +96,7 @@ curl -X POST "http://localhost:8000/apply-lora" \
 
 ### Uploading Local LoRA Files
 
-The web interface now supports uploading local LoRA files:
+The web interface supports uploading local LoRA files:
 
 1. **Click "Upload LoRA"** button in the frontend
 2. **Select your LoRA file** (.safetensors, .bin, .pt, .pth)
@@ -98,14 +144,14 @@ curl -X POST "http://localhost:8000/upload-lora" \
 
 ### Port Configuration
 
-Set custom ports using environment variables or command-line flags:
+Set custom ports using environment variables:
 
 ```bash
 # Environment variables
-export FP4_PORT=8000
+export FP4_API_PORT=8002
 
-# Or command-line flags
-./start_fp4_api.sh --port 8000
+# Or modify config/settings.py
+FP4_API_PORT = 8002
 ```
 
 ### GPU Configuration
@@ -115,6 +161,19 @@ The service automatically detects and uses available GPUs:
 ```bash
 # Check GPU status
 python -c "from utils.gpu_manager import GPUManager; gm = GPUManager(); print(gm.get_gpu_info())"
+
+# Start with specific GPUs
+./start_flux_api.sh -g 0,1
+```
+
+### Cleanup Configuration
+
+Configure automatic cleanup in `config/cleanup_settings.py`:
+
+```python
+# Directory size limits
+MAX_DIRECTORY_SIZE_GB = 10
+MAX_FILE_AGE_DAYS = 30
 ```
 
 ## File Structure
@@ -122,14 +181,20 @@ python -c "from utils.gpu_manager import GPUManager; gm = GPUManager(); print(gm
 ```
 flux_api/
 ├── api/                    # API routes and models
-├── models/                 # FLUX model implementations (FP4)
-├── utils/                  # Utility modules
+├── models/                 # FLUX model implementations
+├── utils/                  # Utility modules including cleanup service
 ├── config/                 # Configuration files
+├── services/               # Systemd service files
 ├── frontend/               # Web interface
 ├── uploads/                # Uploaded LoRA files
 │   └── lora_files/        # LoRA file storage
 ├── generated_images/       # Generated images
-└── start_fp4_api.sh        # Service startup script
+├── logs/                   # Application logs
+├── main.py                 # Main FastAPI application
+├── start_flux_api.sh       # Service startup script
+├── start_flux_service.py   # Alternative startup script
+├── cleanup_directories.py  # Manual cleanup utility
+└── requirements.txt        # Python dependencies
 ```
 
 ## Troubleshooting
@@ -138,7 +203,8 @@ flux_api/
 
 1. **Port Already in Use**
    ```bash
-   # Kill process using port
+   # The startup script automatically handles port conflicts
+   # Or manually kill processes using the port
    sudo lsof -ti:8000 | xargs kill -9
    ```
 
@@ -152,13 +218,21 @@ flux_api/
    - Ensure file size < 1GB
    - Verify file integrity
 
+4. **Cleanup Service Issues**
+   - Check service status: `sudo systemctl status flux-cleanup.service`
+   - View logs: `sudo journalctl -u flux-cleanup.service -f`
+   - Verify configuration in `config/cleanup_settings.py`
+
 ### Logs
 
 Check service logs for detailed error information:
 
 ```bash
 # View real-time logs
-tail -f logs/flux_api.log
+tail -f logs/flux_api_fp4.log
+
+# Check cleanup service logs
+sudo journalctl -u flux-cleanup.service -f
 ```
 
 ## Development
@@ -168,6 +242,7 @@ tail -f logs/flux_api.log
 1. **Frontend**: Modify `frontend/static/js/app.js`
 2. **API**: Add routes in `api/routes.py`
 3. **Models**: Extend `models/flux_model.py`
+4. **Services**: Add new service files in `services/`
 
 ### Testing
 
@@ -177,6 +252,35 @@ python -c "import requests; print(requests.get('http://localhost:8000/').json())
 
 # Test model imports
 python -c "from models.flux_model import FluxModelManager; print('✅ FP4 model imports successfully')"
+
+# Test cleanup service
+python utils/cleanup_service.py --dry-run
+```
+
+## Production Deployment
+
+### Systemd Services
+
+For production deployment, use the provided systemd services:
+
+```bash
+# Install cleanup service
+sudo cp services/flux-cleanup.service /etc/systemd/system/
+sudo systemctl enable flux-cleanup.service
+sudo systemctl start flux-cleanup.service
+
+# Create custom service for main API (example)
+sudo nano /etc/systemd/system/flux-api.service
+```
+
+### Environment Variables
+
+Set production environment variables:
+
+```bash
+export FP4_API_PORT=8000
+export CUDA_VISIBLE_DEVICES=0,1
+export FLUX_LOG_LEVEL=INFO
 ```
 
 ## License
