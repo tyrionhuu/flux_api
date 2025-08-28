@@ -13,8 +13,7 @@ from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 
-from config.fp4_settings import (DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT,
-                                 MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
+from config.fp4_settings import (MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
 from utils.gpu_manager import GPUManager
 
 # Configure logging
@@ -104,7 +103,7 @@ class FluxModelManager:
 
                 # Load the Nunchaku transformer on the same device
                 transformer_result = NunchakuFluxTransformer2dModel.from_pretrained(
-                    f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-schnell.safetensors"
+                    f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-dev.safetensors"
                 )
 
                 # Handle the tuple return: (transformer, config_dict)
@@ -122,7 +121,7 @@ class FluxModelManager:
                     # Multi-GPU balanced mode
                     logger.info("Loading pipeline with balanced device map")
                     self.pipe = FluxPipeline.from_pretrained(
-                        "black-forest-labs/FLUX.1-schnell",
+                        "black-forest-labs/FLUX.1-dev",
                         transformer=transformer,
                         torch_dtype=torch.bfloat16,
                         device_map=device_map,
@@ -130,7 +129,7 @@ class FluxModelManager:
                 else:
                     # Single GPU mode
                     self.pipe = FluxPipeline.from_pretrained(
-                        "black-forest-labs/FLUX.1-schnell",
+                        "black-forest-labs/FLUX.1-dev",
                         transformer=transformer,
                         torch_dtype=torch.bfloat16,
                     ).to(device)
@@ -160,8 +159,7 @@ class FluxModelManager:
             # Perform CUDA Graph warm-up for better performance
             self._warmup_cuda_graph()
 
-            # Apply default LoRA
-            self._apply_default_lora()
+            # No default LoRA - users must explicitly specify LoRAs if they want them
 
             return True
 
@@ -196,71 +194,9 @@ class FluxModelManager:
                 f"CUDA Graph warm-up failed: {e} - continuing without warm-up"
             )
 
-    def _apply_default_lora(self):
-        """Apply the default LoRA after model loading"""
-        try:
-            if not self.pipe:
-                logger.warning("Pipeline not loaded, cannot apply default LoRA")
-                return False
 
-            logger.info(
-                f"Applying default LoRA: {DEFAULT_LORA_NAME} with weight {DEFAULT_LORA_WEIGHT}"
-            )
 
-            # The LoRA methods are on the transformer, not the pipeline
-            if hasattr(self.pipe, "transformer") and hasattr(
-                self.pipe.transformer, "update_lora_params"
-            ):
-                # Get the transformer safely
-                try:
-                    transformer = self._get_pipe_transformer()
-                except RuntimeError:
-                    logger.warning("Pipeline transformer not available")
-                    return False
 
-                # Load LoRA parameters
-                logger.info(
-                    f"   - Loading default LoRA parameters from {DEFAULT_LORA_NAME}"
-                )
-                try:
-                    transformer.update_lora_params(DEFAULT_LORA_NAME)
-                    logger.info(f"   - Default LoRA parameters loaded successfully")
-                except Exception as load_error:
-                    logger.warning(
-                        f"   - Failed to load default LoRA parameters: {load_error}"
-                    )
-                    return False
-
-                # Set LoRA strength
-                logger.info(
-                    f"   - Setting default LoRA strength to {DEFAULT_LORA_WEIGHT}"
-                )
-                try:
-                    transformer.set_lora_strength(DEFAULT_LORA_WEIGHT)
-                    logger.info(f"   - Default LoRA strength set successfully")
-                except Exception as strength_error:
-                    logger.warning(
-                        f"   - Failed to set default LoRA strength: {strength_error}"
-                    )
-                    return False
-
-                self.current_lora = DEFAULT_LORA_NAME
-                self.current_weight = DEFAULT_LORA_WEIGHT
-                logger.info(
-                    f"Default LoRA {DEFAULT_LORA_NAME} applied successfully with weight {DEFAULT_LORA_WEIGHT}"
-                )
-                return True
-            else:
-                logger.warning(
-                    "FluxPipeline transformer does not have LoRA support methods"
-                )
-                return False
-
-        except Exception as e:
-            logger.warning(
-                f"Failed to apply default LoRA: {e} - continuing without default LoRA"
-            )
-            return False
 
     # Removed _integrate_quantized_weights - now using Nunchaku pipeline directly
 

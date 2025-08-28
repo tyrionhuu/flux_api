@@ -8,9 +8,9 @@ from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-
+import os
 from api.models import GenerateRequest
-from config.fp4_settings import (DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT,
+from config.fp4_settings import (MAX_TRIGGER_WORD_LENGTH,
                                  STATIC_IMAGES_DIR)
 from models.fp4_flux_model import FluxModelManager
 from utils.image_utils import (extract_image_from_result,
@@ -155,9 +155,17 @@ async def generate_image(request: GenerateRequest):
                             status_code=400,
                             detail="LoRA weight must be between 0 and 2.0",
                         )
-                    loras_to_apply.append(
-                        {"name": lora_config.name.strip(), "weight": lora_config.weight}
-                    )
+                    # Validate trigger word length if provided
+                    if lora_config.trigger_word and len(lora_config.trigger_word.strip()) > MAX_TRIGGER_WORD_LENGTH:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Trigger word exceeds maximum length of {MAX_TRIGGER_WORD_LENGTH} characters",
+                        )
+                    loras_to_apply.append({
+                        "name": lora_config.name.strip(), 
+                        "weight": lora_config.weight,
+                        "trigger_word": lora_config.trigger_word.strip() if lora_config.trigger_word else None
+                    })
         # Legacy support for single LoRA
         elif request.lora_name:
             if not request.lora_name.strip():
@@ -172,20 +180,14 @@ async def generate_image(request: GenerateRequest):
                 raise HTTPException(
                     status_code=400, detail="LoRA weight must be between 0 and 2.0"
                 )
-            loras_to_apply.append(
-                {"name": request.lora_name.strip(), "weight": request.lora_weight}
-            )
+            loras_to_apply.append({
+                "name": request.lora_name.strip(), 
+                "weight": request.lora_weight,
+                "trigger_word": None  # Legacy single LoRA doesn't support trigger words
+            })
 
-        # Apply default LoRA only when client did not send loras at all (None) and no legacy fields
-        if (
-            not loras_to_apply
-            and not remove_all_loras
-            and request.loras is None
-            and not request.lora_name
-        ):
-            loras_to_apply = [
-                {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
-            ]
+        # No default LoRA - users must explicitly specify LoRAs if they want them
+        # This removes the hardcoded "GHIBLISTYLE" trigger word behavior
 
         # Clean up input
         prompt = request.prompt.strip()
@@ -298,8 +300,11 @@ async def generate_image(request: GenerateRequest):
                 lora_applied = current_lora.get("name")
                 lora_weight_applied = current_lora.get("weight")
 
+        # Process prompt with LoRA trigger words
+        processed_prompt = process_prompt_with_loras(prompt, loras_to_apply)
+        
         result = generate_image_internal(
-            prompt,
+            processed_prompt,
             "FLUX",
             lora_applied,
             lora_weight_applied,
@@ -591,6 +596,22 @@ async def get_queue_stats():
         )
 
 
+def process_prompt_with_loras(prompt: str, loras: list) -> str:
+    """Process prompt by adding trigger words from LoRAs"""
+    enhanced_prompt = prompt
+    
+    for lora_config in loras:
+        if lora_config.get('trigger_word') and lora_config['trigger_word'].strip():
+            trigger = lora_config['trigger_word'].strip()
+            # Validate trigger word length
+            if len(trigger) > MAX_TRIGGER_WORD_LENGTH:
+                logger.warning(f"Trigger word '{trigger}' exceeds maximum length, truncating")
+                trigger = trigger[:MAX_TRIGGER_WORD_LENGTH]
+            enhanced_prompt = f"{trigger}, {enhanced_prompt}"
+    
+    return enhanced_prompt
+
+
 def generate_image_internal(
     prompt: str,
     model_type_name: str = "FLUX",
@@ -604,9 +625,7 @@ def generate_image_internal(
     guidance_scale: float = 0.0,
 ):
     """Internal function to generate images - used by both endpoints"""
-    # Append "Use GHIBLISTYLE" to the start of the user prompt
-    enhanced_prompt = f"Use GHIBLISTYLE, {prompt}"
-    logger.info(f"Starting image generation for prompt: {enhanced_prompt}")
+    logger.info(f"Starting image generation for prompt: {prompt}")
 
     # Model should already be loaded at this point
     if not model_manager.is_loaded():
@@ -651,7 +670,7 @@ def generate_image_internal(
 
         # Generate the image
         result = model_manager.generate_image(
-            enhanced_prompt,
+            prompt,
             10,  # Fixed num_inference_steps
             guidance_scale,  # Use parameter value
             width,
@@ -684,21 +703,14 @@ def generate_image_internal(
             upscaled_image_path = None
             logger.info(f"Falling back to original image: {image_filename}")
 
-        # Get system information
-        vram_usage = model_manager.gpu_manager.get_vram_usage()
-        system_memory_used, system_memory_total = get_system_memory()
-
         # Get the actual LoRA status from the model manager
         actual_lora_info = model_manager.get_lora_info()
-
-        # Create download URL for the generated image
-        import os
 
         filename = os.path.basename(image_filename)
         download_url = f"/download/{filename}"
 
         return {
-            "message": f"Generated {model_type_name} image for prompt: {enhanced_prompt}",
+            "message": f"Generated {model_type_name} image for prompt: {prompt}",
             "image_url": image_filename,
             "download_url": download_url,
             "filename": filename,

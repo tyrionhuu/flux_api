@@ -8,11 +8,7 @@ import os
 FP4_API_PORT = int(os.environ.get("FP4_API_PORT", "8000"))
 
 # Model Configuration
-NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-schnell"
-
-# Quantized Model Files (for reference - not currently used)
-# FP4_WEIGHTS_FILE = "svdq-fp4_r32-flux.1-schnell.safetensors"
-# INT4_WEIGHTS_FILE = "svdq-int4_r32-flux.1-schnell.safetensors"
+NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-dev"
 
 # Model Types
 MODEL_TYPE_QUANTIZED_GPU = "flux_quantized_gpu"
@@ -42,7 +38,7 @@ GENERATED_IMAGES_DIR = "generated_images"
 STATIC_IMAGES_DIR = "static"
 
 # LoRA Configuration
-DEFAULT_LORA_NAME = "/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors"  # Default LoRA to apply
-DEFAULT_LORA_WEIGHT = 1.0
+# Removed DEFAULT_LORA_NAME and DEFAULT_LORA_WEIGHT - now configurable per LoRA
 MIN_LORA_WEIGHT = 0.0
 MAX_LORA_WEIGHT = 2.0
+MAX_TRIGGER_WORD_LENGTH = 50  # Prevent extremely long trigger words
