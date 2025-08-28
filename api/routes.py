@@ -483,6 +483,9 @@ async def get_available_loras():
         uploaded_loras = []
         index_file = Path("uploads/lora_files/index.json")
 
+        # Ensure directory exists
+        index_file.parent.mkdir(parents=True, exist_ok=True)
+
         if index_file.exists():
             try:
                 with open(index_file, "r") as f:
@@ -499,12 +502,19 @@ async def get_available_loras():
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse index.json: {e}")
                 uploaded_loras = []
+        else:
+            # Initialize empty index file
+            try:
+                with open(index_file, "w") as f:
+                    json.dump({"entries": []}, f, indent=2)
+            except Exception as init_err:
+                logger.warning(f"Failed to initialize LoRA index.json: {init_err}")
 
         # Add default LoRA
         default_loras = [
             {
                 "name": "/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors",
-                "display_name": "21j3h123/realEarthKontext/lora_emoji.safetensors (Default)",
+                "display_name": "/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors (Default)",
                 "type": "default",
                 "weight": 1.0,
             }
@@ -551,6 +561,23 @@ async def upload_lora_file(file: UploadFile = File(...)):
         # Create uploads directory if it doesn't exist
         uploads_dir = Path("uploads/lora_files")
         uploads_dir.mkdir(parents=True, exist_ok=True)
+
+        # Prevent duplicate upload by original filename (case-insensitive)
+        index_file = uploads_dir / "index.json"
+        current_entries = {"entries": []}
+        if index_file.exists():
+            try:
+                with open(index_file, "r") as f:
+                    current_entries = json.loads(f.read()) or {"entries": []}
+            except Exception:
+                current_entries = {"entries": []}
+
+        original_name_lower = file.filename.lower()
+        if any(
+            (e.get("original_name", "").lower() == original_name_lower)
+            for e in current_entries.get("entries", [])
+        ):
+            raise HTTPException(status_code=409, detail=f"LoRA '{file.filename}' already uploaded")
 
         # Generate unique filename
         timestamp = int(time.time())

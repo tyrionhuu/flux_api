@@ -67,23 +67,25 @@ class FluxAPI {
             console.error('Apply LoRA button not found!');
         }
 
-        // Drag-and-drop reordering for LoRA list
+        // Drag-and-drop reordering for LoRA list (only if manual list exists)
         const loraList = document.getElementById('lora-list');
-        loraList.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const afterElement = this.getDragAfterElement(loraList, e.clientY);
-            const dragging = document.querySelector('.lora-entry.dragging');
-            if (!dragging) return;
-            if (afterElement == null) {
-                loraList.appendChild(dragging);
-            } else {
-                loraList.insertBefore(dragging, afterElement);
-            }
-        });
-        loraList.addEventListener('drop', () => {
-            // Re-sync internal order with DOM order
-            this.loraEntries = Array.from(loraList.children);
-        });
+        if (loraList) {
+            loraList.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const afterElement = this.getDragAfterElement(loraList, e.clientY);
+                const dragging = document.querySelector('.lora-entry.dragging');
+                if (!dragging) return;
+                if (afterElement == null) {
+                    loraList.appendChild(dragging);
+                } else {
+                    loraList.insertBefore(dragging, afterElement);
+                }
+            });
+            loraList.addEventListener('drop', () => {
+                // Re-sync internal order with DOM order
+                this.loraEntries = Array.from(loraList.children);
+            });
+        }
 
         // Clear history (optional element)
         const clearHistoryBtn = document.getElementById('clear-history');
@@ -340,7 +342,7 @@ class FluxAPI {
             name: '/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors',
             weight: 1.0,
             type: 'default',
-            displayName: '21j3h123/realEarthKontext/lora_emoji.safetensors (Default)'
+            displayName: '/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors (Default)'
         });
 
         try {
@@ -479,6 +481,29 @@ class FluxAPI {
         this.renderAppliedLoras();
         this.updateApiCommand();
         this.showSuccess(`LoRA "${removed?.name || ''}" removed from applied list`);
+    }
+
+    // Add a custom LoRA by name/path
+    addCustomLora() {
+        const customName = prompt('Enter LoRA name (Hugging Face repo ID or local path):');
+        if (!customName || !customName.trim()) return;
+
+        const trimmed = customName.trim();
+        const exists = this.appliedLoras.find(item => item.name === trimmed);
+        if (exists) {
+            this.showError('This LoRA is already applied');
+            return;
+        }
+
+        this.appliedLoras.push({
+            name: trimmed,
+            weight: 1.0,
+            type: 'custom'
+        });
+
+        this.renderAppliedLoras();
+        this.updateApiCommand();
+        this.showSuccess(`Custom LoRA "${trimmed}" added`);
     }
 
     // Add default LoRA into applied if desired
@@ -701,6 +726,15 @@ class FluxAPI {
         commandSection.classList.remove('hidden');
     }
 
+    // Keep API command in sync with current parameters/LoRAs
+    updateApiCommand() {
+        try {
+            this.showApiCommand();
+        } catch (_) {
+            // Safely ignore if UI not ready yet
+        }
+    }
+
     copyApiCommand() {
         const commandElement = document.getElementById('api-command');
         navigator.clipboard.writeText(commandElement.textContent).then(() => {
@@ -877,6 +911,14 @@ class FluxAPI {
         }
 
         try {
+            // Frontend duplicate check by original filename
+            const lower = file.name.toLowerCase();
+            const exists = this.availableLoras.some(l => (l.storedName || l.name || '').toLowerCase() === lower || (l.name || '').toLowerCase() === lower);
+            if (exists) {
+                this.showError(`LoRA "${file.name}" is already in the list`);
+                event.target.value = '';
+                return;
+            }
             // Show upload progress indicator
             this.showUploadProgress(file.name);
             
@@ -958,12 +1000,99 @@ class FluxAPI {
         return formData;
     }
 
+    // ===== Helpers and no-op fallbacks to avoid UI errors =====
+    updateButtonVisibility() {
+        const generateBtn = document.getElementById('generate-btn');
+        const generateWithImageBtn = document.getElementById('generate-with-image-btn');
+        if (!generateBtn || !generateWithImageBtn) return;
+        if (this.hasUploadedImage()) {
+            generateBtn.style.display = 'none';
+            generateWithImageBtn.style.display = 'block';
+        } else {
+            generateBtn.style.display = 'block';
+            generateWithImageBtn.style.display = 'none';
+        }
+    }
 
+    setupImageUpload() {
+        // Safe guard if image upload UI not present
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('image-upload');
+        const removeBtn = document.getElementById('remove-image');
+        if (!uploadArea || !fileInput || !removeBtn) return;
 
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => this.handleImageUpload(e));
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.removeUploadedImage();
+            this.serverUploadedImagePath = null;
+            this.updateApiCommand();
+        });
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => { uploadArea.classList.remove('dragover'); });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                fileInput.files = files;
+                this.handleImageUpload({ target: fileInput });
+            }
+        });
+    }
 
+    hasUploadedImage() {
+        return !!this.uploadedImageFile;
+    }
 
+    showImagePreview(imageDataUrl, fileName) {
+        const uploadPlaceholder = document.getElementById('upload-placeholder');
+        const imagePreview = document.getElementById('uploaded-image-preview');
+        const uploadControls = document.getElementById('upload-controls');
+        if (uploadPlaceholder) uploadPlaceholder.classList.add('hidden');
+        if (imagePreview) { imagePreview.src = imageDataUrl; imagePreview.classList.remove('hidden'); }
+        if (uploadControls) uploadControls.style.display = 'block';
+        this.updateButtonVisibility();
+    }
 
+    removeUploadedImage() {
+        const uploadPlaceholder = document.getElementById('upload-placeholder');
+        const imagePreview = document.getElementById('uploaded-image-preview');
+        const uploadControls = document.getElementById('upload-controls');
+        const fileInput = document.getElementById('image-upload');
+        if (fileInput) fileInput.value = '';
+        if (uploadPlaceholder) uploadPlaceholder.classList.remove('hidden');
+        if (imagePreview) imagePreview.classList.add('hidden');
+        if (uploadControls) uploadControls.style.display = 'none';
+        this.uploadedImageFile = null;
+        this.updateButtonVisibility();
+    }
 
+    async generateImageWithImage() {
+        // Graceful fallback if image-to-image UI not present
+        this.showError('Image-to-image is not enabled in this build.');
+    }
+
+    escapeForShell(text) {
+        if (!text) return '';
+        return text.replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\$/g, '\\$');
+    }
+
+    formatFileSize(bytes) {
+        if (!bytes && bytes !== 0) return '';
+        const units = ['B','KB','MB','GB'];
+        let size = bytes; let i = 0;
+        while (size >= 1024 && i < units.length - 1) { size /= 1024; i++; }
+        return `${size.toFixed(1)}${units[i]}`;
+    }
+
+    formatDate(ts) {
+        try {
+            const d = new Date((ts || 0) * 1000);
+            return d.toLocaleString();
+        } catch { return ''; }
+    }
 
 }
 

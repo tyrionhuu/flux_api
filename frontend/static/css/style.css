@@ -852,10 +852,20 @@ textarea {
     gap: 0.5rem;
 }
 
+/* Empty state for applied LoRA list */
+.applied-lora-list:empty::after {
+    content: 'No LoRAs applied yet';
+    color: #9ca3af;
+    font-style: italic;
+    text-align: center;
+    display: block;
+    padding: 1rem;
+}
+
 .applied-lora-item {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
     align-items: center;
-    justify-content: space-between;
     gap: 0.75rem;
     border: 1px solid #e9ecef;
     border-radius: 8px;
@@ -867,16 +877,29 @@ textarea {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    min-width: 0;
+    min-width: 0; /* allow name to truncate inside grid */
 }
 
 .applied-lora-item .lora-name {
     font-weight: 600;
     color: #2d3748;
-    max-width: 420px;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Hover to expand long names */
+.lora-name:hover {
+    overflow: visible;
+    white-space: normal;
+    word-break: break-all;
+    background: #fff;
+    position: relative;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-radius: 4px;
+    padding: 4px;
 }
 
 .applied-lora-item .lora-meta {
@@ -886,9 +909,58 @@ textarea {
     gap: 0.5rem;
 }
 
+/* Keep size/date on one line */
+.lora-size, .lora-date {
+    white-space: nowrap;
+}
+
+/* Type badges */
+.lora-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: capitalize;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.lora-type-default {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+}
+
+.lora-type-uploaded {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+}
+
+.lora-type-custom {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+}
+
+.applied-lora-item .weight-control {
+    justify-self: end;
+    flex-shrink: 0;
+}
+
 .applied-lora-item .weight-control input {
     width: 80px;
 }
+
+.applied-lora-item .remove-from-applied {
+    justify-self: end;
+    flex-shrink: 0;
+}
+
+/* Ensure long names don't cover controls */
+.lora-name-container { min-width: 0; }
 
 .lora-selection-section label {
     display: block;
@@ -1426,6 +1498,7 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
+    position: relative;
 }
 
 .api-command-header h4 {
@@ -1464,7 +1537,7 @@ body {
     margin-bottom: 1rem;
 }
 
-.copy-btn {
+.api-command-header .copy-btn {
     position: absolute;
     top: 0.5rem;
     right: 0.5rem;
@@ -1478,7 +1551,7 @@ body {
     transition: background-color 0.2s;
 }
 
-.copy-btn:hover {
+.api-command-header .copy-btn:hover {
     background: #2d3748;
 }
 
