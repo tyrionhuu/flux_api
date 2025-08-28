@@ -277,7 +277,9 @@ class FluxAPI {
                             weight: 1.0,
                             type: 'uploaded',
                             storedName: item.stored_name,
-                            displayName: `${item.original_name || item.stored_name} (Uploaded)`
+                            displayName: `${item.original_name || item.stored_name} (Uploaded)`,
+                            size: item.size,
+                                                        timestamp: item.timestamp
                         });
                     });
                 }
@@ -365,22 +367,20 @@ class FluxAPI {
                         ${lora.timestamp ? `<span class="lora-date">${this.formatDate(lora.timestamp)}</span>` : ''}
                     </div>
                 </div>
-                <div class="lora-actions">
-                    <div class="weight-control">
-                        <label>W:</label>
-                        <input type="number" class="weight-input" value="${lora.weight}" min="0" max="2" step="0.1" data-index="${index}">
-                    </div>
-                    <button class="btn btn-sm btn-danger remove-from-applied" data-index="${index}">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
+                <div class="weight-control">
+                    <label>W:</label>
+                    <input type="number" class="weight-input" value="${lora.weight}" min="0" max="2" step="0.1" data-index="${index}">
+                                </div>
+                <button class="btn btn-sm btn-danger remove-from-applied" data-index="${index}">
+                    <i class="fas fa-times"></i>
+                </button>
             `;
             
             // 添加事件监听器
             const weightInput = item.querySelector('.weight-input');
             const removeBtn = item.querySelector('.remove-from-applied');
             
-            // Weight input change only
+            // Weight input change
             weightInput.addEventListener('input', (e) => {
                 const newWeight = parseFloat(e.target.value);
                 if (!isNaN(newWeight)) {
@@ -469,7 +469,7 @@ class FluxAPI {
     getLoraConfigs() {
         return this.appliedLoras.map(lora => ({
             name: lora.storedName || lora.name,
-            weight: lora.weight,
+                        weight: lora.weight,
             isUploaded: lora.type === 'uploaded'
         }));
     }

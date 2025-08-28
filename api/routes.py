@@ -291,7 +291,10 @@ def _extract_loras_from_request(request: GenerateRequest):
                         status_code=400, detail="LoRA weight must be between 0 and 2.0"
                     )
                 loras_to_apply.append(
-                    {"name": lora_config.name.strip(), "weight": lora_config.weight}
+                    {
+                        "name": lora_config.name.strip(), 
+                                                "weight": lora_config.weight
+                    }
                 )
     elif request.lora_name:
         if not request.lora_name.strip():
@@ -319,6 +322,7 @@ def _extract_loras_from_request(request: GenerateRequest):
         loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
 
     return loras_to_apply, remove_all_loras
+
 
 
 def _apply_loras(loras_to_apply, remove_all_loras):
@@ -448,6 +452,8 @@ async def generate_and_return_image(request: GenerateRequest):
         # Clean up input
         prompt = request.prompt.strip()
 
+        enhanced_prompt = prompt
+
         _ensure_model_loaded()
 
         lora_applied, lora_weight_applied = _apply_loras(
@@ -455,7 +461,7 @@ async def generate_and_return_image(request: GenerateRequest):
         )
 
         result = await _queue_txt2img_and_get_result(
-            prompt,
+            enhanced_prompt,
             request.width or 512,
             request.height or 512,
             request.seed,
@@ -506,6 +512,8 @@ async def generate_image(request: GenerateRequest):
         # Clean up input
         prompt = request.prompt.strip()
 
+        enhanced_prompt = prompt
+
         _ensure_model_loaded()
 
         lora_applied, lora_weight_applied = _apply_loras(
@@ -514,7 +522,7 @@ async def generate_image(request: GenerateRequest):
 
         def processor(_req, _ctx):
             return generate_image_internal(
-                prompt,
+                enhanced_prompt,
                 "FLUX",
                 lora_applied,
                 lora_weight_applied,
