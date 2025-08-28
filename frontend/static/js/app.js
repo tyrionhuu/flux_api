@@ -367,10 +367,9 @@ class FluxAPI {
                         ${lora.timestamp ? `<span class="lora-date">${this.formatDate(lora.timestamp)}</span>` : ''}
                     </div>
                 </div>
-                <div class="weight-control">
-                    <label>W:</label>
+                                <div class="weight-control">
                     <input type="number" class="weight-input" value="${lora.weight}" min="0" max="2" step="0.1" data-index="${index}">
-                                </div>
+                </div>
                 <button class="btn btn-sm btn-danger remove-from-applied" data-index="${index}">
                     <i class="fas fa-times"></i>
                 </button>
