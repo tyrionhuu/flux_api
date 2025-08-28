@@ -357,11 +357,19 @@ class FluxAPI {
             item.className = 'lora-item applied-lora-item';
             item.innerHTML = `
                 <div class="lora-info">
-                    <span class="lora-name">${lora.name}</span>
-                    <span class="lora-type">${lora.type}</span>
+                    <div class="lora-name-container">
+                        <span class="lora-name" title="${lora.name}">${lora.name}</span>
+                    </div>
+                    <div class="lora-meta">
+                        ${lora.size ? `<span class="lora-size">${this.formatFileSize(lora.size)}</span>` : ''}
+                        ${lora.timestamp ? `<span class="lora-date">${this.formatDate(lora.timestamp)}</span>` : ''}
+                    </div>
                 </div>
                 <div class="lora-actions">
-                    <input type="number" class="weight-input" value="${lora.weight}" min="0" max="2" step="0.1" data-index="${index}">
+                    <div class="weight-control">
+                        <label>W:</label>
+                        <input type="number" class="weight-input" value="${lora.weight}" min="0" max="2" step="0.1" data-index="${index}">
+                    </div>
                     <button class="btn btn-sm btn-danger remove-from-applied" data-index="${index}">
                         <i class="fas fa-times"></i>
                     </button>
@@ -372,6 +380,7 @@ class FluxAPI {
             const weightInput = item.querySelector('.weight-input');
             const removeBtn = item.querySelector('.remove-from-applied');
             
+            // Weight input change only
             weightInput.addEventListener('input', (e) => {
                 const newWeight = parseFloat(e.target.value);
                 if (!isNaN(newWeight)) {
@@ -409,7 +418,9 @@ class FluxAPI {
             name: loraData.name,
             weight: loraData.weight,
             type: loraData.type,
-            storedName: loraData.storedName
+            storedName: loraData.storedName,
+            size: loraData.size,
+            timestamp: loraData.timestamp
         });
         
         this.renderAppliedLoras();
@@ -438,7 +449,9 @@ class FluxAPI {
                 name: defaultLora.name,
                 weight: defaultLora.weight,
                 type: defaultLora.type,
-                storedName: defaultLora.storedName
+                storedName: defaultLora.storedName,
+                size: defaultLora.size,
+                timestamp: defaultLora.timestamp
             });
             this.renderAppliedLoras();
         }
