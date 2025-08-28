@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, Optional
 
+from config.settings import DEFAULT_GUIDANCE_SCALE, INFERENCE_STEPS
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,8 +41,8 @@ class QueueRequest:
     lora_weight: float = 1.0  # For backward compatibility
     loras: Optional[list[dict]] = None  # New multiple LoRA support
     # Generation parameters
-    num_inference_steps: int = 10  # Fixed value
-    guidance_scale: float = 3.5  # Default value, can be overridden
+    num_inference_steps: int = INFERENCE_STEPS  # Fixed value
+    guidance_scale: float = DEFAULT_GUIDANCE_SCALE  # Default value, can be overridden
     width: int = 512
     height: int = 512
     seed: Optional[int] = None
@@ -91,8 +93,8 @@ class QueueManager:
         lora_weight: float = 1.0,
         loras: Optional[list[dict]] = None,  # New multiple LoRA support
         priority: int = 0,
-        num_inference_steps: int = 10,  # Fixed value
-        guidance_scale: float = 3.5,  # Default value, can be overridden
+        num_inference_steps: int = INFERENCE_STEPS,  # Fixed value
+        guidance_scale: float = DEFAULT_GUIDANCE_SCALE,  # Default value, can be overridden
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,

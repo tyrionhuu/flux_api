@@ -11,7 +11,8 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from api.models import GenerateRequest
-from config.settings import MAX_TRIGGER_WORD_LENGTH, STATIC_IMAGES_DIR
+from config.settings import (DEFAULT_GUIDANCE_SCALE, INFERENCE_STEPS,
+                             MAX_TRIGGER_WORD_LENGTH, STATIC_IMAGES_DIR)
 from models.flux_model import FluxModelManager
 from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name)
@@ -325,7 +326,7 @@ async def generate_image(request: GenerateRequest):
             request.seed,
             request.upscale or False,
             request.upscale_factor or 2,
-            request.guidance_scale or 3.5,
+            request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
         )
 
         # Trigger cleanup after successful image generation
@@ -519,8 +520,8 @@ async def submit_generation_request(request: GenerateRequest):
                 if request.loras
                 else None
             ),
-            num_inference_steps=10,  # Fixed value
-            guidance_scale=request.guidance_scale or 3.5,
+            num_inference_steps=INFERENCE_STEPS,  # Fixed value
+            guidance_scale=request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
             width=request.width or 512,
             height=request.height or 512,
             seed=request.seed,
@@ -560,7 +561,7 @@ async def get_request_status(request_id: str):
             "error": request.error,
             # Generation parameters
             "num_inference_steps": request.num_inference_steps,
-            "guidance_scale": request.guidance_scale,
+            "guidance_scale": request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
             "width": request.width,
             "height": request.height,
             "seed": request.seed,
@@ -636,7 +637,7 @@ def generate_image_internal(
     seed: Optional[int] = None,
     upscale: bool = False,
     upscale_factor: int = 2,
-    guidance_scale: float = 3.5,
+    guidance_scale: float = DEFAULT_GUIDANCE_SCALE,
 ):
     """Internal function to generate images - used by both endpoints"""
     logger.info(f"Starting image generation for prompt: {prompt}")
@@ -685,7 +686,7 @@ def generate_image_internal(
         # Generate the image
         result = model_manager.generate_image(
             prompt,
-            10,  # Fixed num_inference_steps
+            INFERENCE_STEPS,  # Fixed num_inference_steps
             guidance_scale,  # Use parameter value
             width,
             height,
