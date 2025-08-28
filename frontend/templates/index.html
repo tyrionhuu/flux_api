@@ -41,16 +41,35 @@
                             </div>
                         </label>
                         <div class="lora-container">
-                            <div id="lora-list" class="lora-list">
-                                <!-- LoRA entries will be added here dynamically -->
-                            </div>
+                            <!-- 已应用的LoRA列表 -->
+                            <div id="applied-lora-list" class="lora-list applied-lora-list"></div>
                             <div class="lora-buttons">
-                                <button id="add-lora" class="btn btn-secondary">
-                                    <i class="fas fa-plus"></i> Add LoRA
+                                <button id="clear-all-loras" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-trash"></i> Clear All
                                 </button>
-                                <button id="upload-lora" class="btn btn-secondary">
-                                    <i class="fas fa-upload"></i> Upload LoRA
-                                </button>
+                            </div>
+
+                            <!-- LoRA选择器 -->
+                            <div class="lora-selector">
+                                <div class="lora-dropdown-container">
+                                    <select id="lora-dropdown" class="lora-dropdown">
+                                        <option value="">Select a LoRA to add...</option>
+                                    </select>
+                                    <button id="add-selected-lora" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Add
+                                    </button>
+                                </div>
+                                <div class="lora-actions">
+                                    <button id="refresh-loras" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-rotate"></i> Refresh
+                                    </button>
+                                    <button id="add-custom-lora" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-edit"></i> Add Custom
+                                    </button>
+                                    <button id="upload-lora" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-upload"></i> Upload LoRA
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <button id="apply-lora-btn" class="btn btn-primary">
@@ -59,6 +78,22 @@
                         
                         <!-- Hidden file input for LoRA upload -->
                         <input type="file" id="lora-file-input" accept=".safetensors,.bin,.pt,.pth" style="display: none;">
+                        
+                        <!-- Upload Progress Container -->
+                        <div id="upload-progress-container" class="upload-progress-container hidden">
+                            <div class="upload-progress-header">
+                                <h4><i class="fas fa-upload"></i> Uploading LoRA...</h4>
+                            </div>
+                            <div class="upload-progress-content">
+                                <div class="upload-file-info">
+                                    <span class="upload-filename" id="upload-filename"></span>
+                                </div>
+                                <div class="upload-progress-bar">
+                                    <div class="upload-progress-fill" id="upload-progress-fill"></div>
+                                </div>
+                                <div class="upload-status" id="upload-status">0%</div>
+                            </div>
+                        </div>
                         
                         <!-- API Command Display -->
                         <div id="api-command-section" class="api-command-section hidden">

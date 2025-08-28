@@ -5,6 +5,9 @@ API routes for the FLUX API
 import logging
 import os
 import time
+import json
+import shutil
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -46,6 +49,85 @@ model_manager = get_model_manager()
 
 # Global queue manager instance
 queue_manager = QueueManager(max_concurrent=2, max_queue_size=100)
+
+
+async def update_lora_index(
+    stored_name: str, original_name: str, timestamp: int, size: int
+):
+    """Update the LoRA index.json file with a new entry"""
+    try:
+        index_file = Path("uploads/lora_files/index.json")
+
+        # Load existing index or create new one
+        if index_file.exists():
+            try:
+                with open(index_file, "r") as f:
+                    index_data = json.loads(f.read())
+            except (json.JSONDecodeError, FileNotFoundError):
+                index_data = {"entries": []}
+        else:
+            index_data = {"entries": []}
+
+        # Add new entry
+        new_entry = {
+            "stored_name": stored_name,
+            "original_name": original_name,
+            "timestamp": timestamp,
+            "size": size,
+        }
+
+        # Check if entry already exists (avoid duplicates)
+        existing_entry = next(
+            (
+                entry
+                for entry in index_data["entries"]
+                if entry["stored_name"] == stored_name
+            ),
+            None,
+        )
+
+        if not existing_entry:
+            index_data["entries"].append(new_entry)
+
+            # Save updated index
+            with open(index_file, "w") as f:
+                json.dump(index_data, f, indent=2)
+
+            logger.info(f"Updated index.json with new LoRA: {stored_name}")
+        else:
+            logger.info(f"LoRA entry already exists in index: {stored_name}")
+
+    except Exception as e:
+        logger.error(f"Failed to update LoRA index: {e}")
+        # Don't fail the upload if index update fails
+
+
+async def remove_lora_from_index(stored_name: str):
+    """Remove a LoRA entry from the index.json file"""
+    try:
+        index_file = Path("uploads/lora_files/index.json")
+
+        if not index_file.exists():
+            return
+
+        with open(index_file, "r") as f:
+            index_data = json.loads(f.read())
+
+        # Remove the entry
+        index_data["entries"] = [
+            entry
+            for entry in index_data["entries"]
+            if entry["stored_name"] != stored_name
+        ]
+
+        # Save updated index
+        with open(index_file, "w") as f:
+            json.dump(index_data, f, indent=2)
+
+        logger.info(f"Removed LoRA entry from index: {stored_name}")
+
+    except Exception as e:
+        logger.error(f"Failed to remove LoRA from index: {e}")
 
 
 @router.get("/debug-version")
@@ -394,12 +476,111 @@ def get_gpu_info():
 
 
 @router.get("/loras")
-def list_loras():
-    """List all available LoRA files - only Hugging Face LoRAs supported"""
-    return {
-        "available_loras": [],
-        "note": "Only Hugging Face LoRAs are supported. Use /apply-lora with a Hugging Face repository ID.",
-    }
+async def get_available_loras():
+    """Get list of available LoRA files (uploaded and default)"""
+    try:
+        # Get uploaded LoRAs from index.json
+        uploaded_loras = []
+        index_file = Path("uploads/lora_files/index.json")
+
+        if index_file.exists():
+            try:
+                with open(index_file, "r") as f:
+                    index_data = json.loads(f.read())
+                    if "entries" in index_data and isinstance(
+                        index_data["entries"], list
+                    ):
+                        uploaded_loras = index_data["entries"]
+                        logger.info(
+                            f"Loaded {len(uploaded_loras)} LoRAs from index.json"
+                        )
+                    else:
+                        logger.warning("Invalid index.json format")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse index.json: {e}")
+                uploaded_loras = []
+
+        # Add default LoRA
+        default_loras = [
+            {
+                "name": "/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors",
+                "display_name": "21j3h123/realEarthKontext/lora_emoji.safetensors (Default)",
+                "type": "default",
+                "weight": 1.0,
+            }
+        ]
+
+        return {
+            "uploaded": uploaded_loras,
+            "default": default_loras,
+            "total_count": len(uploaded_loras) + len(default_loras),
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting available LoRAs: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get available LoRAs: {str(e)}"
+        )
+
+
+@router.post("/upload-lora")
+async def upload_lora_file(file: UploadFile = File(...)):
+    """Upload a LoRA file to the server"""
+
+    # Check file type
+    allowed_extensions = [".safetensors", ".bin", ".pt", ".pth"]
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    file_extension = Path(file.filename).suffix.lower()
+
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}",
+        )
+
+    # Check file size (max 1GB)
+    max_size = 1024 * 1024 * 1024  # 1GB
+    if not file.size or file.size > max_size:
+        raise HTTPException(
+            status_code=400, detail="File too large. Maximum size is 1GB."
+        )
+
+    try:
+        # Create uploads directory if it doesn't exist
+        uploads_dir = Path("uploads/lora_files")
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate unique filename
+        timestamp = int(time.time())
+        safe_filename = f"uploaded_lora_{timestamp}{file_extension}"
+        file_path = uploads_dir / safe_filename
+
+        # Save the uploaded file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        logger.info(f"LoRA file uploaded successfully: {file_path}")
+
+        # Update the index.json file
+        try:
+            await update_lora_index(safe_filename, file.filename, timestamp, file.size)
+        except Exception as index_error:
+            logger.warning(f"Failed to update LoRA index after upload: {index_error}")
+
+        return {
+            "message": "LoRA file uploaded successfully",
+            "filename": safe_filename,
+            "file_path": str(file_path),
+            "size": file.size,
+        }
+
+    except Exception as e:
+        logger.error(f"Error uploading LoRA file: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to upload LoRA file: {str(e)}"
+        )
 
 
 @router.post("/apply-lora")
@@ -431,6 +612,32 @@ async def apply_lora(lora_name: str, weight: float = 1.0):
         )
         raise HTTPException(
             status_code=500, detail=f"LoRA application failed: {str(e)}"
+        )
+
+
+@router.delete("/remove-lora/{filename}")
+async def remove_lora_file(filename: str):
+    """Remove a LoRA file and its entry from the index"""
+    try:
+        uploads_dir = Path("uploads/lora_files")
+        file_path = uploads_dir / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="LoRA file not found")
+
+        # Remove the file
+        file_path.unlink()
+
+        # Remove entry from index.json
+        await remove_lora_from_index(filename)
+
+        logger.info(f"LoRA file removed: {filename}")
+        return {"message": f"LoRA file {filename} removed successfully"}
+
+    except Exception as e:
+        logger.error(f"Error removing LoRA file: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to remove LoRA file: {str(e)}"
         )
 
 
@@ -715,65 +922,4 @@ def generate_image_internal(
         )
 
 
-@router.post("/upload-lora")
-async def upload_lora_file(file: UploadFile = File(...)):
-    """Upload a LoRA file to the server"""
-    import shutil
-    from pathlib import Path
 
-    # Check file type
-    allowed_extensions = [".safetensors", ".bin", ".pt", ".pth"]
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided")
-
-    file_extension = Path(file.filename).suffix.lower()
-
-    if file_extension not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}",
-        )
-
-    # Check file size (max 1GB)
-    max_size = 1024 * 1024 * 1024  # 1GB
-    if not file.size or file.size > max_size:
-        raise HTTPException(
-            status_code=400, detail="File too large. Maximum size is 1GB."
-        )
-
-    try:
-        # Create uploads directory if it doesn't exist
-        uploads_dir = Path("uploads/lora_files")
-        uploads_dir.mkdir(parents=True, exist_ok=True)
-
-        # Generate unique filename
-        timestamp = int(time.time())
-        safe_filename = f"uploaded_lora_{timestamp}{file_extension}"
-        file_path = uploads_dir / safe_filename
-
-        # Save the uploaded file
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        logger.info(f"LoRA file uploaded successfully: {file_path}")
-
-        # Trigger cleanup after upload
-        try:
-            from utils.cleanup_service import cleanup_after_upload
-
-            cleanup_after_upload()
-        except Exception as cleanup_error:
-            logger.warning(f"Failed to trigger cleanup after upload: {cleanup_error}")
-
-        return {
-            "message": "LoRA file uploaded successfully",
-            "filename": safe_filename,
-            "file_path": str(file_path),
-            "size": file.size,
-        }
-
-    except Exception as e:
-        logger.error(f"Error uploading LoRA file: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to upload LoRA file: {str(e)}"
-        )

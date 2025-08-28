@@ -810,6 +810,146 @@ textarea {
     gap: 0.75rem;
 }
 
+.lora-selection-section {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+/* New LoRA selector layout */
+.lora-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.lora-dropdown-container {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.lora-dropdown {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background: white;
+    font-size: 0.9rem;
+}
+
+.lora-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.applied-lora-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.applied-lora-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+}
+
+.applied-lora-item .lora-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.applied-lora-item .lora-name {
+    font-weight: 600;
+    color: #2d3748;
+    max-width: 420px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.applied-lora-item .lora-meta {
+    font-size: 0.8rem;
+    color: #6b7280;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.applied-lora-item .weight-control input {
+    width: 80px;
+}
+
+.lora-selection-section label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+.lora-select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background: white;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.lora-select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.lora-weight-control {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.lora-weight-control label {
+    margin-bottom: 0;
+    margin-right: 0.5rem;
+    white-space: nowrap;
+}
+
+.lora-weight-input {
+    width: 80px;
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.lora-weight-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.lora-manual-section {
+    margin-top: 1rem;
+}
+
+.lora-manual-section h4 {
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    color: #495057;
+    font-weight: 600;
+}
+
 .lora-buttons {
     display: flex;
     gap: 0.5rem;
@@ -1354,4 +1494,74 @@ body {
     margin: 0;
     color: #2d3748;
     font-size: 0.9rem;
+}
+
+/* Upload Progress Styles */
+.upload-progress-container {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    border-left: 4px solid #28a745;
+}
+
+.upload-progress-container.hidden {
+    display: none;
+}
+
+.upload-progress-header {
+    margin-bottom: 1rem;
+}
+
+.upload-progress-header h4 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.upload-progress-header h4 i {
+    color: #28a745;
+}
+
+.upload-progress-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.upload-file-info {
+    text-align: center;
+}
+
+.upload-filename {
+    font-size: 0.85rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.upload-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.upload-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.upload-status {
+    text-align: center;
+    font-size: 0.85rem;
+    color: #495057;
+    font-weight: 500;
 }
