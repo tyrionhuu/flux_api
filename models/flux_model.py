@@ -13,7 +13,7 @@ from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 
-from config.fp4_settings import (MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
+from config.fp4_settings import MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID
 from utils.gpu_manager import GPUManager
 
 # Configure logging
@@ -193,10 +193,6 @@ class FluxModelManager:
             logger.warning(
                 f"CUDA Graph warm-up failed: {e} - continuing without warm-up"
             )
-
-
-
-
 
     # Removed _integrate_quantized_weights - now using Nunchaku pipeline directly
 

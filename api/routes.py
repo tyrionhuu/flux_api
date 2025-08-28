@@ -3,15 +3,15 @@ API routes for the FLUX API
 """
 
 import logging
+import os
 import time
 from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-import os
+
 from api.models import GenerateRequest
-from config.fp4_settings import (MAX_TRIGGER_WORD_LENGTH,
-                                 STATIC_IMAGES_DIR)
+from config.fp4_settings import MAX_TRIGGER_WORD_LENGTH, STATIC_IMAGES_DIR
 from models.flux_model import FluxModelManager
 from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name)
@@ -156,16 +156,26 @@ async def generate_image(request: GenerateRequest):
                             detail="LoRA weight must be between 0 and 2.0",
                         )
                     # Validate trigger word length if provided
-                    if lora_config.trigger_word and len(lora_config.trigger_word.strip()) > MAX_TRIGGER_WORD_LENGTH:
+                    if (
+                        lora_config.trigger_word
+                        and len(lora_config.trigger_word.strip())
+                        > MAX_TRIGGER_WORD_LENGTH
+                    ):
                         raise HTTPException(
                             status_code=400,
                             detail=f"Trigger word exceeds maximum length of {MAX_TRIGGER_WORD_LENGTH} characters",
                         )
-                    loras_to_apply.append({
-                        "name": lora_config.name.strip(), 
-                        "weight": lora_config.weight,
-                        "trigger_word": lora_config.trigger_word.strip() if lora_config.trigger_word else None
-                    })
+                    loras_to_apply.append(
+                        {
+                            "name": lora_config.name.strip(),
+                            "weight": lora_config.weight,
+                            "trigger_word": (
+                                lora_config.trigger_word.strip()
+                                if lora_config.trigger_word
+                                else None
+                            ),
+                        }
+                    )
         # Legacy support for single LoRA
         elif request.lora_name:
             if not request.lora_name.strip():
@@ -180,11 +190,13 @@ async def generate_image(request: GenerateRequest):
                 raise HTTPException(
                     status_code=400, detail="LoRA weight must be between 0 and 2.0"
                 )
-            loras_to_apply.append({
-                "name": request.lora_name.strip(), 
-                "weight": request.lora_weight,
-                "trigger_word": None  # Legacy single LoRA doesn't support trigger words
-            })
+            loras_to_apply.append(
+                {
+                    "name": request.lora_name.strip(),
+                    "weight": request.lora_weight,
+                    "trigger_word": None,  # Legacy single LoRA doesn't support trigger words
+                }
+            )
 
         # No default LoRA - users must explicitly specify LoRAs if they want them
         # This removes the hardcoded "GHIBLISTYLE" trigger word behavior
@@ -302,7 +314,7 @@ async def generate_image(request: GenerateRequest):
 
         # Process prompt with LoRA trigger words
         processed_prompt = process_prompt_with_loras(prompt, loras_to_apply)
-        
+
         result = generate_image_internal(
             processed_prompt,
             "FLUX",
@@ -599,16 +611,18 @@ async def get_queue_stats():
 def process_prompt_with_loras(prompt: str, loras: list) -> str:
     """Process prompt by adding trigger words from LoRAs"""
     enhanced_prompt = prompt
-    
+
     for lora_config in loras:
-        if lora_config.get('trigger_word') and lora_config['trigger_word'].strip():
-            trigger = lora_config['trigger_word'].strip()
+        if lora_config.get("trigger_word") and lora_config["trigger_word"].strip():
+            trigger = lora_config["trigger_word"].strip()
             # Validate trigger word length
             if len(trigger) > MAX_TRIGGER_WORD_LENGTH:
-                logger.warning(f"Trigger word '{trigger}' exceeds maximum length, truncating")
+                logger.warning(
+                    f"Trigger word '{trigger}' exceeds maximum length, truncating"
+                )
                 trigger = trigger[:MAX_TRIGGER_WORD_LENGTH]
             enhanced_prompt = f"{trigger}, {enhanced_prompt}"
-    
+
     return enhanced_prompt
 
 
