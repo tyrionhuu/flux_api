@@ -338,73 +338,46 @@ class FluxModelManager:
         try:
             logger.info(f"Generating image with prompt: {prompt}")
 
-            # Try with user-specified parameters first
-            try:
-                logger.info(
-                    f"Generating with parameters: steps={num_inference_steps}, guidance={guidance_scale}, size={width}x{height}, max_area={width * height}, _auto_resize=False"
-                )
+            # Set seed if provided
+            generator = None
+            if seed is not None:
+                try:
+                    generator = torch.Generator(device="cuda").manual_seed(seed)
+                    logger.info(f"Created torch generator with seed: {seed}")
+                    logger.info(f"Generator device: {generator.device}, generator state: {generator.initial_seed()}")
+                except Exception as seed_error:
+                    logger.error(f"Failed to create torch generator with seed {seed}: {seed_error}")
+                    generator = None
+            else:
+                logger.info("No seed provided, using random generation")
 
-                # Set seed if provided
-                if seed is not None:
-                    torch.manual_seed(seed)
-                    logger.info(f"Using seed: {seed}")
+            # Prepare generation kwargs
+            generation_kwargs = {
+                "prompt": prompt,
+                "num_inference_steps": num_inference_steps,
+                "guidance_scale": guidance_scale,
+                "width": width,
+                "height": height,
+                # Force the FLUX pipeline to respect our exact dimensions
+                "max_area": width * height,
+                "_auto_resize": False,
+            }
 
-                # Prepare generation kwargs
-                generation_kwargs = {
-                    "prompt": prompt,
-                    "num_inference_steps": num_inference_steps,
-                    "guidance_scale": guidance_scale,
-                    "width": width,
-                    "height": height,
-                    # Force the FLUX pipeline to respect our exact dimensions
-                    "max_area": width * height,
-                    "_auto_resize": False,
-                }
+            # Add negative prompt if provided
+            if negative_prompt:
+                generation_kwargs["negative_prompt"] = negative_prompt
 
-                # Add negative prompt if provided
-                if negative_prompt:
-                    generation_kwargs["negative_prompt"] = negative_prompt
+            # Add generator if seed is set
+            if generator:
+                generation_kwargs["generator"] = generator
+                logger.info("Generator added to generation kwargs")
+                logger.info(f"Final generation kwargs: {list(generation_kwargs.keys())}")
+            else:
+                logger.info("No generator in generation kwargs - using random generation")
 
-                result = self.pipe(**generation_kwargs)
-                logger.info("Image generation completed successfully")
-                return result
-
-            except Exception as memory_error:
-                if "CUDA" in str(memory_error) or "memory" in str(memory_error).lower():
-                    logger.warning(
-                        f"CUDA memory error detected: {memory_error} (Type: {type(memory_error).__name__})"
-                    )
-                    logger.info("Trying with reduced parameters...")
-
-                    # Fallback with reduced parameters
-                    fallback_steps = min(num_inference_steps // 2, 10)
-                    fallback_guidance = max(guidance_scale * 0.6, 1.0)
-
-                    generation_kwargs = {
-                        "prompt": prompt,
-                        "num_inference_steps": fallback_steps,
-                        "guidance_scale": fallback_guidance,
-                        "width": width,
-                        "height": height,
-                        # Force the FLUX pipeline to respect our exact dimensions
-                        "max_area": width * height,
-                        "_auto_resize": False,
-                    }
-
-                    if negative_prompt:
-                        generation_kwargs["negative_prompt"] = negative_prompt
-
-                    result = self.pipe(**generation_kwargs)
-                    logger.info(
-                        f"Image generation completed with reduced parameters: steps={fallback_steps}, guidance={fallback_guidance}"
-                    )
-                    return result
-                else:
-                    # Re-raise if it's not a memory error
-                    logger.error(
-                        f"Non-memory error during image generation: {memory_error} (Type: {type(memory_error).__name__})"
-                    )
-                    raise memory_error
+            result = self.pipe(**generation_kwargs)
+            logger.info("Image generation completed successfully")
+            return result
 
         except Exception as e:
             logger.error(f"Error in image generation: {e} (Type: {type(e).__name__})")
@@ -463,8 +436,15 @@ class FluxModelManager:
             # Set seed if provided
             generator = None
             if seed is not None:
-                generator = torch.Generator(device="cuda").manual_seed(seed)
-                logger.info(f"Using seed: {seed}")
+                try:
+                    generator = torch.Generator(device="cuda").manual_seed(seed)
+                    logger.info(f"Created torch generator with seed: {seed}")
+                    logger.info(f"Generator device: {generator.device}, generator state: {generator.initial_seed()}")
+                except Exception as seed_error:
+                    logger.error(f"Failed to create torch generator with seed {seed}: {seed_error}")
+                    generator = None
+            else:
+                logger.info("No seed provided, using random generation")
 
             # Prepare generation kwargs for image-to-image
             generation_kwargs = {
@@ -494,6 +474,10 @@ class FluxModelManager:
             # Add generator if seed is set
             if generator:
                 generation_kwargs["generator"] = generator
+                logger.info("Generator added to generation kwargs")
+                logger.info(f"Final generation kwargs: {list(generation_kwargs.keys())}")
+            else:
+                logger.info("No generator in generation kwargs - using random generation")
 
             result = self.pipe(**generation_kwargs)
             logger.info("Image-to-image generation completed successfully")
