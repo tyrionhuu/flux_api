@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.routes import router, get_model_manager
+from api.routes import get_model_manager, router
 from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
                              FP4_API_PORT)
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service

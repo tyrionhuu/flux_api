@@ -9,10 +9,9 @@ import shutil
 import time
 from pathlib import Path
 from typing import Optional
-from fastapi.responses import HTMLResponse
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from api.models import GenerateRequest
 from config.settings import (DEFAULT_GUIDANCE_SCALE, INFERENCE_STEPS,
