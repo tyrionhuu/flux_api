@@ -244,12 +244,12 @@ def _extract_loras_from_request(request: GenerateRequest):
                     raise HTTPException(
                         status_code=400, detail="LoRA name cannot be empty"
                     )
-                if lora_config.weight < 0 or lora_config.weight > 2.0:
+                if not hasattr(lora_config, 'weight') or lora_config.weight < 0 or lora_config.weight > 2.0:
                     raise HTTPException(
                         status_code=400, detail="LoRA weight must be between 0 and 2.0"
                     )
                 loras_to_apply.append(
-                    {"name": lora_config.name.strip(), "weight": lora_config.weight}
+                    {"name": lora_config.name.strip(), "weight": float(lora_config.weight)}
                 )
     elif request.lora_name:
         if not request.lora_name.strip():
@@ -265,14 +265,16 @@ def _extract_loras_from_request(request: GenerateRequest):
                 status_code=400, detail="LoRA weight must be between 0 and 2.0"
             )
         loras_to_apply.append(
-            {"name": request.lora_name.strip(), "weight": request.lora_weight}
+            {"name": request.lora_name.strip(), "weight": float(request.lora_weight)}
         )
 
+    # Only apply default LoRA if explicitly requested or if no LoRAs specified
     if (
         not loras_to_apply
         and not remove_all_loras
         and request.loras is None
         and not request.lora_name
+        and hasattr(request, 'use_default_lora') and request.use_default_lora
     ):
         loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
 
@@ -284,19 +286,32 @@ def _apply_loras(loras_to_apply, remove_all_loras):
     lora_applied = None
     lora_weight_applied = None
 
+    logger.info(f"LoRA application request - loras_to_apply: {loras_to_apply}, remove_all_loras: {remove_all_loras}")
+    logger.info(f"Current LoRA state: {current_lora}")
+
     if loras_to_apply:
         logger.info(f"Applying {len(loras_to_apply)} LoRAs to loaded model")
         for lora_config in loras_to_apply:
+            logger.info(f"Processing LoRA: {lora_config}")
             if not lora_config["name"]:
                 raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
+            
+            # Handle uploaded LoRAs
             if lora_config["name"].startswith("uploaded_lora_"):
                 upload_path = f"uploads/lora_files/{lora_config['name']}"
                 if not os.path.exists(upload_path):
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Uploaded LoRA file not found: {lora_config['name']}",
+                        detail=f"Uploaded LoRA file not found: {lora_config['name']} at {upload_path}",
                     )
-            elif "/" not in lora_config["name"]:
+                logger.info(f"Found uploaded LoRA at: {upload_path}")
+            # Handle Hugging Face LoRAs
+            elif "/" in lora_config["name"]:
+                logger.info(f"Processing Hugging Face LoRA: {lora_config['name']}")
+            # Handle local path LoRAs
+            elif os.path.exists(lora_config["name"]):
+                logger.info(f"Processing local LoRA: {lora_config['name']}")
+            else:
                 raise HTTPException(
                     status_code=400,
                     detail=(
@@ -304,6 +319,7 @@ def _apply_loras(loras_to_apply, remove_all_loras):
                     ),
                 )
 
+        # Apply the LoRAs
         if not model_manager.apply_multiple_loras(loras_to_apply):
             logger.error(
                 f"Multiple LoRA application failed - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is None}"
@@ -320,14 +336,21 @@ def _apply_loras(loras_to_apply, remove_all_loras):
             logger.info(
                 f"Multiple LoRAs applied successfully. Current LoRAs: {lora_applied} with total weight {lora_weight_applied}"
             )
+        else:
+            logger.warning("LoRAs were applied but get_lora_info() returned None")
     elif remove_all_loras:
         if model_manager.get_lora_info():
             logger.info("Removing all LoRAs as requested by client (empty list)")
             model_manager.remove_lora()
+        else:
+            logger.info("No LoRAs to remove")
     else:
         if current_lora:
             lora_applied = current_lora.get("name")
             lora_weight_applied = current_lora.get("weight")
+            logger.info(f"Using existing LoRA: {lora_applied} with weight {lora_weight_applied}")
+        else:
+            logger.info("No LoRAs specified and no existing LoRAs")
 
     return lora_applied, lora_weight_applied
 
