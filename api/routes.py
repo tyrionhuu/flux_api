@@ -773,7 +773,6 @@ async def generate_with_image(
                 status_code=400, detail="height must be between 256 and 1024"
             )
 
-        # Load input image
         if not image.filename:
             raise HTTPException(status_code=400, detail="No image file provided")
 
