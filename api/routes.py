@@ -18,7 +18,7 @@ from PIL import Image
 from rembg import remove
 
 from api.models import GenerateRequest
-from config.settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
+from config.settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT, DEFAULT_GUIDANCE_SCALE, INFERENCE_STEPS
 from models.flux_model import FluxModelManager
 from models.upscaler import apply_upscaling
 from utils.cleanup_service import (cleanup_after_generation,
@@ -537,8 +537,8 @@ async def generate_image(request: GenerateRequest):
 async def generate_with_image_and_return(
     prompt: str = Form(...),
     image: UploadFile = File(...),
-    num_inference_steps: Optional[int] = Form(10),
-    guidance_scale: Optional[float] = Form(0),
+    num_inference_steps: Optional[int] = Form(INFERENCE_STEPS),
+    guidance_scale: Optional[float] = Form(DEFAULT_GUIDANCE_SCALE),
     width: Optional[int] = Form(512),
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
@@ -623,8 +623,8 @@ async def generate_with_image_and_return(
             return model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
                 image=img,
-                num_inference_steps=num_inference_steps or 10,
-                guidance_scale=guidance_scale or 0,
+                num_inference_steps=num_inference_steps or INFERENCE_STEPS,
+                guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
                 width=width or 512,
                 height=height or 512,
                 seed=seed,
@@ -732,8 +732,8 @@ async def generate_with_image_and_return(
 async def generate_with_image(
     prompt: str = Form(...),
     image: UploadFile = File(...),
-    num_inference_steps: Optional[int] = Form(10),
-    guidance_scale: Optional[float] = Form(0),
+    num_inference_steps: Optional[int] = Form(INFERENCE_STEPS),
+    guidance_scale: Optional[float] = Form(DEFAULT_GUIDANCE_SCALE),
     width: Optional[int] = Form(512),
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
@@ -820,8 +820,8 @@ async def generate_with_image(
             return model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
                 image=img,
-                num_inference_steps=num_inference_steps or 10,
-                guidance_scale=guidance_scale or 0,
+                num_inference_steps=num_inference_steps or INFERENCE_STEPS,
+                guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
                 width=width or 512,
                 height=height or 512,
                 seed=seed,
@@ -1234,8 +1234,8 @@ def generate_image_internal(
         # Generate the image
         result = model_manager.generate_image(
             enhanced_prompt,
-            10,  # Fixed num_inference_steps
-            0,  # Fixed guidance_scale
+            INFERENCE_STEPS,
+            DEFAULT_GUIDANCE_SCALE,
             width,
             height,
             seed,
