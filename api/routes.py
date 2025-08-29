@@ -922,10 +922,10 @@ async def generate_with_image(
         # Return JSON response in the same format as /generate endpoint
         filename = os.path.basename(image_filename)
         download_url = f"/generated_images/{filename}"
-        
+
         # Format generation time
         formatted_generation_time = f"{generation_time:.2f}s"
-        
+
         return {
             "message": f"Generated image from uploaded image for prompt: {enhanced_prompt}",
             "image_url": image_filename,
