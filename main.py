@@ -4,13 +4,14 @@ Main FastAPI application for the FP4 FLUX API (Port 8002)
 
 import logging
 import os
+import time
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.routes import router
+from api.routes import router, get_model_manager
 from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
                              FP4_API_PORT)
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
@@ -70,8 +71,29 @@ async def lifespan(app: FastAPI):
     try:
         start_cleanup_service()
         logging.info("FP4 FLUX API started with cleanup service")
+
+        # Auto-load the FLUX model
+        logging.info("Auto-loading FLUX model...")
+
+        model_manager = get_model_manager()
+
+        if model_manager.load_model():
+            logging.info("FLUX model loaded successfully during startup")
+        else:
+            logging.error("Failed to load FLUX model during startup")
+
+        time.sleep(2)
+
+        # Verify model is ready
+        if model_manager.is_loaded():
+            logging.info("FLUX model verified and ready for requests")
+        else:
+            logging.warning(
+                "FLUX model may not be fully ready - some requests may fail"
+            )
+
     except Exception as e:
-        logging.error(f"Failed to start cleanup service: {e}")
+        logging.error(f"Failed to start services: {e}")
 
     yield
 
