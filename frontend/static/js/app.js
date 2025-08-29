@@ -99,6 +99,24 @@ class FluxAPI {
             });
         }
 
+        // Background removal strength wiring
+        const removeBgCheckboxInit = document.getElementById('remove-background');
+        const bgStrengthSlider = document.getElementById('bg_strength');
+        const bgStrengthValue = document.getElementById('bg_strength_value');
+        if (removeBgCheckboxInit && bgStrengthSlider) {
+            const syncBgStrength = () => {
+                bgStrengthSlider.disabled = !removeBgCheckboxInit.checked;
+                if (bgStrengthValue) {
+                    const v = parseFloat(bgStrengthSlider.value || '0');
+                    bgStrengthValue.textContent = v.toFixed(2);
+                }
+                this.updateApiCommand();
+            };
+            removeBgCheckboxInit.addEventListener('change', syncBgStrength);
+            bgStrengthSlider.addEventListener('input', syncBgStrength);
+            syncBgStrength();
+        }
+
         // Inference steps slider
         const inferenceStepsSlider = document.getElementById('inference_steps');
         if (inferenceStepsSlider) {
@@ -761,6 +779,10 @@ class FluxAPI {
         const removeBgCheckbox = document.getElementById('remove-background');
         if (removeBgCheckbox && removeBgCheckbox.checked) {
             params.remove_background = true;
+            const bgStrength = document.getElementById('bg_strength');
+            if (bgStrength && bgStrength.value) {
+                params.bg_strength = parseFloat(bgStrength.value);
+            }
         }
  
         return params;
