@@ -18,7 +18,8 @@ from PIL import Image
 from rembg import remove
 
 from api.models import GenerateRequest
-from config.settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT, DEFAULT_GUIDANCE_SCALE, INFERENCE_STEPS
+from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_LORA_NAME,
+                             DEFAULT_LORA_WEIGHT, INFERENCE_STEPS)
 from models.flux_model import FluxModelManager
 from models.upscaler import apply_upscaling
 from utils.cleanup_service import (cleanup_after_generation,
@@ -132,6 +133,7 @@ async def remove_lora_from_index(stored_name: str):
 
     except Exception as e:
         logger.error(f"Failed to remove LoRA from index: {e}")
+
 
 @router.get("/")
 def read_root():
