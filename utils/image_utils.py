@@ -20,11 +20,8 @@ def extract_image_from_result(result: Any) -> Image.Image:
     logger = logging.getLogger(__name__)
 
     try:
-        logger.info(f"Extracting image from result type: {type(result)}")
-
         # Handle different possible return types from FLUX pipeline
         if hasattr(result, "images") and result.images:
-            logger.info("Found result.images, returning first image")
             return result.images[0]
         elif isinstance(result, (list, tuple)) and len(result) > 0:
             logger.info(f"Result is {type(result)} with {len(result)} items")

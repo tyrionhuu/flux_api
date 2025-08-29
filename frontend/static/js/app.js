@@ -98,6 +98,32 @@ class FluxAPI {
                 this.updateApiCommand();
             });
         }
+
+        // Inference steps slider
+        const inferenceStepsSlider = document.getElementById('inference_steps');
+        if (inferenceStepsSlider) {
+            inferenceStepsSlider.addEventListener('input', (e) => {
+                const valueDisplay = document.getElementById('inference_steps_value');
+                if (valueDisplay) {
+                    valueDisplay.textContent = e.target.value;
+                }
+                // Update API command when inference steps change
+                this.updateApiCommand();
+            });
+        }
+
+        // Guidance scale slider
+        const guidanceScaleSlider = document.getElementById('guidance_scale');
+        if (guidanceScaleSlider) {
+            guidanceScaleSlider.addEventListener('input', (e) => {
+                const valueDisplay = document.getElementById('guidance_scale_value');
+                if (valueDisplay) {
+                    valueDisplay.textContent = parseFloat(e.target.value).toFixed(1);
+                }
+                // Update API command when guidance scale changes
+                this.updateApiCommand();
+            });
+        }
         
         // Image upload functionality
         this.setupImageUpload();
@@ -634,6 +660,16 @@ class FluxAPI {
             const height = document.getElementById('height').value;
             formData.append('width', width);
             formData.append('height', height);
+
+            // Add inference controls
+            const inferenceSteps = document.getElementById('inference_steps');
+            if (inferenceSteps && inferenceSteps.value) {
+                formData.append('num_inference_steps', parseInt(inferenceSteps.value, 10));
+            }
+            const guidanceScale = document.getElementById('guidance_scale');
+            if (guidanceScale && guidanceScale.value) {
+                formData.append('guidance_scale', parseFloat(guidanceScale.value));
+            }
             
             // Add LoRA configurations
             const loraConfigs = this.getLoraConfigs();
@@ -694,7 +730,9 @@ class FluxAPI {
         const params = {
             prompt: document.getElementById('prompt').value.trim(),
             width: parseInt(document.getElementById('width').value),
-            height: parseInt(document.getElementById('height').value)
+            height: parseInt(document.getElementById('height').value),
+            num_inference_steps: parseInt(document.getElementById('inference_steps').value),
+            guidance_scale: parseFloat(document.getElementById('guidance_scale').value)
         };
         
         // Always include LoRA configurations (empty list means remove any applied LoRA)
@@ -1070,6 +1108,8 @@ class FluxAPI {
         const width = document.getElementById('width').value;
         const height = document.getElementById('height').value;
         const seed = document.getElementById('seed').value;
+        const numInferenceSteps = document.getElementById('inference_steps').value;
+        const guidanceScale = document.getElementById('guidance_scale').value;
         const upscaleCheckbox = document.getElementById('upscale');
         const upscaleFactorEl = document.getElementById('upscale-factor');
         
@@ -1088,6 +1128,9 @@ class FluxAPI {
             if (seed) {
                 command += ` -F "seed=${seed}"`;
             }
+            
+            command += ` -F "num_inference_steps=${numInferenceSteps}"`;
+            command += ` -F "guidance_scale=${guidanceScale}"`;
             
             if (loras && loras.length > 0) {
                 // Convert LoRAs to JSON string for form data
@@ -1120,7 +1163,9 @@ class FluxAPI {
             const jsonPayload = {
                 prompt: prompt,
                 width: parseInt(width),
-                height: parseInt(height)
+                height: parseInt(height),
+                num_inference_steps: parseInt(numInferenceSteps),
+                guidance_scale: parseFloat(guidanceScale)
             };
             
             if (seed) {

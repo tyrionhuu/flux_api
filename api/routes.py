@@ -244,12 +244,19 @@ def _extract_loras_from_request(request: GenerateRequest):
                     raise HTTPException(
                         status_code=400, detail="LoRA name cannot be empty"
                     )
-                if not hasattr(lora_config, 'weight') or lora_config.weight < 0 or lora_config.weight > 2.0:
+                if (
+                    not hasattr(lora_config, "weight")
+                    or lora_config.weight < 0
+                    or lora_config.weight > 2.0
+                ):
                     raise HTTPException(
                         status_code=400, detail="LoRA weight must be between 0 and 2.0"
                     )
                 loras_to_apply.append(
-                    {"name": lora_config.name.strip(), "weight": float(lora_config.weight)}
+                    {
+                        "name": lora_config.name.strip(),
+                        "weight": float(lora_config.weight),
+                    }
                 )
     elif request.lora_name:
         if not request.lora_name.strip():
@@ -274,7 +281,8 @@ def _extract_loras_from_request(request: GenerateRequest):
         and not remove_all_loras
         and request.loras is None
         and not request.lora_name
-        and hasattr(request, 'use_default_lora') and request.use_default_lora
+        and hasattr(request, "use_default_lora")
+        and request.use_default_lora
     ):
         loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
 
@@ -286,7 +294,9 @@ def _apply_loras(loras_to_apply, remove_all_loras):
     lora_applied = None
     lora_weight_applied = None
 
-    logger.info(f"LoRA application request - loras_to_apply: {loras_to_apply}, remove_all_loras: {remove_all_loras}")
+    logger.info(
+        f"LoRA application request - loras_to_apply: {loras_to_apply}, remove_all_loras: {remove_all_loras}"
+    )
     logger.info(f"Current LoRA state: {current_lora}")
 
     if loras_to_apply:
@@ -295,7 +305,7 @@ def _apply_loras(loras_to_apply, remove_all_loras):
             logger.info(f"Processing LoRA: {lora_config}")
             if not lora_config["name"]:
                 raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
-            
+
             # Handle uploaded LoRAs
             if lora_config["name"].startswith("uploaded_lora_"):
                 upload_path = f"uploads/lora_files/{lora_config['name']}"
@@ -348,7 +358,9 @@ def _apply_loras(loras_to_apply, remove_all_loras):
         if current_lora:
             lora_applied = current_lora.get("name")
             lora_weight_applied = current_lora.get("weight")
-            logger.info(f"Using existing LoRA: {lora_applied} with weight {lora_weight_applied}")
+            logger.info(
+                f"Using existing LoRA: {lora_applied} with weight {lora_weight_applied}"
+            )
         else:
             logger.info("No LoRAs specified and no existing LoRAs")
 
@@ -645,14 +657,17 @@ async def generate_with_image_and_return(
             logger.info(
                 f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}"
             )
+            logger.info(
+                f"Using parameters from request: num_inference_steps={_req.num_inference_steps}, guidance_scale={_req.guidance_scale}, width={_req.width}, height={_req.height}, seed={_req.seed}"
+            )
             return model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
                 image=img,
-                num_inference_steps=num_inference_steps or INFERENCE_STEPS,
-                guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
-                width=width or 512,
-                height=height or 512,
-                seed=seed,
+                num_inference_steps=_req.num_inference_steps,
+                guidance_scale=_req.guidance_scale,
+                width=_req.width,
+                height=_req.height,
+                seed=_req.seed,
                 negative_prompt=negative_prompt,
             )
 
@@ -662,6 +677,8 @@ async def generate_with_image_and_return(
                 width=width or 512,
                 height=height or 512,
                 seed=seed,
+                num_inference_steps=num_inference_steps or INFERENCE_STEPS,
+                guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
                 processor=processor,
                 context={},
             )
@@ -682,9 +699,6 @@ async def generate_with_image_and_return(
             generated_image = extract_image_from_result(result)
             if generated_image is None:
                 raise RuntimeError("Failed to extract image from generation result")
-            logger.info(
-                f"Successfully extracted generated image: {type(generated_image)}"
-            )
         except Exception as extract_error:
             logger.error(f"Failed to extract image from result: {extract_error}")
             raise HTTPException(
@@ -841,14 +855,17 @@ async def generate_with_image(
             logger.info(
                 f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}"
             )
+            logger.info(
+                f"Using parameters from request: num_inference_steps={_req.num_inference_steps}, guidance_scale={_req.guidance_scale}, width={_req.width}, height={_req.height}, seed={_req.seed}"
+            )
             return model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
                 image=img,
-                num_inference_steps=num_inference_steps or INFERENCE_STEPS,
-                guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
-                width=width or 512,
-                height=height or 512,
-                seed=seed,
+                num_inference_steps=_req.num_inference_steps,
+                guidance_scale=_req.guidance_scale,
+                width=_req.width,
+                height=_req.height,
+                seed=_req.seed,
                 negative_prompt=negative_prompt,
             )
 
@@ -858,6 +875,8 @@ async def generate_with_image(
                 width=width or 512,
                 height=height or 512,
                 seed=seed,
+                num_inference_steps=num_inference_steps or INFERENCE_STEPS,
+                guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
                 processor=processor,
                 context={},
             )
@@ -878,9 +897,6 @@ async def generate_with_image(
             generated_image = extract_image_from_result(result)
             if generated_image is None:
                 raise RuntimeError("Failed to extract image from generation result")
-            logger.info(
-                f"Successfully extracted generated image: {type(generated_image)}"
-            )
         except Exception as extract_error:
             logger.error(f"Failed to extract image from result: {extract_error}")
             raise HTTPException(
@@ -1105,8 +1121,8 @@ async def submit_generation_request(request: GenerateRequest):
                 if request.loras
                 else None
             ),
-            num_inference_steps=10,  # Fixed value
-            guidance_scale=0,  # Fixed value
+            num_inference_steps=request.num_inference_steps or INFERENCE_STEPS,
+            guidance_scale=request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
             width=request.width or 512,
             height=request.height or 512,
             seed=request.seed,

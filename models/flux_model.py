@@ -344,9 +344,13 @@ class FluxModelManager:
                 try:
                     generator = torch.Generator(device="cuda").manual_seed(seed)
                     logger.info(f"Created torch generator with seed: {seed}")
-                    logger.info(f"Generator device: {generator.device}, generator state: {generator.initial_seed()}")
+                    logger.info(
+                        f"Generator device: {generator.device}, generator state: {generator.initial_seed()}"
+                    )
                 except Exception as seed_error:
-                    logger.error(f"Failed to create torch generator with seed {seed}: {seed_error}")
+                    logger.error(
+                        f"Failed to create torch generator with seed {seed}: {seed_error}"
+                    )
                     generator = None
             else:
                 logger.info("No seed provided, using random generation")
@@ -371,9 +375,13 @@ class FluxModelManager:
             if generator:
                 generation_kwargs["generator"] = generator
                 logger.info("Generator added to generation kwargs")
-                logger.info(f"Final generation kwargs: {list(generation_kwargs.keys())}")
+                logger.info(
+                    f"Final generation kwargs: {list(generation_kwargs.keys())}"
+                )
             else:
-                logger.info("No generator in generation kwargs - using random generation")
+                logger.info(
+                    "No generator in generation kwargs - using random generation"
+                )
 
             result = self.pipe(**generation_kwargs)
             logger.info("Image generation completed successfully")
@@ -439,9 +447,13 @@ class FluxModelManager:
                 try:
                     generator = torch.Generator(device="cuda").manual_seed(seed)
                     logger.info(f"Created torch generator with seed: {seed}")
-                    logger.info(f"Generator device: {generator.device}, generator state: {generator.initial_seed()}")
+                    logger.info(
+                        f"Generator device: {generator.device}, generator state: {generator.initial_seed()}"
+                    )
                 except Exception as seed_error:
-                    logger.error(f"Failed to create torch generator with seed {seed}: {seed_error}")
+                    logger.error(
+                        f"Failed to create torch generator with seed {seed}: {seed_error}"
+                    )
                     generator = None
             else:
                 logger.info("No seed provided, using random generation")
@@ -475,9 +487,13 @@ class FluxModelManager:
             if generator:
                 generation_kwargs["generator"] = generator
                 logger.info("Generator added to generation kwargs")
-                logger.info(f"Final generation kwargs: {list(generation_kwargs.keys())}")
+                logger.info(
+                    f"Final generation kwargs: {list(generation_kwargs.keys())}"
+                )
             else:
-                logger.info("No generator in generation kwargs - using random generation")
+                logger.info(
+                    "No generator in generation kwargs - using random generation"
+                )
 
             result = self.pipe(**generation_kwargs)
             logger.info("Image-to-image generation completed successfully")
