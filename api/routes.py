@@ -925,26 +925,26 @@ async def generate_with_image(
                 # Process the saved image for background removal
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 abs_image_path = Path(base_dir) / image_filename
-                
+
                 with Image.open(abs_image_path).convert("RGBA") as im:
                     out_im = remove(im)
-                
+
                 # Save the processed image with a new name
                 new_rel = save_image_with_unique_name(out_im)
                 new_filename = os.path.basename(new_rel)
-                
+
                 # Clean up the original image
                 try:
                     os.remove(abs_image_path)
                 except Exception:
                     pass
-                
+
                 # Update variables to use the processed image
                 image_filename = new_rel
                 filename = new_filename
-                
+
                 logger.info(f"Background removal completed, new image saved: {new_rel}")
-                
+
             except Exception as e:
                 logger.error(f"Background removal failed: {e}")
                 # Keep the original image if background removal fails
@@ -953,7 +953,7 @@ async def generate_with_image(
         # Return JSON response in the same format as /generate endpoint
         if not remove_background:
             filename = os.path.basename(image_filename)
-        
+
         download_url = f"/generated_images/{filename}"
 
         # Format generation time
