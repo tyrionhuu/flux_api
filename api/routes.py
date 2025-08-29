@@ -919,23 +919,25 @@ async def generate_with_image(
                 detail=f"Failed to save generated image: {str(save_error)}",
             )
 
-        # Read saved image and return as bytes
-        file_path = image_filename
-        if not os.path.exists(file_path):
-            raise HTTPException(
-                status_code=404, detail="Generated image file not found"
-            )
-
-        with open(file_path, "rb") as f:
-            out_bytes = f.read()
-
-        # Cleanup saved file
-        try:
-            os.remove(file_path)
-        except Exception as cleanup_error:
-            logger.warning(f"Failed to cleanup temporary image file: {cleanup_error}")
-
-        return Response(content=out_bytes, media_type="image/png")
+        # Return JSON response in the same format as /generate endpoint
+        filename = os.path.basename(image_filename)
+        download_url = f"/generated_images/{filename}"
+        
+        # Format generation time
+        formatted_generation_time = f"{generation_time:.2f}s"
+        
+        return {
+            "message": f"Generated image from uploaded image for prompt: {enhanced_prompt}",
+            "image_url": image_filename,
+            "download_url": download_url,
+            "filename": filename,
+            "generation_time": formatted_generation_time,
+            "lora_applied": None,  # No LoRA support in image-to-image currently
+            "lora_weight": None,
+            "width": width or 512,
+            "height": height or 512,
+            "seed": seed,
+        }
 
     except Exception as e:
         logger.error(f"Error in generate_with_image: {e}")
