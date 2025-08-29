@@ -192,6 +192,11 @@
                             <div class="background-removal-option">
                                 <input type="checkbox" id="remove-background" name="remove-background">
                                 <label for="remove-background">Enable background removal</label>
+                                <div class="slider-container" style="margin-top:.5rem;">
+                                    <input type="range" id="bg_strength" name="bg_strength" value="0.2" min="0" max="1" step="0.05" disabled>
+                                    <span id="bg_strength_value">0.20</span>
+                                </div>
+                                <small style="color:#6b7280;">Removal strength (0 gentle → 1 aggressive)</small>
                             </div>
                         </div>
                     </div>

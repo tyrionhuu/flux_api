@@ -67,6 +67,12 @@ class GenerateRequest(BaseModel):
     remove_background: Optional[bool] = Field(
         False, description="Whether to remove background from the final image"
     )
+    bg_strength: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Background removal strength (0.0 gentle → 1.0 aggressive)",
+    )
 
 
 class ImageUploadGenerateRequest(BaseModel):
@@ -121,6 +127,12 @@ class ImageUploadGenerateRequest(BaseModel):
     )
     remove_background: Optional[bool] = Field(
         False, description="Whether to remove background from the final image"
+    )
+    bg_strength: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Background removal strength (0.0 gentle → 1.0 aggressive)",
     )
 
 

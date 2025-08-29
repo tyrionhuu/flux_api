@@ -36,6 +36,49 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter()
 
+
+def _removal_params_from_strength(strength: Optional[float]) -> dict:
+    try:
+        if strength is None:
+            # Gentler default
+            return {
+                "alpha_matting": False,
+                "alpha_matting_foreground_threshold": 210,
+                "alpha_matting_background_threshold": 60,
+                "alpha_matting_erode_size": 0,
+                "post_process_mask": False,
+                "putalpha": True,
+            }
+        s = max(0.0, min(1.0, float(strength)))
+        if s <= 0.2:
+            # Very gentle: raw mask with alpha, no erosion
+            return {
+                "alpha_matting": False,
+                "alpha_matting_foreground_threshold": 190,
+                "alpha_matting_background_threshold": 90,
+                "alpha_matting_erode_size": 0,
+                "post_process_mask": False,
+                "putalpha": True,
+            }
+        # Progressive mapping
+        return {
+            "alpha_matting": True,
+            "alpha_matting_foreground_threshold": int(200 + 40 * s),
+            "alpha_matting_background_threshold": int(90 * (1.0 - s)),
+            "alpha_matting_erode_size": int(0 + 6 * s),
+            "post_process_mask": (s >= 0.5),
+        }
+    except Exception:
+        return {
+            "alpha_matting": False,
+            "alpha_matting_foreground_threshold": 210,
+            "alpha_matting_background_threshold": 60,
+            "alpha_matting_erode_size": 0,
+            "post_process_mask": False,
+            "putalpha": True,
+        }
+
+
 _model_manager_instance = None
 _model_manager_lock = threading.Lock()
 
@@ -472,7 +515,9 @@ async def generate_and_return_image(request: GenerateRequest):
 
         # Optional background removal on the final image
         if getattr(request, "remove_background", False):
-            download_url = _apply_background_removal_to_saved(download_url)
+            download_url = _apply_background_removal_to_saved(
+                download_url, getattr(request, "bg_strength", None)
+            )
 
         return Response(
             content=_read_and_cleanup_generated(download_url), media_type="image/png"
@@ -582,6 +627,7 @@ async def generate_with_image_and_return(
     negative_prompt: Optional[str] = Form(None),
     prompt_prefix: Optional[str] = Form(None),
     remove_background: Optional[bool] = Form(False),
+    bg_strength: Optional[float] = Form(None),
 ):
     """Generate image from uploaded image and return it directly as binary data"""
     try:
@@ -746,7 +792,7 @@ async def generate_with_image_and_return(
                 with open(tmp_path, "wb") as f:
                     f.write(out_bytes)
                 with Image.open(tmp_path).convert("RGBA") as im:
-                    out_im = remove(im)
+                    out_im = remove(im, **_removal_params_from_strength(bg_strength))
                 new_rel = save_image_with_unique_name(out_im)
                 new_abs = Path(base_dir) / new_rel
                 with open(new_abs, "rb") as f:
@@ -779,6 +825,7 @@ async def generate_with_image(
     negative_prompt: Optional[str] = Form(None),
     prompt_prefix: Optional[str] = Form(None),
     remove_background: Optional[bool] = Form(False),
+    bg_strength: Optional[float] = Form(None),
 ):
     """Generate image using image + text input (image-to-image generation)"""
     try:
@@ -922,7 +969,7 @@ async def generate_with_image(
                 abs_image_path = Path(base_dir) / image_filename
 
                 with Image.open(abs_image_path).convert("RGBA") as im:
-                    out_im = remove(im)
+                    out_im = remove(im, **_removal_params_from_strength(bg_strength))
 
                 # Save the processed image with a new name
                 new_rel = save_image_with_unique_name(out_im)
@@ -1500,12 +1547,17 @@ def _absolute_generated_path_from_download(download_url: str) -> Path:
     return Path(base_dir) / "generated_images" / filename
 
 
-def _apply_background_removal_to_saved(download_url: str) -> str:
-    """Open saved generated image by download_url, apply rembg.remove, save as new unique file, return new download_url. Leaves original file on disk; caller may clean up later."""
+def _apply_background_removal_to_saved(
+    download_url: str, bg_strength: Optional[float] = None
+) -> str:
+    """Open saved generated image by download_url, apply rembg.remove, save as new unique file, return new download_url. Leaves original file on disk; caller may clean up later.
+
+    bg_strength: optional float 0..1 mapped to remove parameters.
+    """
     try:
         abs_path = _absolute_generated_path_from_download(download_url)
         with Image.open(abs_path).convert("RGBA") as im:
-            output_im = remove(im)
+            output_im = remove(im, **_removal_params_from_strength(bg_strength))
         new_rel = save_image_with_unique_name(output_im)  # saves into generated_images
         return f"/generated_images/{Path(new_rel).name}"
     except Exception as e:
