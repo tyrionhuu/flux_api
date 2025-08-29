@@ -9,6 +9,7 @@ import shutil
 import time
 from pathlib import Path
 from typing import Optional
+from fastapi.responses import HTMLResponse
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -133,10 +134,6 @@ async def remove_lora_from_index(stored_name: str):
 @router.get("/")
 def read_root():
     """Serve the frontend HTML"""
-    import os
-
-    from fastapi.responses import HTMLResponse
-
     html_path = "frontend/templates/index.html"
     if os.path.exists(html_path):
         with open(html_path, "r") as f:
