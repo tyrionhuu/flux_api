@@ -46,6 +46,12 @@ class GenerateRequest(BaseModel):
         le=2**32 - 1,
         description="Random seed for reproducible results (0-4294967295)",
     )
+    num_inference_steps: Optional[int] = Field(
+        20, ge=1, le=100, description="Number of inference steps for generation (1-100, default: 20)"
+    )
+    guidance_scale: Optional[float] = Field(
+        3.5, ge=-10.0, le=10.0, description="Guidance scale for generation (-10.0 to 10.0, default: 3.5)"
+    )
     upscale: Optional[bool] = Field(
         False, description="Whether to upscale the generated image using Remacri ESRGAN"
     )
@@ -88,6 +94,12 @@ class ImageUploadGenerateRequest(BaseModel):
         ge=0,
         le=2**32 - 1,
         description="Random seed for reproducible results (0-4294967295)",
+    )
+    num_inference_steps: Optional[int] = Field(
+        20, ge=1, le=100, description="Number of inference steps for generation (1-100, default: 20)"
+    )
+    guidance_scale: Optional[float] = Field(
+        3.5, ge=-10.0, le=10.0, description="Guidance scale for generation (-10.0 to 10.0, default: 3.5)"
     )
     upscale: Optional[bool] = Field(
         False, description="Whether to upscale the generated image using Remacri ESRGAN"

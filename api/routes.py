@@ -645,14 +645,17 @@ async def generate_with_image_and_return(
             logger.info(
                 f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}"
             )
+            logger.info(
+                f"Using parameters from request: num_inference_steps={_req.num_inference_steps}, guidance_scale={_req.guidance_scale}, width={_req.width}, height={_req.height}, seed={_req.seed}"
+            )
             return model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
                 image=img,
-                num_inference_steps=num_inference_steps or INFERENCE_STEPS,
-                guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
-                width=width or 512,
-                height=height or 512,
-                seed=seed,
+                num_inference_steps=_req.num_inference_steps,
+                guidance_scale=_req.guidance_scale,
+                width=_req.width,
+                height=_req.height,
+                seed=_req.seed,
                 negative_prompt=negative_prompt,
             )
 
@@ -662,6 +665,8 @@ async def generate_with_image_and_return(
                 width=width or 512,
                 height=height or 512,
                 seed=seed,
+                num_inference_steps=num_inference_steps or INFERENCE_STEPS,
+                guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
                 processor=processor,
                 context={},
             )
@@ -682,9 +687,6 @@ async def generate_with_image_and_return(
             generated_image = extract_image_from_result(result)
             if generated_image is None:
                 raise RuntimeError("Failed to extract image from generation result")
-            logger.info(
-                f"Successfully extracted generated image: {type(generated_image)}"
-            )
         except Exception as extract_error:
             logger.error(f"Failed to extract image from result: {extract_error}")
             raise HTTPException(
@@ -841,14 +843,17 @@ async def generate_with_image(
             logger.info(
                 f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}"
             )
+            logger.info(
+                f"Using parameters from request: num_inference_steps={_req.num_inference_steps}, guidance_scale={_req.guidance_scale}, width={_req.width}, height={_req.height}, seed={_req.seed}"
+            )
             return model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
                 image=img,
-                num_inference_steps=num_inference_steps or INFERENCE_STEPS,
-                guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
-                width=width or 512,
-                height=height or 512,
-                seed=seed,
+                num_inference_steps=_req.num_inference_steps,
+                guidance_scale=_req.guidance_scale,
+                width=_req.width,
+                height=_req.height,
+                seed=_req.seed,
                 negative_prompt=negative_prompt,
             )
 
@@ -858,6 +863,8 @@ async def generate_with_image(
                 width=width or 512,
                 height=height or 512,
                 seed=seed,
+                num_inference_steps=num_inference_steps or INFERENCE_STEPS,
+                guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
                 processor=processor,
                 context={},
             )
@@ -878,9 +885,6 @@ async def generate_with_image(
             generated_image = extract_image_from_result(result)
             if generated_image is None:
                 raise RuntimeError("Failed to extract image from generation result")
-            logger.info(
-                f"Successfully extracted generated image: {type(generated_image)}"
-            )
         except Exception as extract_error:
             logger.error(f"Failed to extract image from result: {extract_error}")
             raise HTTPException(
@@ -1105,8 +1109,8 @@ async def submit_generation_request(request: GenerateRequest):
                 if request.loras
                 else None
             ),
-            num_inference_steps=10,  # Fixed value
-            guidance_scale=0,  # Fixed value
+            num_inference_steps=request.num_inference_steps or INFERENCE_STEPS,
+            guidance_scale=request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
             width=request.width or 512,
             height=request.height or 512,
             seed=request.seed,
