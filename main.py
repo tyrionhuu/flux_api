@@ -268,7 +268,7 @@ if __name__ == "__main__":
                 "class": "logging.FileHandler",
                 "formatter": "default",
                 "level": "INFO",
-                "filename": "logs/flux_api_fp4.log",
+                "filename": "logs/flux_api.log",
             },
         },
         "loggers": {
