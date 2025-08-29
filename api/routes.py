@@ -133,51 +133,6 @@ async def remove_lora_from_index(stored_name: str):
     except Exception as e:
         logger.error(f"Failed to remove LoRA from index: {e}")
 
-
-@router.get("/debug-version")
-def debug_version():
-    """Debug endpoint to check code version"""
-
-    # Get current working directory and file paths
-    cwd = os.getcwd()
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    base_dir = os.path.dirname(script_dir)
-    generated_images_dir = Path(base_dir) / "generated_images"
-    static_dir = Path(base_dir) / "static"
-
-    # Check if directories exist
-    generated_exists = generated_images_dir.exists()
-    static_exists = static_dir.exists()
-
-    # List files in generated_images if it exists
-    generated_files = []
-    if generated_exists:
-        try:
-            generated_files = [f.name for f in generated_images_dir.glob("*.png")]
-        except Exception as e:
-            generated_files = [f"Error listing files: {e}"]
-
-    return {
-        "status": "debug",
-        "service": "FLUX API",
-        "code_version": "enhanced_v2",
-        "timestamp": time.time(),
-        "thread_safe_model_check": True,
-        "paths": {
-            "current_working_directory": cwd,
-            "script_directory": script_dir,
-            "base_directory": base_dir,
-            "generated_images_dir": str(generated_images_dir),
-            "static_dir": str(static_dir),
-        },
-        "directories": {
-            "generated_images_exists": generated_exists,
-            "static_exists": static_exists,
-            "generated_images_files": generated_files,
-        },
-    }
-
-
 @router.get("/")
 def read_root():
     """Root endpoint for testing"""
