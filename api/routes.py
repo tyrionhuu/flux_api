@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter()
+
+
 def _removal_params_from_strength(strength: Optional[float]) -> dict:
     try:
         if strength is None:
@@ -75,6 +77,7 @@ def _removal_params_from_strength(strength: Optional[float]) -> dict:
             "post_process_mask": False,
             "putalpha": True,
         }
+
 
 _model_manager_instance = None
 _model_manager_lock = threading.Lock()
@@ -512,7 +515,9 @@ async def generate_and_return_image(request: GenerateRequest):
 
         # Optional background removal on the final image
         if getattr(request, "remove_background", False):
-            download_url = _apply_background_removal_to_saved(download_url, getattr(request, "bg_strength", None))
+            download_url = _apply_background_removal_to_saved(
+                download_url, getattr(request, "bg_strength", None)
+            )
 
         return Response(
             content=_read_and_cleanup_generated(download_url), media_type="image/png"
@@ -1542,7 +1547,9 @@ def _absolute_generated_path_from_download(download_url: str) -> Path:
     return Path(base_dir) / "generated_images" / filename
 
 
-def _apply_background_removal_to_saved(download_url: str, bg_strength: Optional[float] = None) -> str:
+def _apply_background_removal_to_saved(
+    download_url: str, bg_strength: Optional[float] = None
+) -> str:
     """Open saved generated image by download_url, apply rembg.remove, save as new unique file, return new download_url. Leaves original file on disk; caller may clean up later.
 
     bg_strength: optional float 0..1 mapped to remove parameters.
