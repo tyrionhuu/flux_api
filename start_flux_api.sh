@@ -10,7 +10,7 @@ echo "=========================="
 
 # Parse args (-g supports single GPU id or comma-separated list, e.g., "1,2,3")
 GPU_ID=""
-PORT=8000
+PORT=9000
 
 usage() {
     echo "Usage: $0 [-g <gpu_ids>]"
