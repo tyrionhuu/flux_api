@@ -9,7 +9,11 @@ import torch
 # Set PyTorch thread limits BEFORE any other imports or operations
 # This prevents thread oversubscription when running multiple instances
 num_cores = os.cpu_count() or 8
-threads_per_instance = max(1, num_cores // 4)  # Use 1/4 of cores per instance
+# Get number of GPU instances from environment (set by start_multi_gpu.sh)
+num_gpu_instances = int(os.environ.get("NUM_GPU_INSTANCES", "1"))
+# Calculate threads per instance accounting for multiple GPU instances
+# Using num_cores // (num_instances * 2) to leave headroom for system
+threads_per_instance = max(1, num_cores // (num_gpu_instances * 2))
 torch.set_num_threads(threads_per_instance)
 
 # Also set inter-op threads to prevent thread explosion

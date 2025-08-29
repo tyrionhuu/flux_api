@@ -164,20 +164,24 @@ start_service() {
     if [ "$MODEL_TYPE" = "fp4" ]; then
         env CUDA_VISIBLE_DEVICES=$gpu_id \
             FP4_API_PORT=$port \
+            NUM_GPU_INSTANCES=$NUM_GPUS \
             OMP_NUM_THREADS=$threads_per_gpu \
             MKL_NUM_THREADS=$threads_per_gpu \
             NUMEXPR_NUM_THREADS=$threads_per_gpu \
             OPENBLAS_NUM_THREADS=$threads_per_gpu \
             VECLIB_MAXIMUM_THREADS=$threads_per_gpu \
+            TORCH_NUM_THREADS=$threads_per_gpu \
             nohup $python_cmd main_fp4.py > "$log_file" 2>&1 &
     else
         env CUDA_VISIBLE_DEVICES=$gpu_id \
             BF16_API_PORT=$port \
+            NUM_GPU_INSTANCES=$NUM_GPUS \
             OMP_NUM_THREADS=$threads_per_gpu \
             MKL_NUM_THREADS=$threads_per_gpu \
             NUMEXPR_NUM_THREADS=$threads_per_gpu \
             OPENBLAS_NUM_THREADS=$threads_per_gpu \
             VECLIB_MAXIMUM_THREADS=$threads_per_gpu \
+            TORCH_NUM_THREADS=$threads_per_gpu \
             nohup $python_cmd main_bf16.py > "$log_file" 2>&1 &
     fi
     
