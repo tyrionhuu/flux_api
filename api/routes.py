@@ -130,20 +130,6 @@ async def remove_lora_from_index(stored_name: str):
         logger.error(f"Failed to remove LoRA from index: {e}")
 
 
-@router.get("/debug-version")
-def debug_version():
-    """Debug endpoint to check code version"""
-    import time
-
-    return {
-        "status": "debug",
-        "service": "FLUX API",
-        "code_version": "enhanced_v2",
-        "timestamp": time.time(),
-        "thread_safe_model_check": True,
-    }
-
-
 @router.get("/")
 def read_root():
     """Serve the frontend HTML"""
