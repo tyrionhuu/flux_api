@@ -19,7 +19,7 @@ from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
-                             MODEL_TYPE, MODEL_TYPE_QUANTIZED_GPU,
+                             MODEL_TYPE,
                              NUNCHAKU_FLUX_MODEL_ID,
                              NUNCHAKU_QWEN_IMAGE_MODEL_ID)
 from utils.gpu_manager import GPUManager
@@ -34,7 +34,6 @@ class DiffusionModelManager:
     def __init__(self):
         self.pipe: Optional[FluxPipeline | NunchakuQwenImagePipeline] = None
         self.model_loaded = False
-        self.model_type = "none"
         self.gpu_manager = GPUManager()
         # LoRA state - can be single LoRA (str) or multiple LoRAs (list)
         self.current_lora: Optional[Union[str, list]] = None
@@ -143,7 +142,6 @@ class DiffusionModelManager:
                         f"Device consistency - Target: {device}, Transformer: {next(transformer.parameters()).device}, Pipeline: {self.pipe.device if hasattr(self.pipe, 'device') else 'unknown'}"
                     )
 
-                    self.model_type = MODEL_TYPE_QUANTIZED_GPU
                     logger.info("Nunchaku model loaded successfully with LoRA support!")
 
                 except Exception as nunchaku_error:
@@ -192,7 +190,6 @@ class DiffusionModelManager:
                     f"Device consistency - Target: {device}, Transformer: {next(transformer.parameters()).device}, Pipeline: {self.pipe.device if hasattr(self.pipe, 'device') else 'unknown'}"
                 )
 
-                self.model_type = MODEL_TYPE_QUANTIZED_GPU
                 logger.info("Nunchaku model loaded successfully with LoRA support!")
 
             self.model_loaded = True
@@ -351,7 +348,6 @@ class DiffusionModelManager:
         """Get the current model status"""
         return {
             "model_loaded": self.model_loaded,
-            "model_type": self.model_type,
             "selected_gpu": self.gpu_manager.selected_gpu,
             "vram_usage_gb": f"{self.gpu_manager.get_vram_usage():.2f}GB",
         }

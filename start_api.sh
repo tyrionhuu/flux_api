@@ -113,7 +113,7 @@ wait_for_port() {
 # Check if we're in the right directory
 if [ ! -f "main.py" ]; then
     echo "❌ main.py not found in current directory!"
-    echo "   Please run this script from the flux_api directory."
+    echo "   Please run this script from the diffusion_api directory."
     exit 1
 fi
 

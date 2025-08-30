@@ -14,9 +14,6 @@ NUNCHAKU_QWEN_IMAGE_MODEL_ID = "nunchaku-tech/nunchaku-qwen-image"
 DEFAULT_GUIDANCE_SCALE = 3.5
 DEFAULT_INFERENCE_STEPS = 20
 
-# Model Types
-MODEL_TYPE_QUANTIZED_GPU = "flux_quantized_gpu"
-
 # Device Configuration
 DEFAULT_GPU = 0
 CUDA_TEST_TENSOR_SIZE = (100, 100)

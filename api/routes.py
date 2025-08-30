@@ -150,7 +150,6 @@ def read_root():
                 "/lora-status",
             ],
             "model_loaded": model_manager.is_loaded(),
-            "model_type": model_manager.model_type,
         }
 
 
@@ -365,7 +364,6 @@ async def generate_image(request: GenerateRequest):
 
         result = generate_image_internal(
             processed_prompt,
-            "flux",
             lora_applied,
             lora_weight_applied,
             request.width or 512,
@@ -814,7 +812,6 @@ async def get_queue_stats():
 
 def generate_image_internal(
     prompt: str,
-    model_type_name: str = "flux",
     lora_applied: Optional[str] = None,
     lora_weight: Optional[float] = None,
     width: int = 512,
@@ -856,7 +853,7 @@ def generate_image_internal(
                 )
 
     try:
-        logger.info(f"Generating {model_type_name} image for prompt: {prompt}")
+        logger.info(f"Generating image for prompt: {prompt}")
 
         # Start timing
         start_time = time.time()
@@ -865,7 +862,6 @@ def generate_image_internal(
         if model_manager.get_pipeline() is None:
             raise HTTPException(
                 status_code=500,
-                detail=f"{model_type_name} model not properly loaded",
             )
 
         # Generate the image
@@ -910,7 +906,7 @@ def generate_image_internal(
         download_url = f"/download/{filename}"
 
         return {
-            "message": f"Generated {model_type_name} image for prompt: {prompt}",
+            "message": f"Generated image for prompt: {prompt}",
             "image_url": image_filename,
             "download_url": download_url,
             "filename": filename,
@@ -924,9 +920,8 @@ def generate_image_internal(
 
     except Exception as e:
         logger.error(
-            f"Error generating {model_type_name} image: {e} (Type: {type(e).__name__})"
+            f"Error generating image: {e} (Type: {type(e).__name__})"
         )
         raise HTTPException(
             status_code=500,
-            detail=f"{model_type_name} image generation failed: {str(e)}",
         )

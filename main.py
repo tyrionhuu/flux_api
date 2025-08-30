@@ -22,7 +22,7 @@ os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("logs/flux_api_fp4.log")],
+    handlers=[logging.StreamHandler(), logging.FileHandler("logs/diffusion_api.log")],
 )
 
 # Configure specific loggers for better error visibility
