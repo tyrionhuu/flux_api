@@ -251,7 +251,7 @@ sudo journalctl -u cleanup.service -f
 python -c "import requests; print(requests.get('http://localhost:8000/').json())"
 
 # Test model imports
-python -c "from models.models import FluxModelManager; print('✅ FP4 model imports successfully')"
+python -c "from models.models import DiffusionModelManager; print('✅ FP4 model imports successfully')"
 
 # Test cleanup service
 python utils/cleanup_service.py --dry-run

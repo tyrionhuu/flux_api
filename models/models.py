@@ -28,7 +28,7 @@ from utils.gpu_manager import GPUManager
 logger = logging.getLogger(__name__)
 
 
-class FluxModelManager:
+class DiffusionModelManager:
     """Manages Diffusion model loading and quantization"""
 
     def __init__(self):

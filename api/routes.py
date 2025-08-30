@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from api.models import GenerateRequest
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
                              STATIC_IMAGES_DIR)
-from models.models import FluxModelManager
+from models.models import DiffusionModelManager
 from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name)
 from utils.queue_manager import QueueManager
@@ -41,7 +41,7 @@ def get_model_manager():
         with _model_manager_lock:
             # Double-check pattern for thread safety
             if _model_manager_instance is None:
-                _model_manager_instance = FluxModelManager()
+                _model_manager_instance = DiffusionModelManager()
     return _model_manager_instance
 
 
