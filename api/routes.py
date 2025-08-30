@@ -1,5 +1,5 @@
 """
-API routes for the FLUX API
+API routes for the Diffusion API
 """
 
 import json
@@ -140,7 +140,7 @@ def read_root():
         return HTMLResponse(content=html_content)
     else:
         return {
-            "message": "FLUX API is running!",
+            "message": "Diffusion API is running!",
             "endpoints": [
                 "/static-image",
                 "/generate",

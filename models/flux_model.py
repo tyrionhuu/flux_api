@@ -1,5 +1,5 @@
 """
-FLUX model management for the FLUX API
+FLUX model management for the Diffusion API
 """
 
 import logging

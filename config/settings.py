@@ -1,5 +1,5 @@
 """
-Configuration settings for the FLUX API
+Configuration settings for the Diffusion API
 """
 
 # Port Configuration (overridable via environment)
@@ -34,7 +34,7 @@ PLACEHOLDER_COLORS = {
 }
 
 # API Configuration
-API_TITLE = "FLUX API"
+API_TITLE = "Diffusion API"
 API_DESCRIPTION = "High-performance image generation using FLUX model"
 API_VERSION = "1.0.0"
 

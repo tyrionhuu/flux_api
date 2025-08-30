@@ -1,5 +1,5 @@
 """
-Queue manager for handling concurrent requests in the FLUX API
+Queue manager for handling concurrent requests in the Diffusion API
 """
 
 import asyncio

@@ -1,5 +1,5 @@
 """
-System utilities for the FLUX API
+System utilities for the Diffusion API
 """
 
 from typing import Tuple

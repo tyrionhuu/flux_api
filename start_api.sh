@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# FLUX API Startup Script with Port Cleanup
+# Diffusion API Startup Script with Port Cleanup
 # This script ensures clean startup by handling port conflicts
 
 set -e
 
-echo "🚀 FLUX API Startup Script"
+echo "🚀 Diffusion API Startup Script"
 echo "=========================="
 
 # Parse args (-g supports single GPU id or comma-separated list, e.g., "1,2,3")
@@ -139,7 +139,7 @@ if ! wait_for_port "$PORT" 30; then
     exit 1
 fi
 
-echo "🚀 Starting FLUX API Service..."
+echo "🚀 Starting Diffusion API Service..."
 
 # Assign GPU visibility only if -g provided; otherwise leave all GPUs visible
 if [ -n "$GPU_ID" ]; then

@@ -1,4 +1,4 @@
-// FLUX API ComfyUI Frontend
+// Diffusion API ComfyUI Frontend
 class FluxAPI {
     constructor() {
         // Use current origin (protocol + host + port) so UI works on any served port
@@ -1103,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Add some helpful keyboard shortcuts info
 console.log(`
-🎨 FLUX API Frontend Shortcuts:
+🎨 Diffusion API Frontend Shortcuts:
 Ctrl/Cmd + Enter: Generate image
 Escape: Close modal
 `);

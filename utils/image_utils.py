@@ -1,5 +1,5 @@
 """
-Image utilities for the FLUX API
+Image utilities for the Diffusion API
 """
 
 from typing import Any, Optional

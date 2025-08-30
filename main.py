@@ -1,5 +1,5 @@
 """
-Main FastAPI application for the FP4 FLUX API (Port 8002)
+Main FastAPI application for the FP4 Diffusion API (Port 8002)
 """
 
 import logging
@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         start_cleanup_service()
-        logging.info("FP4 FLUX API started with cleanup service")
+        logging.info("FP4 Diffusion API started with cleanup service")
 
         # Auto-load the FLUX model
         logging.info("Auto-loading FLUX model...")
@@ -100,7 +100,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     try:
         stop_cleanup_service()
-        logging.info("FP4 FLUX API shutdown, cleanup service stopped")
+        logging.info("FP4 Diffusion API shutdown, cleanup service stopped")
     except Exception as e:
         logging.error(f"Error stopping cleanup service: {e}")
 
@@ -139,9 +139,9 @@ async def serve_frontend():
     else:
         return """
         <html>
-            <head><title>FP4 FLUX API</title></head>
+            <head><title>FP4 Diffusion API</title></head>
             <body>
-                <h1>FP4 FLUX API - Frontend Not Available</h1>
+                <h1>FP4 Diffusion API - Frontend Not Available</h1>
                 <p>The frontend files are not found. Please check the frontend directory.</p>
                 <p><a href="/docs">Visit API Documentation</a></p>
             </body>
@@ -153,7 +153,7 @@ async def serve_frontend():
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "FP4 FLUX API"}
+    return {"status": "healthy", "service": "FP4 Diffusion API"}
 
 
 if __name__ == "__main__":

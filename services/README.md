@@ -1,12 +1,12 @@
-# FLUX API Services
+# Diffusion API Services
 
-This directory contains systemd service files for running FLUX API components as system services.
+This directory contains systemd service files for running Diffusion API components as system services.
 
 ## Available Services
 
 ### flux-cleanup.service
 
-The directory cleanup service that automatically maintains size limits on your FLUX API directories.
+The directory cleanup service that automatically maintains size limits on your Diffusion API directories.
 
 ## Installation
 
@@ -18,7 +18,7 @@ sudo cp flux-cleanup.service /etc/systemd/system/
 
 ### 2. Update the WorkingDirectory path
 
-Edit the service file to match your actual FLUX API installation path:
+Edit the service file to match your actual Diffusion API installation path:
 
 ```bash
 sudo nano /etc/systemd/system/flux-cleanup.service
@@ -73,7 +73,7 @@ sudo journalctl -u flux-cleanup.service -f
 
 ## Configuration
 
-The service will use the settings from `config/cleanup_settings.py` in your FLUX API directory.
+The service will use the settings from `config/cleanup_settings.py` in your Diffusion API directory.
 
 ## Troubleshooting
 
@@ -84,7 +84,7 @@ The service will use the settings from `config/cleanup_settings.py` in your FLUX
 4. Ensure the user has proper permissions
 
 ### Permission denied errors
-1. Check file permissions in your FLUX API directory
+1. Check file permissions in your Diffusion API directory
 2. Ensure the service user can access the required directories
 3. Verify the ReadWritePaths in the service file
 

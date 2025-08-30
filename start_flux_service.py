@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-FLUX API Service Starter
-This script starts the FLUX API service directly using the flux_env virtual environment.
+Diffusion API Service Starter
+This script starts the Diffusion API service directly using the flux_env virtual environment.
 """
 
 import os
@@ -163,8 +163,8 @@ def wait_for_port_free(port: int = 8000, max_wait: int = 30) -> bool:
 
 
 def start_service():
-    """Start the FLUX API service"""
-    print("\n🚀 Starting FLUX API Service...")
+    """Start the Diffusion API service"""
+    print("\n🚀 Starting Diffusion API Service...")
     print("=" * 50)
 
     # Determine target port from environment (fallback to 8000)
@@ -264,7 +264,7 @@ def start_service():
 
 def main():
     """Main function"""
-    print("🐍 FLUX API Service Starter")
+    print("🐍 Diffusion API Service Starter")
     print("=" * 30)
 
     # Check if we're in the right directory

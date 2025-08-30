@@ -1,5 +1,5 @@
 """
-Comprehensive GPU Management for FLUX API
+Comprehensive GPU Management for Diffusion API
 Handles GPU selection, service assignment, monitoring, and dynamic adaptation.
 """
 

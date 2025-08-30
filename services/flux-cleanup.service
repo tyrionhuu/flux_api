@@ -1,5 +1,5 @@
 [Unit]
-Description=FLUX API Directory Cleanup Service
+Description=Diffusion API Directory Cleanup Service
 After=network.target
 Wants=network.target
 
