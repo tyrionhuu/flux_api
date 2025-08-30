@@ -241,7 +241,7 @@ sudo journalctl -u flux-cleanup.service -f
 
 1. **Frontend**: Modify `frontend/static/js/app.js`
 2. **API**: Add routes in `api/routes.py`
-3. **Models**: Extend `models/flux_model.py`
+3. **Models**: Extend `models/models.py`
 4. **Services**: Add new service files in `services/`
 
 ### Testing
@@ -251,7 +251,7 @@ sudo journalctl -u flux-cleanup.service -f
 python -c "import requests; print(requests.get('http://localhost:8000/').json())"
 
 # Test model imports
-python -c "from models.flux_model import FluxModelManager; print('✅ FP4 model imports successfully')"
+python -c "from models.models import FluxModelManager; print('✅ FP4 model imports successfully')"
 
 # Test cleanup service
 python utils/cleanup_service.py --dry-run

@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from api.models import GenerateRequest
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
                              STATIC_IMAGES_DIR)
-from models.flux_model import FluxModelManager
+from models.models import FluxModelManager
 from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name)
 from utils.queue_manager import QueueManager
