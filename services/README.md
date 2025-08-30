@@ -4,7 +4,7 @@ This directory contains systemd service files for running Diffusion API componen
 
 ## Available Services
 
-### flux-cleanup.service
+### cleanup.service
 
 The directory cleanup service that automatically maintains size limits on your Diffusion API directories.
 
@@ -13,7 +13,7 @@ The directory cleanup service that automatically maintains size limits on your D
 ### 1. Copy the service file
 
 ```bash
-sudo cp flux-cleanup.service /etc/systemd/system/
+sudo cp cleanup.service /etc/systemd/system/
 ```
 
 ### 2. Update the WorkingDirectory path
@@ -21,7 +21,7 @@ sudo cp flux-cleanup.service /etc/systemd/system/
 Edit the service file to match your actual Diffusion API installation path:
 
 ```bash
-sudo nano /etc/systemd/system/flux-cleanup.service
+sudo nano /etc/systemd/system/cleanup.service
 ```
 
 Change this line to your actual path:
@@ -40,35 +40,35 @@ ExecStart=/usr/bin/python3 /home/tianyu/flux_api/utils/cleanup_service.py
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable flux-cleanup.service
-sudo systemctl start flux-cleanup.service
+sudo systemctl enable cleanup.service
+sudo systemctl start cleanup.service
 ```
 
 ## Usage
 
 ### Check service status
 ```bash
-sudo systemctl status flux-cleanup.service
+sudo systemctl status cleanup.service
 ```
 
 ### Start the service
 ```bash
-sudo systemctl start flux-cleanup.service
+sudo systemctl start cleanup.service
 ```
 
 ### Stop the service
 ```bash
-sudo systemctl stop flux-cleanup.service
+sudo systemctl stop cleanup.service
 ```
 
 ### Restart the service
 ```bash
-sudo systemctl restart flux-cleanup.service
+sudo systemctl restart cleanup.service
 ```
 
 ### View service logs
 ```bash
-sudo journalctl -u flux-cleanup.service -f
+sudo journalctl -u cleanup.service -f
 ```
 
 ## Configuration
@@ -78,8 +78,8 @@ The service will use the settings from `config/cleanup_settings.py` in your Diff
 ## Troubleshooting
 
 ### Service won't start
-1. Check the service status: `sudo systemctl status flux-cleanup.service`
-2. Check the logs: `sudo journalctl -u flux-cleanup.service`
+1. Check the service status: `sudo systemctl status cleanup.service`
+2. Check the logs: `sudo journalctl -u cleanup.service`
 3. Verify the paths in the service file are correct
 4. Ensure the user has proper permissions
 

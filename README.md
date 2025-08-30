@@ -76,9 +76,9 @@ An automatic cleanup service that maintains directory size limits:
 python utils/cleanup_service.py
 
 # Or install as systemd service
-sudo cp services/flux-cleanup.service /etc/systemd/system/
-sudo systemctl enable flux-cleanup.service
-sudo systemctl start flux-cleanup.service
+sudo cp services/cleanup.service /etc/systemd/system/
+sudo systemctl enable cleanup.service
+sudo systemctl start cleanup.service
 ```
 
 For detailed service configuration, see [services/README.md](services/README.md).
@@ -219,8 +219,8 @@ flux_api/
    - Verify file integrity
 
 4. **Cleanup Service Issues**
-   - Check service status: `sudo systemctl status flux-cleanup.service`
-   - View logs: `sudo journalctl -u flux-cleanup.service -f`
+   - Check service status: `sudo systemctl status cleanup.service`
+   - View logs: `sudo journalctl -u cleanup.service -f`
    - Verify configuration in `config/cleanup_settings.py`
 
 ### Logs
@@ -232,7 +232,7 @@ Check service logs for detailed error information:
 tail -f logs/flux_api_fp4.log
 
 # Check cleanup service logs
-sudo journalctl -u flux-cleanup.service -f
+sudo journalctl -u cleanup.service -f
 ```
 
 ## Development
@@ -265,9 +265,9 @@ For production deployment, use the provided systemd services:
 
 ```bash
 # Install cleanup service
-sudo cp services/flux-cleanup.service /etc/systemd/system/
-sudo systemctl enable flux-cleanup.service
-sudo systemctl start flux-cleanup.service
+sudo cp services/cleanup.service /etc/systemd/system/
+sudo systemctl enable cleanup.service
+sudo systemctl start cleanup.service
 
 # Create custom service for main API (example)
 sudo nano /etc/systemd/system/flux-api.service
