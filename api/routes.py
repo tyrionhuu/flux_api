@@ -194,7 +194,7 @@ def download_image(filename: str):
 
 @router.post("/generate")
 async def generate_image(request: GenerateRequest):
-    """Generate image using FLUX model with optional LoRA support - supports multiple LoRAs"""
+    """Generate image using Diffusion model with optional LoRA support - supports multiple LoRAs"""
     try:
         # Validate request parameters
         if not request.prompt or request.prompt.strip() == "":
@@ -273,7 +273,7 @@ async def generate_image(request: GenerateRequest):
                 ):
                     if not model_manager.load_model():
                         raise HTTPException(
-                            status_code=500, detail="Failed to load FLUX model"
+                            status_code=500, detail="Failed to load Diffusion model"
                         )
                     logger.info("Model loaded successfully")
                 else:
@@ -365,7 +365,7 @@ async def generate_image(request: GenerateRequest):
 
         result = generate_image_internal(
             processed_prompt,
-            "FLUX",
+            "flux",
             lora_applied,
             lora_weight_applied,
             request.width or 512,
@@ -396,7 +396,7 @@ async def generate_image(request: GenerateRequest):
 
 @router.post("/load-model")
 def load_model():
-    """Load the FLUX model"""
+    """Load the Diffusion model"""
     try:
         with _model_manager_lock:
             # Enhanced check for proper model loading
@@ -407,18 +407,18 @@ def load_model():
             )
 
             if model_actually_loaded:
-                logger.info("FLUX model already properly loaded")
-                return {"message": "FLUX model already loaded"}
+                logger.info("Diffusion model already properly loaded")
+                return {"message": "Diffusion model already loaded"}
 
-            logger.info("Loading FLUX model...")
+            logger.info("Loading Diffusion model...")
             if model_manager.load_model():
-                logger.info("FLUX model loaded successfully")
-                return {"message": "FLUX model loaded successfully"}
+                logger.info("Diffusion model loaded successfully")
+                return {"message": "Diffusion model loaded successfully"}
             else:
                 logger.error(
-                    f"Failed to load FLUX model - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+                    f"Failed to load Diffusion model - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
                 )
-                raise HTTPException(status_code=500, detail="Failed to load FLUX model")
+                raise HTTPException(status_code=500, detail="Failed to load Diffusion model")
     except Exception as e:
         logger.error(f"Exception during model loading: {e} (Type: {type(e).__name__})")
         raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
@@ -812,7 +812,7 @@ async def get_queue_stats():
 
 def generate_image_internal(
     prompt: str,
-    model_type_name: str = "FLUX",
+    model_type_name: str = "flux",
     lora_applied: Optional[str] = None,
     lora_weight: Optional[float] = None,
     width: int = 512,
@@ -859,7 +859,7 @@ def generate_image_internal(
         # Start timing
         start_time = time.time()
 
-        # Generate image with FLUX
+        # Generate image with Diffusion
         if model_manager.get_pipeline() is None:
             raise HTTPException(
                 status_code=500,

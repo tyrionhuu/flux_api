@@ -1,5 +1,5 @@
 """
-FLUX Framework Upscaler using Remacri ESRGAN model
+Diffusion Framework Upscaler using Remacri ESRGAN model
 Provides high-quality 2x and 4x upscaling capabilities
 """
 
@@ -33,7 +33,7 @@ class FLUXUpscaler:
 
     def __init__(self, model_path: Optional[str] = None):
         """
-        Initialize the FLUX upscaler
+        Initialize the Diffusion upscaler
 
         Args:
             model_path: Path to the Remacri ESRGAN model weights
@@ -420,7 +420,7 @@ def quick_upscale(
 
 if __name__ == "__main__":
     # Example usage
-    print("🚀 FLUX Upscaler - Remacri ESRGAN Implementation")
+    print("🚀 Diffusion Upscaler - Remacri ESRGAN Implementation")
 
     # Test the upscaler
     upscaler = FLUXUpscaler()

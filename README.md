@@ -1,10 +1,10 @@
 # Diffusion API - Text to Image Generation Service
 
-A high-performance AI image generation API service featuring the FLUX FP4 model with LoRA support and automatic cleanup services.
+A high-performance AI image generation API service featuring the Diffusion FP4 model with LoRA support and automatic cleanup services.
 
 ## Features
 
-- **Model Support**: FP4 (quantized) FLUX model
+- **Model Support**: FP4 (quantized) Diffusion model
 - **GPU Management**: Automatic GPU selection and load balancing
 - **LoRA Support**: Apply custom LoRA weights for style customization
 - **LoRA File Upload**: Upload local LoRA files directly through the web interface
@@ -181,7 +181,7 @@ MAX_FILE_AGE_DAYS = 30
 ```
 flux_api/
 ├── api/                    # API routes and models
-├── models/                 # FLUX model implementations
+├── models/                 # Diffusion model implementations
 ├── utils/                  # Utility modules including cleanup service
 ├── config/                 # Configuration files
 ├── services/               # Systemd service files
@@ -258,20 +258,6 @@ python utils/cleanup_service.py --dry-run
 ```
 
 ## Production Deployment
-
-### Systemd Services
-
-For production deployment, use the provided systemd services:
-
-```bash
-# Install cleanup service
-sudo cp services/cleanup.service /etc/systemd/system/
-sudo systemctl enable cleanup.service
-sudo systemctl start cleanup.service
-
-# Create custom service for main API (example)
-sudo nano /etc/systemd/system/flux-api.service
-```
 
 ### Environment Variables
 

@@ -10,9 +10,9 @@ from config.settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
 
 
 def extract_image_from_result(result: Any) -> Image.Image:
-    """Extract image from FLUX pipeline result"""
+    """Extract image from Diffusion pipeline result"""
     try:
-        # Handle different possible return types from FLUX pipeline
+        # Handle different possible return types from Diffusion pipeline
         if hasattr(result, "images") and result.images:
             return result.images[0]
         elif isinstance(result, (list, tuple)) and len(result) > 0:

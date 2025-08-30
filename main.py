@@ -71,24 +71,24 @@ async def lifespan(app: FastAPI):
         start_cleanup_service()
         logging.info("FP4 Diffusion API started with cleanup service")
 
-        # Auto-load the FLUX model
-        logging.info("Auto-loading FLUX model...")
+        # Auto-load the Diffusion model
+        logging.info("Auto-loading Diffusion model...")
 
         model_manager = get_model_manager()
 
         if model_manager.load_model():
-            logging.info("FLUX model loaded successfully during startup")
+            logging.info("Diffusion model loaded successfully during startup")
         else:
-            logging.error("Failed to load FLUX model during startup")
+            logging.error("Failed to load Diffusion model during startup")
 
         time.sleep(2)
 
         # Verify model is ready
         if model_manager.is_loaded():
-            logging.info("FLUX model verified and ready for requests")
+            logging.info("Diffusion model verified and ready for requests")
         else:
             logging.warning(
-                "FLUX model may not be fully ready - some requests may fail"
+                "Diffusion model may not be fully ready - some requests may fail"
             )
 
     except Exception as e:

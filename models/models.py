@@ -1,5 +1,5 @@
 """
-FLUX model management for the Diffusion API
+Diffusion model management for the Diffusion API
 """
 
 import logging
@@ -7,25 +7,28 @@ import os
 import shutil
 import tempfile
 from typing import Any, Optional, Union
+from nunchaku import NunchakuFluxTransformer2dModel
 
 import torch
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
-
+from nunchaku.models.transformers.transformer_qwenimage import NunchakuQwenImageTransformer2DModel
+from nunchaku.pipeline.pipeline_qwenimage import NunchakuQwenImagePipeline
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
-                             MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
+                             MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID, MODEL_TYPE)
 from utils.gpu_manager import GPUManager
+from nunchaku.utils import get_precision
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
 class FluxModelManager:
-    """Manages FLUX model loading and quantization"""
+    """Manages Diffusion model loading and quantization"""
 
     def __init__(self):
-        self.pipe: Optional[FluxPipeline] = (
+        self.pipe: Optional[FluxPipeline | NunchakuQwenImagePipeline] = (
             None  # Will be FluxPipeline with Nunchaku transformer
         )
         self.model_loaded = False
@@ -45,14 +48,14 @@ class FluxModelManager:
             pass  # Ignore errors during cleanup
 
     def load_model(self) -> bool:
-        """Load the FLUX model with GPU-only support and quantization"""
+        """Load the Diffusion model with GPU-only support and quantization"""
         try:
             # Safety check: avoid reloading if already loaded
             if self.model_loaded and self.pipe is not None:
-                logger.info("FLUX model already loaded, skipping reload")
+                logger.info("Diffusion model already loaded, skipping reload")
                 return True
 
-            logger.info("Loading FLUX model...")
+            logger.info("Loading Diffusion model...")
 
             # Check if CUDA is available
             if not torch.cuda.is_available():
@@ -91,20 +94,68 @@ class FluxModelManager:
                     torch.cuda.set_device(0)
                     current_device = torch.cuda.current_device()
                     logger.info(f"Device after force set: {current_device}")
+                    
+            precision = get_precision() 
+            logger.info(f"Detected precision: {precision}")
 
             # Always load Nunchaku model (this has LoRA support)
             logger.info("Loading Nunchaku model with LoRA support...")
+            
+            if MODEL_TYPE == "flux":
+                try:
+                    # Load the Nunchaku transformer on the same device
+                    transformer_result = NunchakuFluxTransformer2dModel.from_pretrained(
+                        f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-dev.safetensors"
+                    )
 
-            try:
-                from nunchaku import NunchakuFluxTransformer2dModel
-                from nunchaku.utils import get_precision
+                    # Handle the tuple return: (transformer, config_dict)
+                    if isinstance(transformer_result, tuple):
+                        transformer = transformer_result[0].to(
+                            device
+                        )  # Extract transformer from tuple
+                    else:
+                        transformer = transformer_result.to(
+                            device
+                        )  # Direct transformer object
 
-                precision = get_precision()  # auto-detect precision
-                logger.info(f"Detected precision: {precision}")
+                    # Create FluxPipeline with the Nunchaku transformer
+                    if device_map == "balanced":
+                        # Multi-GPU balanced mode
+                        logger.info("Loading pipeline with balanced device map")
+                        self.pipe = FluxPipeline.from_pretrained(
+                            "black-forest-labs/FLUX.1-dev",
+                            transformer=transformer,
+                            torch_dtype=torch.bfloat16,
+                            device_map=device_map,
+                        )
+                    else:
+                        # Single GPU mode
+                        self.pipe = FluxPipeline.from_pretrained(
+                            "black-forest-labs/FLUX.1-dev",
+                            transformer=transformer,
+                            torch_dtype=torch.bfloat16,
+                        ).to(device)
 
+                    # Verify device consistency
+                    logger.debug(
+                        f"Device consistency - Target: {device}, Transformer: {next(transformer.parameters()).device}, Pipeline: {self.pipe.device if hasattr(self.pipe, 'device') else 'unknown'}"
+                    )
+
+                    self.model_type = MODEL_TYPE_QUANTIZED_GPU
+                    logger.info("Nunchaku model loaded successfully with LoRA support!")
+
+                except Exception as nunchaku_error:
+                    logger.error(
+                        f"Error loading Nunchaku model: {nunchaku_error} (Type: {type(nunchaku_error).__name__})"
+                    )
+                    raise RuntimeError(
+                        f"Failed to load Nunchaku model: {nunchaku_error}. Nunchaku is required for this model."
+                    )
+            
+            elif MODEL_TYPE == "qwen":
                 # Load the Nunchaku transformer on the same device
-                transformer_result = NunchakuFluxTransformer2dModel.from_pretrained(
-                    f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-dev.safetensors"
+                transformer_result = NunchakuQwenImageTransformer2DModel.from_pretrained(
+                    f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-qwen-image.safetensors"
                 )
 
                 # Handle the tuple return: (transformer, config_dict)
@@ -117,20 +168,19 @@ class FluxModelManager:
                         device
                     )  # Direct transformer object
 
-                # Create FluxPipeline with the Nunchaku transformer
                 if device_map == "balanced":
                     # Multi-GPU balanced mode
                     logger.info("Loading pipeline with balanced device map")
-                    self.pipe = FluxPipeline.from_pretrained(
-                        "black-forest-labs/FLUX.1-dev",
+                    self.pipe = NunchakuQwenImagePipeline.from_pretrained(
+                        "Qwen/Qwen-Image",
                         transformer=transformer,
                         torch_dtype=torch.bfloat16,
                         device_map=device_map,
                     )
                 else:
                     # Single GPU mode
-                    self.pipe = FluxPipeline.from_pretrained(
-                        "black-forest-labs/FLUX.1-dev",
+                    self.pipe = NunchakuQwenImagePipeline.from_pretrained(
+                        "Qwen/Qwen-Image",
                         transformer=transformer,
                         torch_dtype=torch.bfloat16,
                     ).to(device)
@@ -143,29 +193,18 @@ class FluxModelManager:
                 self.model_type = MODEL_TYPE_QUANTIZED_GPU
                 logger.info("Nunchaku model loaded successfully with LoRA support!")
 
-            except Exception as nunchaku_error:
-                logger.error(
-                    f"Error loading Nunchaku model: {nunchaku_error} (Type: {type(nunchaku_error).__name__})"
-                )
-                raise RuntimeError(
-                    f"Failed to load Nunchaku model: {nunchaku_error}. Nunchaku is required for this model."
-                )
-
             self.model_loaded = True
             # Reset LoRA state when loading a new model
             self.current_lora = None
             self.current_weight = 1.0
-            logger.info(f"FLUX model loaded successfully on {device}!")
+            logger.info(f"Diffusion model loaded successfully on {device}!")
 
             # Perform CUDA Graph warm-up for better performance
             self._warmup_cuda_graph()
-
-            # No default LoRA - users must explicitly specify LoRAs if they want them
-
             return True
 
         except Exception as e:
-            logger.error(f"Error loading FLUX model: {e} (Type: {type(e).__name__})")
+            logger.error(f"Error loading Diffusion model: {e} (Type: {type(e).__name__})")
             return False
 
     def _warmup_cuda_graph(self):
@@ -235,7 +274,6 @@ class FluxModelManager:
                     f"GPU error: {gpu_error}. GPU required for image generation."
                 )
 
-        # Generate the image using the FluxPipeline (same as the example)
         try:
             logger.info(f"Generating image with prompt: {prompt}")
 
@@ -318,8 +356,8 @@ class FluxModelManager:
         """Check if the model is loaded and pipeline is available"""
         return self.model_loaded and self.pipe is not None
 
-    def get_pipeline(self) -> Optional[FluxPipeline]:
-        """Get the loaded FluxPipeline with Nunchaku transformer"""
+    def get_pipeline(self) -> Optional[FluxPipeline | NunchakuQwenImagePipeline]:
+        """Get the loaded Diffusion pipeline with Nunchaku transformer"""
         return self.pipe
 
     def _is_ready_with_lora(self) -> bool:
@@ -330,10 +368,10 @@ class FluxModelManager:
             )
             return False
         if not (
-            hasattr(self.pipe, "transformer")
+            hasattr(self.pipe, "transformer") or hasattr(self.pipe, "transformer2d")
             and hasattr(self.pipe.transformer, "update_lora_params")
         ):
-            logger.error("FluxPipeline transformer does not have LoRA support methods")
+            logger.error("Diffusion pipeline transformer does not have LoRA support methods")
             return False
         return True
 
@@ -341,7 +379,7 @@ class FluxModelManager:
         """Get the transformer from the pipeline with type safety."""
         if self.pipe is None:
             raise RuntimeError("Pipeline not loaded")
-        if not hasattr(self.pipe, "transformer"):
+        if not hasattr(self.pipe, "transformer") or not hasattr(self.pipe, "transformer2d"):
             raise RuntimeError("Pipeline does not have transformer")
         return self.pipe.transformer
 
@@ -386,7 +424,7 @@ class FluxModelManager:
         return repo_id, filename
 
     def _check_lora_compatibility(self, lora_path: str) -> bool:
-        """Check if a LoRA file is compatible with FLUX models"""
+        """Check if a LoRA file is compatible with Diffusion models"""
         try:
             # Check if file exists
             if not os.path.exists(lora_path):
@@ -427,7 +465,7 @@ class FluxModelManager:
                     )
                     return False
 
-                # Check for FLUX-compatible LoRA keys
+                # Check for Diffusion-compatible LoRA keys
                 has_compatible_keys = False
                 expected_patterns = ["lora", "adapter", "model", "weights"]
                 for key in lora_weights.keys():
@@ -441,7 +479,7 @@ class FluxModelManager:
 
                 if not has_compatible_keys:
                     logger.error(
-                        f"   - LoRA file does not appear to be compatible with FLUX models"
+                        f"   - LoRA file does not appear to be compatible with Diffusion models"
                     )
                     return False
 
@@ -502,7 +540,7 @@ class FluxModelManager:
                 logger.info("No LoRAs to apply")
                 return True
 
-            logger.info(f"Applying {len(lora_configs)} LoRAs to FLUX pipeline...")
+            logger.info(f"Applying {len(lora_configs)} LoRAs to Diffusion pipeline...")
 
             if len(lora_configs) == 1:
                 # Single LoRA - apply directly
