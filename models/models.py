@@ -19,8 +19,7 @@ from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
-                             MODEL_TYPE,
-                             NUNCHAKU_FLUX_MODEL_ID,
+                             MODEL_TYPE, NUNCHAKU_FLUX_MODEL_ID,
                              NUNCHAKU_QWEN_IMAGE_MODEL_ID)
 from utils.gpu_manager import GPUManager
 

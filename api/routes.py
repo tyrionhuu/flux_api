@@ -919,9 +919,7 @@ def generate_image_internal(
         }
 
     except Exception as e:
-        logger.error(
-            f"Error generating image: {e} (Type: {type(e).__name__})"
-        )
+        logger.error(f"Error generating image: {e} (Type: {type(e).__name__})")
         raise HTTPException(
             status_code=500,
         )
