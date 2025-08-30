@@ -6,7 +6,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from config.settings import DEFAULT_GUIDANCE_SCALE, INFERENCE_STEPS
+from config.settings import DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS
 
 
 class LoRAConfig(BaseModel):

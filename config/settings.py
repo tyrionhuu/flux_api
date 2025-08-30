@@ -12,7 +12,7 @@ NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-dev"
 
 # Generation Configuration
 DEFAULT_GUIDANCE_SCALE = 3.5
-INFERENCE_STEPS = 20
+DEFAULT_INFERENCE_STEPS = 20
 
 # Model Types
 MODEL_TYPE_QUANTIZED_GPU = "flux_quantized_gpu"

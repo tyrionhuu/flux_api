@@ -13,7 +13,7 @@ from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 
-from config.settings import (DEFAULT_GUIDANCE_SCALE, INFERENCE_STEPS,
+from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
                              MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
 from utils.gpu_manager import GPUManager
 
@@ -179,7 +179,7 @@ class FluxModelManager:
                     logger.info(f"CUDA Graph warm-up iteration {i+1}/2")
                     _ = self.pipe(
                         "warmup prompt",
-                        num_inference_steps=INFERENCE_STEPS,
+                        num_inference_steps=DEFAULT_INFERENCE_STEPS,
                         guidance_scale=DEFAULT_GUIDANCE_SCALE,
                     )
 
@@ -202,7 +202,7 @@ class FluxModelManager:
     def generate_image(
         self,
         prompt: str,
-        num_inference_steps: int = INFERENCE_STEPS,
+        num_inference_steps: int = DEFAULT_INFERENCE_STEPS,
         guidance_scale: float = DEFAULT_GUIDANCE_SCALE,
         width: int = 512,
         height: int = 512,

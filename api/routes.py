@@ -14,7 +14,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 from api.models import GenerateRequest
-from config.settings import (DEFAULT_GUIDANCE_SCALE, INFERENCE_STEPS,
+from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
                              STATIC_IMAGES_DIR)
 from models.flux_model import FluxModelManager
 from utils.image_utils import (extract_image_from_result,
@@ -721,7 +721,7 @@ async def submit_generation_request(request: GenerateRequest):
                 if request.loras
                 else None
             ),
-            num_inference_steps=INFERENCE_STEPS,  # Fixed value
+            num_inference_steps=DEFAULT_INFERENCE_STEPS,  # Fixed value
             guidance_scale=request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
             width=request.width or 512,
             height=request.height or 512,
@@ -869,7 +869,7 @@ def generate_image_internal(
         # Generate the image
         result = model_manager.generate_image(
             prompt,
-            INFERENCE_STEPS,  # Fixed num_inference_steps
+            DEFAULT_INFERENCE_STEPS,  # Fixed num_inference_steps
             guidance_scale,  # Use parameter value
             width,
             height,
