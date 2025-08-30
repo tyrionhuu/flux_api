@@ -11,12 +11,22 @@ from models.fp4_flux_model import FluxModelManager
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
 from utils.system_utils import get_system_memory
 from utils.queue_manager import QueueManager
-from config.fp4_settings import (
+from config.sekai_settings import (
     STATIC_IMAGES_DIR,
-    DEFAULT_LORA_NAME,
-    DEFAULT_LORA_WEIGHT,
+    LORA_1_NAME,
+    LORA_1_WEIGHT,
+    LORA_2_NAME,
+    LORA_2_WEIGHT,
+    LORA_3_NAME,
+    LORA_3_WEIGHT,
 )
 from api.models import GenerateRequest
+
+DEFAULT_LORA_LIST = [
+    {"name": LORA_1_NAME, "weight": LORA_1_WEIGHT},
+    {"name": LORA_2_NAME, "weight": LORA_2_WEIGHT},
+    {"name": LORA_3_NAME, "weight": LORA_3_WEIGHT},
+]
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -173,9 +183,7 @@ async def generate_image(request: GenerateRequest):
             and request.loras is None
             and not request.lora_name
         ):
-            loras_to_apply = [
-                {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
-            ]
+            loras_to_apply = DEFAULT_LORA_LIST
 
         # Clean up input
         prompt = request.prompt.strip()
@@ -298,6 +306,7 @@ async def generate_image(request: GenerateRequest):
             request.seed,
             request.upscale or False,
             request.upscale_factor or 2,
+            request.response_format or "binary",
         )
 
         # Trigger cleanup after successful image generation
@@ -491,7 +500,7 @@ async def submit_generation_request(request: GenerateRequest):
                 if request.loras
                 else None
             ),
-            num_inference_steps=10,  # Fixed value
+            num_inference_steps=20,  # Fixed value
             guidance_scale=4.0,  # Fixed value
             width=request.width or 512,
             height=request.height or 512,
@@ -590,6 +599,7 @@ def generate_image_internal(
     seed: Optional[int] = None,
     upscale: bool = False,
     upscale_factor: int = 2,
+    response_format: str = "binary",
 ):
     """Internal function to generate images - used by both endpoints"""
     # Append "Use GHIBLISTYLE" to the start of the user prompt
@@ -640,7 +650,7 @@ def generate_image_internal(
         # Generate the image
         result = model_manager.generate_image(
             enhanced_prompt,
-            10,  # Fixed num_inference_steps
+            20,  # Fixed num_inference_steps
             4.0,  # Fixed guidance_scale
             width,
             height,
@@ -684,6 +694,16 @@ def generate_image_internal(
 
         filename = os.path.basename(image_filename)
         download_url = f"/download/{filename}"
+
+        # Return binary image if requested
+        if response_format == "binary":
+            from fastapi.responses import FileResponse
+            return FileResponse(
+                image_filename,
+                media_type="image/png",
+                filename=filename,
+                headers={"Content-Disposition": f"inline; filename={filename}"}
+            )
 
         return {
             "message": f"Generated {model_type_name} image for prompt: {enhanced_prompt}",
@@ -871,7 +891,7 @@ async def upload_image_and_generate(
 
             # Apply default LoRA if none specified
             if not loras_to_apply and not remove_all_loras:
-                loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
+                loras_to_apply = DEFAULT_LORA_LIST
 
             # Validate dimensions
             if width < 256 or width > 1024 or height < 256 or height > 1024:
@@ -926,7 +946,7 @@ async def upload_image_and_generate(
             # For now use standard generate; future: img2img
             result = model_manager.generate_image(
                 prompt=prompt,
-                num_inference_steps=10,
+                num_inference_steps=20,
                 guidance_scale=image_guidance_scale,
                 width=width,
                 height=height,

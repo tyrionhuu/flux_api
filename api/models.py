@@ -51,6 +51,9 @@ class GenerateRequest(BaseModel):
     upscale_factor: Optional[int] = Field(
         2, ge=2, le=4, description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
     )
+    response_format: Optional[str] = Field(
+        "json", description="Response format: 'json' for JSON response, 'binary' for raw image"
+    )
 
 
 class ImageUploadGenerateRequest(BaseModel):

@@ -16,8 +16,8 @@ PID_FILE="flux_multi_gpu.pids"
 VENV_PATH="${VENV_PATH:-venv}"  # Allow override via environment
 
 # Parse command line arguments
-MODEL_TYPE="fp4"  # Default to fp4 for lower memory usage
-NGINX_CONFIG="nginx.conf"
+MODEL_TYPE="fp4_sekai"  # Default to fp4 for lower memory usage
+NGINX_CONFIG="/home/pingzhi/flux_api/nginx.conf"
 
 usage() {
     echo "Usage: $0 [-m <model_type>] [-c <nginx_config>]"
@@ -30,8 +30,8 @@ while getopts ":m:c:h" opt; do
   case "$opt" in
     m)
       MODEL_TYPE="$OPTARG"
-      if [[ "$MODEL_TYPE" != "fp4" && "$MODEL_TYPE" != "bf16" ]]; then
-        echo "❌ Invalid model type: $MODEL_TYPE (must be fp4 or bf16)"
+      if [[ "$MODEL_TYPE" != "fp4" && "$MODEL_TYPE" != "bf16" && "$MODEL_TYPE" != "fp4_sekai" ]]; then
+        echo "❌ Invalid model type: $MODEL_TYPE (must be fp4 or bf16 or fp4_sekai)"
         exit 1
       fi
       ;;
@@ -172,6 +172,18 @@ start_service() {
             VECLIB_MAXIMUM_THREADS=$threads_per_gpu \
             TORCH_NUM_THREADS=$threads_per_gpu \
             nohup $python_cmd main_fp4.py > "$log_file" 2>&1 &
+    elif [ "$MODEL_TYPE" = "fp4_sekai" ]; then
+        env CUDA_VISIBLE_DEVICES=$gpu_id \
+            FP4_API_PORT=$port \
+            NUM_GPU_INSTANCES=$NUM_GPUS \
+            FLUX_RETURN_BASE64=true \
+            OMP_NUM_THREADS=$threads_per_gpu \
+            MKL_NUM_THREADS=$threads_per_gpu \
+            NUMEXPR_NUM_THREADS=$threads_per_gpu \
+            OPENBLAS_NUM_THREADS=$threads_per_gpu \
+            VECLIB_MAXIMUM_THREADS=$threads_per_gpu \
+            TORCH_NUM_THREADS=$threads_per_gpu \
+            nohup $python_cmd main_fp4_sekai.py > "$log_file" 2>&1 &
     else
         env CUDA_VISIBLE_DEVICES=$gpu_id \
             BF16_API_PORT=$port \

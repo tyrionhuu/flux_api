@@ -1,5 +1,5 @@
 """
-Main FastAPI application for the BF16 FLUX API (Port 8001)
+Main FastAPI application for the FP4 FLUX API (Port 8002)
 """
 
 import logging
@@ -13,7 +13,7 @@ num_cores = os.cpu_count() or 8
 num_gpu_instances = int(os.environ.get("NUM_GPU_INSTANCES", "1"))
 # Calculate threads per instance accounting for multiple GPU instances
 # Using num_cores // (num_instances * 2) to leave headroom for system
-threads_per_instance = max(1, num_cores // (num_gpu_instances * 2))
+threads_per_instance = max(1, num_cores // (num_gpu_instances))
 torch.set_num_threads(threads_per_instance)
 
 # Also set inter-op threads to prevent thread explosion
@@ -23,8 +23,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
-from api.bf16_routes import router
-from config.bf16_settings import API_TITLE, API_DESCRIPTION, API_VERSION, BF16_API_PORT
+from api.sekai_routes import router
+from config.sekai_settings import API_TITLE, API_DESCRIPTION, API_VERSION, FP4_API_PORT
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
 
 # Ensure logs directory exists
@@ -34,7 +34,7 @@ os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("logs/flux_api_bf16.log")],
+    handlers=[logging.StreamHandler(), logging.FileHandler("logs/flux_api_fp4.log")],
 )
 
 # Log PyTorch thread configuration
@@ -44,8 +44,8 @@ logger.info(f"PyTorch threads per instance: {torch.get_num_threads()}")
 logger.info(f"PyTorch inter-op threads: {torch.get_num_interop_threads()}")
 
 # Configure specific loggers for better error visibility
-logging.getLogger("api.bf16_routes").setLevel(logging.INFO)
-logging.getLogger("models.bf16_flux_model").setLevel(logging.INFO)
+logging.getLogger("api.fp4_routes").setLevel(logging.INFO)
+logging.getLogger("models.fp4_flux_model").setLevel(logging.INFO)
 logging.getLogger("utils.cleanup_service").setLevel(logging.INFO)
 
 # Add a single enhanced console handler for better formatting
@@ -87,7 +87,7 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         start_cleanup_service()
-        logging.info("BF16 FLUX API started with cleanup service")
+        logging.info("FP4 FLUX API started with cleanup service")
     except Exception as e:
         logging.error(f"Failed to start cleanup service: {e}")
 
@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     try:
         stop_cleanup_service()
-        logging.info("BF16 FLUX API shutdown, cleanup service stopped")
+        logging.info("FP4 FLUX API shutdown, cleanup service stopped")
     except Exception as e:
         logging.error(f"Error stopping cleanup service: {e}")
 
@@ -135,9 +135,9 @@ async def serve_frontend():
     else:
         return """
         <html>
-            <head><title>BF16 FLUX API</title></head>
+            <head><title>FP4 FLUX API</title></head>
             <body>
-                <h1>BF16 FLUX API - Frontend Not Available</h1>
+                <h1>FP4 FLUX API - Frontend Not Available</h1>
                 <p>The frontend files are not found. Please check the frontend directory.</p>
                 <p><a href="/docs">Visit API Documentation</a></p>
             </body>
@@ -149,10 +149,10 @@ async def serve_frontend():
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "BF16 FLUX API"}
+    return {"status": "healthy", "service": "FP4 FLUX API"}
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=BF16_API_PORT)
+    uvicorn.run(app, host="0.0.0.0", port=FP4_API_PORT)
