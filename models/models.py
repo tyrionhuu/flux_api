@@ -7,18 +7,22 @@ import os
 import shutil
 import tempfile
 from typing import Any, Optional, Union
-from nunchaku import NunchakuFluxTransformer2dModel
 
 import torch
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
+from nunchaku import NunchakuFluxTransformer2dModel
+from nunchaku.models.transformers.transformer_qwenimage import \
+    NunchakuQwenImageTransformer2DModel
+from nunchaku.pipeline.pipeline_qwenimage import NunchakuQwenImagePipeline
+from nunchaku.utils import get_precision
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
-from nunchaku.models.transformers.transformer_qwenimage import NunchakuQwenImageTransformer2DModel
-from nunchaku.pipeline.pipeline_qwenimage import NunchakuQwenImagePipeline
+
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
-                             MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_FLUX_MODEL_ID, MODEL_TYPE, NUNCHAKU_QWEN_IMAGE_MODEL_ID)
+                             MODEL_TYPE, MODEL_TYPE_QUANTIZED_GPU,
+                             NUNCHAKU_FLUX_MODEL_ID,
+                             NUNCHAKU_QWEN_IMAGE_MODEL_ID)
 from utils.gpu_manager import GPUManager
-from nunchaku.utils import get_precision
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -28,9 +32,7 @@ class FluxModelManager:
     """Manages Diffusion model loading and quantization"""
 
     def __init__(self):
-        self.pipe: Optional[FluxPipeline | NunchakuQwenImagePipeline] = (
-            None
-        )
+        self.pipe: Optional[FluxPipeline | NunchakuQwenImagePipeline] = None
         self.model_loaded = False
         self.model_type = "none"
         self.gpu_manager = GPUManager()
@@ -94,13 +96,13 @@ class FluxModelManager:
                     torch.cuda.set_device(0)
                     current_device = torch.cuda.current_device()
                     logger.info(f"Device after force set: {current_device}")
-                    
-            precision = get_precision() 
+
+            precision = get_precision()
             logger.info(f"Detected precision: {precision}")
 
             # Always load Nunchaku model (this has LoRA support)
             logger.info("Loading Nunchaku model with LoRA support...")
-            
+
             if MODEL_TYPE == "flux":
                 try:
                     # Load the Nunchaku transformer on the same device
@@ -151,7 +153,7 @@ class FluxModelManager:
                     raise RuntimeError(
                         f"Failed to load Nunchaku model: {nunchaku_error}. Nunchaku is required for this model."
                     )
-            
+
             elif MODEL_TYPE == "qwen":
                 # Load the Nunchaku transformer on the same device
                 transformer_result = NunchakuQwenImageTransformer2DModel.from_pretrained(
@@ -204,7 +206,9 @@ class FluxModelManager:
             return True
 
         except Exception as e:
-            logger.error(f"Error loading Diffusion model: {e} (Type: {type(e).__name__})")
+            logger.error(
+                f"Error loading Diffusion model: {e} (Type: {type(e).__name__})"
+            )
             return False
 
     def _warmup_cuda_graph(self):
@@ -368,10 +372,13 @@ class FluxModelManager:
             )
             return False
         if not (
-            hasattr(self.pipe, "transformer") or hasattr(self.pipe, "transformer2d")
+            hasattr(self.pipe, "transformer")
+            or hasattr(self.pipe, "transformer2d")
             and hasattr(self.pipe.transformer, "update_lora_params")
         ):
-            logger.error("Diffusion pipeline transformer does not have LoRA support methods")
+            logger.error(
+                "Diffusion pipeline transformer does not have LoRA support methods"
+            )
             return False
         return True
 
@@ -379,7 +386,9 @@ class FluxModelManager:
         """Get the transformer from the pipeline with type safety."""
         if self.pipe is None:
             raise RuntimeError("Pipeline not loaded")
-        if not hasattr(self.pipe, "transformer") or not hasattr(self.pipe, "transformer2d"):
+        if not hasattr(self.pipe, "transformer") or not hasattr(
+            self.pipe, "transformer2d"
+        ):
             raise RuntimeError("Pipeline does not have transformer")
         return self.pipe.transformer
 

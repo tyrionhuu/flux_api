@@ -418,7 +418,9 @@ def load_model():
                 logger.error(
                     f"Failed to load Diffusion model - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
                 )
-                raise HTTPException(status_code=500, detail="Failed to load Diffusion model")
+                raise HTTPException(
+                    status_code=500, detail="Failed to load Diffusion model"
+                )
     except Exception as e:
         logger.error(f"Exception during model loading: {e} (Type: {type(e).__name__})")
         raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
