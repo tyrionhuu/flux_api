@@ -34,20 +34,20 @@ python -m venv flux_env
 source flux_env/bin/activate  # On Windows: flux_env\Scripts\activate
 pip install -r requirements.txt
 pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
-pip install https://github.com/nunchaku-tech/nunchaku/releases/download/v0.3.2/nunchaku-0.3.2+torch2.8-cp312-cp312-linux_x86_64.whl
+pip install https://github.com/nunchaku-tech/nunchaku/releases/download/v1.0.0dev20250830/nunchaku-1.0.0.dev20250830+torch2.8-cp312-cp312-linux_x86_64.whl
 ```
 
 ### 2. Start the Service
 
 ```bash
 # Start the main API service
-./start_flux_api.sh
+./start_api.sh
 
 # Or start with specific GPU(s)
-./start_flux_api.sh -g 0,1
+./start_api.sh -g 0,1
 
 # Or start with custom port
-./start_flux_api.sh -p 8002
+./start_api.sh -p 8002
 
 # Start frontend (optional)
 cd frontend && python -m http.server 9000
@@ -163,7 +163,7 @@ The service automatically detects and uses available GPUs:
 python -c "from utils.gpu_manager import GPUManager; gm = GPUManager(); print(gm.get_gpu_info())"
 
 # Start with specific GPUs
-./start_flux_api.sh -g 0,1
+./start_api.sh -g 0,1
 ```
 
 ### Cleanup Configuration
@@ -191,7 +191,7 @@ flux_api/
 ├── generated_images/       # Generated images
 ├── logs/                   # Application logs
 ├── main.py                 # Main FastAPI application
-├── start_flux_api.sh       # Service startup script
+├── start_api.sh       # Service startup script
 ├── start_flux_service.py   # Alternative startup script
 ├── cleanup_directories.py  # Manual cleanup utility
 └── requirements.txt        # Python dependencies
