@@ -16,7 +16,7 @@ from safetensors.torch import save_file as safe_save_file
 from nunchaku.models.transformers.transformer_qwenimage import NunchakuQwenImageTransformer2DModel
 from nunchaku.pipeline.pipeline_qwenimage import NunchakuQwenImagePipeline
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
-                             MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID, MODEL_TYPE)
+                             MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_FLUX_MODEL_ID, MODEL_TYPE, NUNCHAKU_QWEN_IMAGE_MODEL_ID)
 from utils.gpu_manager import GPUManager
 from nunchaku.utils import get_precision
 
@@ -29,7 +29,7 @@ class FluxModelManager:
 
     def __init__(self):
         self.pipe: Optional[FluxPipeline | NunchakuQwenImagePipeline] = (
-            None  # Will be FluxPipeline with Nunchaku transformer
+            None
         )
         self.model_loaded = False
         self.model_type = "none"
@@ -105,7 +105,7 @@ class FluxModelManager:
                 try:
                     # Load the Nunchaku transformer on the same device
                     transformer_result = NunchakuFluxTransformer2dModel.from_pretrained(
-                        f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-dev.safetensors"
+                        f"{NUNCHAKU_FLUX_MODEL_ID}/svdq-{precision}_r32-flux.1-dev.safetensors"
                     )
 
                     # Handle the tuple return: (transformer, config_dict)
@@ -155,7 +155,7 @@ class FluxModelManager:
             elif MODEL_TYPE == "qwen":
                 # Load the Nunchaku transformer on the same device
                 transformer_result = NunchakuQwenImageTransformer2DModel.from_pretrained(
-                    f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-qwen-image.safetensors"
+                    f"{NUNCHAKU_QWEN_IMAGE_MODEL_ID}/svdq-{precision}_r32-qwen-image.safetensors"
                 )
 
                 # Handle the tuple return: (transformer, config_dict)
