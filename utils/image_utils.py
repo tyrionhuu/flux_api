@@ -2,12 +2,9 @@
 Image utilities for the Diffusion API
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from PIL import Image
-
-from config.settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
-
 
 def extract_image_from_result(result: Any) -> Image.Image:
     """Extract image from Diffusion pipeline result"""
@@ -27,24 +24,11 @@ def extract_image_from_result(result: Any) -> Image.Image:
 
         # Fallback: create a simple placeholder image
         print("Warning: Could not extract image from result, using placeholder")
-        return Image.new(
-            "RGB", DEFAULT_IMAGE_SIZE, color=PLACEHOLDER_COLORS["placeholder"]
-        )
+        raise ValueError("Could not extract image from result")
 
     except Exception as e:
         print(f"Error extracting image from result: {e}")
-        return Image.new("RGB", DEFAULT_IMAGE_SIZE, color=PLACEHOLDER_COLORS["error"])
-
-
-def create_placeholder_image(
-    text: str = "Placeholder", color: Optional[str] = None
-) -> Image.Image:
-    """Create a placeholder image with optional text"""
-    if color is None:
-        color = PLACEHOLDER_COLORS["default"]
-
-    img = Image.new("RGB", DEFAULT_IMAGE_SIZE, color=color)
-    return img
+        raise ValueError(f"Error extracting image from result: {e}")
 
 
 def save_image_with_unique_name(

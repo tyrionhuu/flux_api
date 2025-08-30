@@ -14,8 +14,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 from api.models import GenerateRequest
-from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
-                             STATIC_IMAGES_DIR)
+from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS)
 from models.models import DiffusionModelManager
 from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name)
@@ -142,7 +141,6 @@ def read_root():
         return {
             "message": "Diffusion API is running!",
             "endpoints": [
-                "/static-image",
                 "/generate",
                 "/loras",
                 "/apply-lora",
@@ -151,14 +149,6 @@ def read_root():
             ],
             "model_loaded": model_manager.is_loaded(),
         }
-
-
-@router.get("/static-image")
-def get_static_image():
-    """Serve static images"""
-    image_path = f"{STATIC_IMAGES_DIR}/sample.jpg"
-    return FileResponse(image_path)
-
 
 @router.get("/download/{filename}")
 def download_image(filename: str):
