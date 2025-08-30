@@ -46,3 +46,5 @@ STATIC_IMAGES_DIR = "static"
 MIN_LORA_WEIGHT = 0.0
 MAX_LORA_WEIGHT = 2.0
 
+# MODEL_TYPE = "flux"
+MODEL_TYPE = "qwen"
