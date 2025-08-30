@@ -5,7 +5,7 @@ Configuration settings for the Diffusion API
 # Port Configuration (overridable via environment)
 import os
 
-FP4_API_PORT = int(os.environ.get("FP4_API_PORT", "8000"))
+API_PORT = int(os.environ.get("API_PORT", "8000"))
 
 # Model Configuration
 NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-dev"

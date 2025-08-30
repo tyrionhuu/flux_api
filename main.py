@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api.routes import get_model_manager, router
 from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
-                             FP4_API_PORT)
+                             API_PORT)
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
 
 # Ensure logs directory exists
@@ -159,4 +159,4 @@ def health_check():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=FP4_API_PORT)
+    uvicorn.run(app, host="0.0.0.0", port=API_PORT)

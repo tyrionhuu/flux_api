@@ -16,7 +16,7 @@ A high-performance AI image generation API service featuring the FLUX FP4 model 
 ## Model Service
 
 ### FP4 Model (Port 8000)
-- **Port**: 8000 (configurable via environment variable `FP4_API_PORT`)
+- **Port**: 8000 (configurable via environment variable `API_PORT`)
 - **Model**: FLUX.1-dev (quantized)
 - **Memory**: ~8GB VRAM
 - **Speed**: Fast inference with LoRA merging support
@@ -148,10 +148,10 @@ Set custom ports using environment variables:
 
 ```bash
 # Environment variables
-export FP4_API_PORT=8002
+export API_PORT=8002
 
 # Or modify config/settings.py
-FP4_API_PORT = 8002
+API_PORT = 8002
 ```
 
 ### GPU Configuration
@@ -192,7 +192,7 @@ flux_api/
 ├── logs/                   # Application logs
 ├── main.py                 # Main FastAPI application
 ├── start_api.sh       # Service startup script
-├── start_flux_service.py   # Alternative startup script
+├── start_service.py   # Alternative startup script
 ├── cleanup_directories.py  # Manual cleanup utility
 └── requirements.txt        # Python dependencies
 ```
@@ -278,7 +278,7 @@ sudo nano /etc/systemd/system/flux-api.service
 Set production environment variables:
 
 ```bash
-export FP4_API_PORT=8000
+export API_PORT=8000
 export CUDA_VISIBLE_DEVICES=0,1
 export FLUX_LOG_LEVEL=INFO
 ```

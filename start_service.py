@@ -169,7 +169,7 @@ def start_service():
 
     # Determine target port from environment (fallback to 8000)
     try:
-        target_port = int(os.environ.get("FP4_API_PORT", "8000"))
+        target_port = int(os.environ.get("API_PORT", "8000"))
     except ValueError:
         target_port = 8000
 
