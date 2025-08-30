@@ -31,7 +31,7 @@ PLACEHOLDER_COLORS = {
 
 # API Configuration
 API_TITLE = "Diffusion API"
-API_DESCRIPTION = "High-performance image generation using FLUX model"
+API_DESCRIPTION = "High-performance image generation API"
 API_VERSION = "1.0.0"
 
 # Cache Configuration
