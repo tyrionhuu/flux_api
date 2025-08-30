@@ -12,8 +12,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.routes import get_model_manager, router
-from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
-                             API_PORT)
+from config.settings import API_DESCRIPTION, API_PORT, API_TITLE, API_VERSION
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
 
 # Ensure logs directory exists
