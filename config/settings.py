@@ -14,10 +14,6 @@ NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-dev"
 DEFAULT_GUIDANCE_SCALE = 3.5
 INFERENCE_STEPS = 20
 
-# Quantized Model Files (for reference - not currently used)
-# FP4_WEIGHTS_FILE = "svdq-fp4_r32-flux.1-dev.safetensors"
-# INT4_WEIGHTS_FILE = "svdq-int4_r32-flux.1-dev.safetensors"
-
 # Model Types
 MODEL_TYPE_QUANTIZED_GPU = "flux_quantized_gpu"
 
@@ -49,3 +45,4 @@ STATIC_IMAGES_DIR = "static"
 # Removed DEFAULT_LORA_NAME and DEFAULT_LORA_WEIGHT - now configurable per LoRA
 MIN_LORA_WEIGHT = 0.0
 MAX_LORA_WEIGHT = 2.0
+
