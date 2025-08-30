@@ -69,6 +69,8 @@ check_gpus() {
         IFS=',' read -ra GPU_IDS <<< "$CUDA_VISIBLE_DEVICES"
         NUM_GPUS=${#GPU_IDS[@]}
         echo "   Will use $NUM_GPUS GPUs: ${GPU_IDS[*]}"
+        echo "   [DEBUG] GPU_IDS array: ${GPU_IDS[@]}"
+        echo "   [DEBUG] NUM_GPUS: $NUM_GPUS"
     else
         local gpu_count=$(nvidia-smi -L | wc -l)
         echo "   Found $gpu_count GPUs total"
@@ -143,8 +145,10 @@ start_service() {
     local gpu_id=${GPU_IDS[$idx]}
     local port=$((BASE_PORT + idx))
     local log_file="$LOG_DIR/flux_gpu${gpu_id}_port${port}.log"
+    local debug_file="$LOG_DIR/debug_gpu${gpu_id}_port${port}.log"
     
     echo "🚀 Starting service on GPU $gpu_id (port $port)..."
+    echo "[DEBUG] Index: $idx, GPU ID: $gpu_id, Port: $port" | tee "$debug_file"
     
     # Prepare Python command with virtual environment
     local python_cmd="python"
@@ -160,48 +164,121 @@ start_service() {
     
     echo "   Configuring with $threads_per_gpu CPU threads (total CPUs: $total_cpus, GPUs: $NUM_GPUS)"
     
+    # Debug: Test GPU visibility before launching
+    echo "[DEBUG] Testing GPU visibility with CUDA_VISIBLE_DEVICES=$gpu_id..." | tee -a "$debug_file"
+    CUDA_VISIBLE_DEVICES=$gpu_id $python_cmd -c "import torch; print(f'PyTorch sees {torch.cuda.device_count()} GPU(s)'); print(f'Current device: {torch.cuda.current_device() if torch.cuda.is_available() else None}')" >> "$debug_file" 2>&1
+    
+    # Debug: Show environment variables
+    echo "[DEBUG] Environment variables:" >> "$debug_file"
+    echo "  CUDA_VISIBLE_DEVICES=$gpu_id" >> "$debug_file"
+    echo "  FP4_API_PORT=$port" >> "$debug_file"
+    echo "  NUM_GPU_INSTANCES=$NUM_GPUS" >> "$debug_file"
+    echo "  Python command: $python_cmd" >> "$debug_file"
+    
     # Start the service in background with proper environment and thread limits
     if [ "$MODEL_TYPE" = "fp4" ]; then
-        env CUDA_VISIBLE_DEVICES=$gpu_id \
-            FP4_API_PORT=$port \
-            NUM_GPU_INSTANCES=$NUM_GPUS \
-            OMP_NUM_THREADS=$threads_per_gpu \
-            MKL_NUM_THREADS=$threads_per_gpu \
-            NUMEXPR_NUM_THREADS=$threads_per_gpu \
-            OPENBLAS_NUM_THREADS=$threads_per_gpu \
-            VECLIB_MAXIMUM_THREADS=$threads_per_gpu \
-            TORCH_NUM_THREADS=$threads_per_gpu \
-            nohup $python_cmd main_fp4.py > "$log_file" 2>&1 &
+        echo "[DEBUG] Launching fp4 model..." >> "$debug_file"
+        echo "[DEBUG] Full command: CUDA_VISIBLE_DEVICES=$gpu_id FP4_API_PORT=$port $python_cmd main_fp4.py" >> "$debug_file"
+        
+        # Export variables properly and launch
+        (
+            export CUDA_VISIBLE_DEVICES=$gpu_id
+            export FP4_API_PORT=$port
+            export NUM_GPU_INSTANCES=$NUM_GPUS
+            export OMP_NUM_THREADS=$threads_per_gpu
+            export MKL_NUM_THREADS=$threads_per_gpu
+            export NUMEXPR_NUM_THREADS=$threads_per_gpu
+            export OPENBLAS_NUM_THREADS=$threads_per_gpu
+            export VECLIB_MAXIMUM_THREADS=$threads_per_gpu
+            export TORCH_NUM_THREADS=$threads_per_gpu
+            
+            echo "[DEBUG] Environment in subshell:" >> "$debug_file"
+            echo "  CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES" >> "$debug_file"
+            echo "  FP4_API_PORT=$FP4_API_PORT" >> "$debug_file"
+            
+            nohup $python_cmd main_fp4.py >> "$log_file" 2>&1 &
+            echo $! > "${debug_file}.pid"
+        )
     elif [ "$MODEL_TYPE" = "fp4_sekai" ]; then
-        env CUDA_VISIBLE_DEVICES=$gpu_id \
-            FP4_API_PORT=$port \
-            NUM_GPU_INSTANCES=$NUM_GPUS \
-            FLUX_RETURN_BASE64=true \
-            OMP_NUM_THREADS=$threads_per_gpu \
-            MKL_NUM_THREADS=$threads_per_gpu \
-            NUMEXPR_NUM_THREADS=$threads_per_gpu \
-            OPENBLAS_NUM_THREADS=$threads_per_gpu \
-            VECLIB_MAXIMUM_THREADS=$threads_per_gpu \
-            TORCH_NUM_THREADS=$threads_per_gpu \
-            nohup $python_cmd main_fp4_sekai.py > "$log_file" 2>&1 &
+        echo "[DEBUG] Launching fp4_sekai model..." >> "$debug_file"
+        echo "[DEBUG] Full command: CUDA_VISIBLE_DEVICES=$gpu_id FP4_API_PORT=$port $python_cmd main_fp4_sekai.py" >> "$debug_file"
+        
+        # Export variables properly and launch
+        (
+            export CUDA_VISIBLE_DEVICES=$gpu_id
+            export FP4_API_PORT=$port
+            export NUM_GPU_INSTANCES=$NUM_GPUS
+            export FLUX_RETURN_BASE64=true
+            export OMP_NUM_THREADS=$threads_per_gpu
+            export MKL_NUM_THREADS=$threads_per_gpu
+            export NUMEXPR_NUM_THREADS=$threads_per_gpu
+            export OPENBLAS_NUM_THREADS=$threads_per_gpu
+            export VECLIB_MAXIMUM_THREADS=$threads_per_gpu
+            export TORCH_NUM_THREADS=$threads_per_gpu
+            
+            echo "[DEBUG] Environment in subshell:" >> "$debug_file"
+            echo "  CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES" >> "$debug_file"
+            echo "  FP4_API_PORT=$FP4_API_PORT" >> "$debug_file"
+            echo "  FLUX_RETURN_BASE64=$FLUX_RETURN_BASE64" >> "$debug_file"
+            
+            nohup $python_cmd main_fp4_sekai.py >> "$log_file" 2>&1 &
+            echo $! > "${debug_file}.pid"
+        )
     else
-        env CUDA_VISIBLE_DEVICES=$gpu_id \
-            BF16_API_PORT=$port \
-            NUM_GPU_INSTANCES=$NUM_GPUS \
-            OMP_NUM_THREADS=$threads_per_gpu \
-            MKL_NUM_THREADS=$threads_per_gpu \
-            NUMEXPR_NUM_THREADS=$threads_per_gpu \
-            OPENBLAS_NUM_THREADS=$threads_per_gpu \
-            VECLIB_MAXIMUM_THREADS=$threads_per_gpu \
-            TORCH_NUM_THREADS=$threads_per_gpu \
-            nohup $python_cmd main_bf16.py > "$log_file" 2>&1 &
+        echo "[DEBUG] Launching bf16 model..." >> "$debug_file"
+        echo "[DEBUG] Full command: CUDA_VISIBLE_DEVICES=$gpu_id BF16_API_PORT=$port $python_cmd main_bf16.py" >> "$debug_file"
+        
+        # Export variables properly and launch
+        (
+            export CUDA_VISIBLE_DEVICES=$gpu_id
+            export BF16_API_PORT=$port
+            export NUM_GPU_INSTANCES=$NUM_GPUS
+            export OMP_NUM_THREADS=$threads_per_gpu
+            export MKL_NUM_THREADS=$threads_per_gpu
+            export NUMEXPR_NUM_THREADS=$threads_per_gpu
+            export OPENBLAS_NUM_THREADS=$threads_per_gpu
+            export VECLIB_MAXIMUM_THREADS=$threads_per_gpu
+            export TORCH_NUM_THREADS=$threads_per_gpu
+            
+            echo "[DEBUG] Environment in subshell:" >> "$debug_file"
+            echo "  CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES" >> "$debug_file"
+            echo "  BF16_API_PORT=$BF16_API_PORT" >> "$debug_file"
+            
+            nohup $python_cmd main_bf16.py >> "$log_file" 2>&1 &
+            echo $! > "${debug_file}.pid"
+        )
     fi
     
-    local pid=$!
+    # Read the PID from the debug file
+    if [ -f "${debug_file}.pid" ]; then
+        local pid=$(cat "${debug_file}.pid")
+        rm -f "${debug_file}.pid"
+    else
+        echo "[ERROR] Failed to get PID!" | tee -a "$debug_file"
+        return 1
+    fi
+    
     echo $pid >> "$PID_FILE"
     
     echo "   Started PID $pid, log: $log_file"
     echo "   Thread limits: OMP=$threads_per_gpu, MKL=$threads_per_gpu"
+    
+    # Check if process is still running after 2 seconds
+    sleep 2
+    if kill -0 $pid 2>/dev/null; then
+        echo "   ✅ Process $pid is running" | tee -a "$debug_file"
+    else
+        echo "   ❌ Process $pid died immediately!" | tee -a "$debug_file"
+        echo "   Checking error in log file:" | tee -a "$debug_file"
+        if [ -f "$log_file" ]; then
+            echo "====== Last 20 lines of $log_file ======" | tee -a "$debug_file"
+            tail -20 "$log_file" | tee -a "$debug_file"
+            echo "========================================" | tee -a "$debug_file"
+        else
+            echo "   Log file not created!" | tee -a "$debug_file"
+        fi
+        return 1
+    fi
     
     # Brief pause to avoid race conditions
     sleep 1

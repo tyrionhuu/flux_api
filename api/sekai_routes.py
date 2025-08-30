@@ -219,7 +219,48 @@ async def generate_image(request: GenerateRequest):
         lora_applied = None
         lora_weight_applied = None
 
-        if loras_to_apply:
+        # Check if current LoRAs match what we want to apply
+        def loras_match(current, desired):
+            """Check if current LoRAs match desired LoRAs"""
+            if not current or not desired:
+                return False
+            
+            # Get current LoRA names and weights
+            if isinstance(current.get("name"), list):
+                # Multiple LoRAs currently applied
+                current_loras = current.get("name", [])
+                current_weight = current.get("weight", 0)
+                
+                # Check if same number of LoRAs
+                if len(current_loras) != len(desired):
+                    return False
+                
+                # Check if all LoRAs match (order matters for merged LoRAs)
+                for i, lora_config in enumerate(desired):
+                    if i >= len(current_loras):
+                        return False
+                    if current_loras[i] != lora_config["name"]:
+                        return False
+                
+                # Check if combined weight matches
+                desired_weight = sum(lora["weight"] for lora in desired)
+                if abs(current_weight - desired_weight) > 0.001:  # Small tolerance for float comparison
+                    return False
+                
+                return True
+            else:
+                # Single LoRA currently applied
+                if len(desired) != 1:
+                    return False
+                return (
+                    current.get("name") == desired[0]["name"] 
+                    and abs(current.get("weight", 0) - desired[0]["weight"]) < 0.001
+                )
+        
+        # Only apply LoRAs if they don't match current state
+        should_apply_loras = loras_to_apply and not loras_match(current_lora, loras_to_apply)
+        
+        if should_apply_loras:
             # Apply multiple LoRAs simultaneously
             logger.info(f"Applying {len(loras_to_apply)} LoRAs to loaded model")
             try:
@@ -282,6 +323,12 @@ async def generate_image(request: GenerateRequest):
                         status_code=500,
                         detail=f"Failed to apply LoRAs: {str(lora_error)}",
                     )
+        elif loras_to_apply and not should_apply_loras:
+            # LoRAs already match what we want - no need to reapply
+            logger.info(f"LoRAs already applied and match desired state, skipping re-application")
+            if current_lora:
+                lora_applied = current_lora.get("name")
+                lora_weight_applied = current_lora.get("weight")
         elif remove_all_loras:
             # Explicit removal requested
             if model_manager.get_lora_info():

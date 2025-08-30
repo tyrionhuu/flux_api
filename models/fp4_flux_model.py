@@ -37,6 +37,8 @@ class FluxModelManager:
         self.current_weight: float = 1.0
         # Track temporary LoRA files for cleanup
         self._temp_lora_paths: list = []
+        # Cache for merged LoRA files to avoid re-merging
+        self._merged_lora_cache: dict = {}
 
     def __del__(self):
         """Cleanup when object is destroyed"""
@@ -712,6 +714,23 @@ class FluxModelManager:
             if len(lora_configs) <= 1:
                 return None
 
+            # Create a cache key from the LoRA configurations
+            import hashlib
+            import json
+            cache_key = hashlib.md5(
+                json.dumps(lora_configs, sort_keys=True).encode()
+            ).hexdigest()
+            
+            # Check if we have this merged LoRA in cache
+            if cache_key in self._merged_lora_cache:
+                cached_path = self._merged_lora_cache[cache_key]
+                if os.path.exists(cached_path):
+                    logger.info(f"Using cached merged LoRA from: {cached_path}")
+                    return cached_path
+                else:
+                    # Cache entry is stale, remove it
+                    del self._merged_lora_cache[cache_key]
+
             logger.info(f"Merging {len(lora_configs)} LoRAs into a single LoRA...")
 
             # Create a temporary directory for the merged LoRA
@@ -786,6 +805,10 @@ class FluxModelManager:
                 # Save the merged LoRA
                 safe_save_file(merged_lora, merged_lora_path)
                 logger.info(f"   - Merged LoRA saved: {merged_lora_path}")
+                
+                # Cache the merged LoRA path
+                self._merged_lora_cache[cache_key] = merged_lora_path
+                logger.info(f"   - Cached merged LoRA with key: {cache_key}")
 
                 return merged_lora_path
 
