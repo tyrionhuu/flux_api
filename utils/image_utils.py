@@ -6,6 +6,7 @@ from typing import Any
 
 from PIL import Image
 
+
 def extract_image_from_result(result: Any) -> Image.Image:
     """Extract image from Diffusion pipeline result"""
     try:

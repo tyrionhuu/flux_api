@@ -14,7 +14,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 from api.models import GenerateRequest, SwitchModelRequest, SwitchModelResponse
-from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS)
+from config.settings import DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS
 from models.models import DiffusionModelManager
 from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name)
@@ -149,6 +149,7 @@ def read_root():
             ],
             "model_loaded": model_manager.is_loaded(),
         }
+
 
 @router.get("/download/{filename}")
 def download_image(filename: str):
@@ -817,9 +818,9 @@ def generate_image_internal(
     # Model should already be loaded at this point
     if not model_manager.is_loaded():
         raise HTTPException(status_code=500, detail="Model not loaded")
-    
+
     # Log which model type is being used for generation
-    current_model_type = getattr(model_manager, 'current_model_type', 'unknown')
+    current_model_type = getattr(model_manager, "current_model_type", "unknown")
     logger.info(f"Using {current_model_type} model for image generation")
 
     # Apply LoRA if specified and different from the currently applied one
@@ -847,7 +848,9 @@ def generate_image_internal(
                 )
 
     try:
-        logger.info(f"Generating image for prompt: {prompt} with {current_model_type} model")
+        logger.info(
+            f"Generating image for prompt: {prompt} with {current_model_type} model"
+        )
 
         # Start timing
         start_time = time.time()
@@ -898,12 +901,14 @@ def generate_image_internal(
 
         filename = os.path.basename(image_filename)
         download_url = f"/download/{filename}"
-        
-        logger.info(f"Image generation completed successfully with {current_model_type} model")
+
+        logger.info(
+            f"Image generation completed successfully with {current_model_type} model"
+        )
 
         # Get the current model type for the response
-        current_model_type = getattr(model_manager, 'current_model_type', 'unknown')
-        
+        current_model_type = getattr(model_manager, "current_model_type", "unknown")
+
         return {
             "message": f"Generated image for prompt: {prompt}",
             "image_url": image_filename,
@@ -919,7 +924,9 @@ def generate_image_internal(
         }
 
     except Exception as e:
-        logger.error(f"Error generating image with {current_model_type} model: {e} (Type: {type(e).__name__})")
+        logger.error(
+            f"Error generating image with {current_model_type} model: {e} (Type: {type(e).__name__})"
+        )
         raise HTTPException(
             status_code=500,
         )
@@ -930,31 +937,29 @@ async def switch_model(request: SwitchModelRequest):
     """Switch between different model types (flux/qwen)"""
     try:
         model_type = request.model_type
-        
+
         with _model_manager_lock:
             # Get current model type before switching
             current_status = model_manager.get_model_status()
             previous_model_type = current_status.get("model_type", "unknown")
-            
+
             # Switch the model
             if model_manager.switch_model(model_type):
-                logger.info(f"Successfully switched from {previous_model_type} to {model_type}")
+                logger.info(
+                    f"Successfully switched from {previous_model_type} to {model_type}"
+                )
                 return SwitchModelResponse(
                     message=f"Model switched to {model_type} successfully",
                     model_type=model_type,
-                    previous_model_type=previous_model_type
+                    previous_model_type=previous_model_type,
                 )
             else:
                 raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to switch to {model_type} model"
+                    status_code=500, detail=f"Failed to switch to {model_type} model"
                 )
-                
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error switching model: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

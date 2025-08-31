@@ -108,7 +108,9 @@ class ModelStatusResponse(BaseModel):
 class SwitchModelRequest(BaseModel):
     """Request model for switching models"""
 
-    model_type: str = Field(..., description="Type of model to switch to (flux or qwen)")
+    model_type: str = Field(
+        ..., description="Type of model to switch to (flux or qwen)"
+    )
 
 
 class SwitchModelResponse(BaseModel):

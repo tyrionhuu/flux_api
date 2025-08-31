@@ -53,13 +53,16 @@ class DiffusionModelManager:
         try:
             # Safety check: avoid reloading if already loaded
             if self.model_loaded and self.pipe is not None:
-                current_type = getattr(self, 'current_model_type', 'unknown')
-                logger.info(f"Diffusion model already loaded ({current_type}), skipping reload")
+                current_type = getattr(self, "current_model_type", "unknown")
+                logger.info(
+                    f"Diffusion model already loaded ({current_type}), skipping reload"
+                )
                 return True
-            
+
             # Use provided model_type or fall back to global setting
             if model_type is None:
                 from config.settings import MODEL_TYPE
+
                 model_type = MODEL_TYPE
 
             logger.info(f"Loading Diffusion model for type: {model_type}")
@@ -206,7 +209,9 @@ class DiffusionModelManager:
             # Reset LoRA state when loading a new model
             self.current_lora = None
             self.current_weight = 1.0
-            logger.info(f"Diffusion model ({model_type}) loaded successfully on {device}!")
+            logger.info(
+                f"Diffusion model ({model_type}) loaded successfully on {device}!"
+            )
 
             # Perform CUDA Graph warm-up for better performance
             self._warmup_cuda_graph()
@@ -264,7 +269,7 @@ class DiffusionModelManager:
             raise RuntimeError("Model not loaded")
 
         # Log which model type is being used for generation
-        current_model_type = getattr(self, 'current_model_type', 'unknown')
+        current_model_type = getattr(self, "current_model_type", "unknown")
         logger.info(f"Starting image generation with {current_model_type} model")
 
         # Ensure we're using GPU
@@ -317,7 +322,9 @@ class DiffusionModelManager:
                     generation_kwargs["negative_prompt"] = negative_prompt
 
                 result = self.pipe(**generation_kwargs)
-                logger.info(f"Image generation completed successfully with {current_model_type} model")
+                logger.info(
+                    f"Image generation completed successfully with {current_model_type} model"
+                )
                 return result
 
             except Exception as memory_error:
@@ -325,7 +332,9 @@ class DiffusionModelManager:
                     logger.warning(
                         f"CUDA memory error detected with {current_model_type} model: {memory_error} (Type: {type(memory_error).__name__})"
                     )
-                    logger.info(f"Trying with reduced parameters for {current_model_type} model...")
+                    logger.info(
+                        f"Trying with reduced parameters for {current_model_type} model..."
+                    )
 
                     # Fallback with reduced parameters
                     fallback_steps = min(num_inference_steps // 2, 10)
@@ -355,14 +364,18 @@ class DiffusionModelManager:
                     raise memory_error
 
         except Exception as e:
-            logger.error(f"Error in image generation with {current_model_type} model: {e} (Type: {type(e).__name__})")
+            logger.error(
+                f"Error in image generation with {current_model_type} model: {e} (Type: {type(e).__name__})"
+            )
             raise RuntimeError(f"Failed to generate image: {e}")
 
     def get_model_status(self) -> dict:
         """Get the current model status"""
         return {
             "model_loaded": self.model_loaded,
-            "model_type": getattr(self, 'current_model_type', 'qwen'),  # Default to qwen if not set
+            "model_type": getattr(
+                self, "current_model_type", "qwen"
+            ),  # Default to qwen if not set
             "selected_gpu": self.gpu_manager.selected_gpu,
             "vram_usage_gb": f"{self.gpu_manager.get_vram_usage():.2f}GB",
         }
@@ -978,26 +991,31 @@ class DiffusionModelManager:
             if new_model_type not in ["flux", "qwen"]:
                 logger.error(f"Invalid model type: {new_model_type}")
                 return False
-            
+
             # Check if we're already using the requested model type
-            if hasattr(self, 'current_model_type') and self.current_model_type == new_model_type:
+            if (
+                hasattr(self, "current_model_type")
+                and self.current_model_type == new_model_type
+            ):
                 logger.info(f"Already using {new_model_type} model")
                 return True
-            
-            logger.info(f"Switching from {getattr(self, 'current_model_type', 'unknown')} to {new_model_type}")
-            
+
+            logger.info(
+                f"Switching from {getattr(self, 'current_model_type', 'unknown')} to {new_model_type}"
+            )
+
             # Unload current model if loaded
             if self.model_loaded and self.pipe is not None:
-                current_type = getattr(self, 'current_model_type', 'unknown')
+                current_type = getattr(self, "current_model_type", "unknown")
                 logger.info(f"Unloading current model ({current_type})...")
                 del self.pipe
                 self.pipe = None
                 self.model_loaded = False
-            
+
             # Clear CUDA cache
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-            
+
             # Load the new model with the specified type
             if self.load_model(new_model_type):
                 self.current_model_type = new_model_type
@@ -1007,7 +1025,7 @@ class DiffusionModelManager:
             else:
                 logger.error(f"Failed to load {new_model_type} model")
                 return False
-                
+
         except Exception as e:
             logger.error(f"Error switching model: {e}")
             return False
