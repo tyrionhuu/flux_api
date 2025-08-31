@@ -34,6 +34,7 @@ class DiffusionModelManager:
         self.pipe: Optional[FluxPipeline | NunchakuQwenImagePipeline] = None
         self.model_loaded = False
         self.gpu_manager = GPUManager()
+        self.current_model_type = MODEL_TYPE
         # LoRA state - can be single LoRA (str) or multiple LoRAs (list)
         self.current_lora: Optional[Union[str, list]] = None
         self.current_weight: float = 1.0
@@ -47,15 +48,21 @@ class DiffusionModelManager:
         except:
             pass  # Ignore errors during cleanup
 
-    def load_model(self) -> bool:
+    def load_model(self, model_type: Optional[str] = None) -> bool:
         """Load the Diffusion model with GPU-only support and quantization"""
         try:
             # Safety check: avoid reloading if already loaded
             if self.model_loaded and self.pipe is not None:
-                logger.info("Diffusion model already loaded, skipping reload")
+                current_type = getattr(self, 'current_model_type', 'unknown')
+                logger.info(f"Diffusion model already loaded ({current_type}), skipping reload")
                 return True
+            
+            # Use provided model_type or fall back to global setting
+            if model_type is None:
+                from config.settings import MODEL_TYPE
+                model_type = MODEL_TYPE
 
-            logger.info("Loading Diffusion model...")
+            logger.info(f"Loading Diffusion model for type: {model_type}")
 
             # Check if CUDA is available
             if not torch.cuda.is_available():
@@ -99,9 +106,10 @@ class DiffusionModelManager:
             logger.info(f"Detected precision: {precision}")
 
             # Always load Nunchaku model (this has LoRA support)
-            logger.info("Loading Nunchaku model with LoRA support...")
+            logger.info(f"Loading Nunchaku model with LoRA support for {model_type}...")
 
-            if MODEL_TYPE == "flux":
+            if model_type == "flux":
+                logger.info("Loading Flux model...")
                 try:
                     # Load the Nunchaku transformer on the same device
                     transformer_result = NunchakuFluxTransformer2dModel.from_pretrained(
@@ -141,7 +149,7 @@ class DiffusionModelManager:
                         f"Device consistency - Target: {device}, Transformer: {next(transformer.parameters()).device}, Pipeline: {self.pipe.device if hasattr(self.pipe, 'device') else 'unknown'}"
                     )
 
-                    logger.info("Nunchaku model loaded successfully with LoRA support!")
+                    logger.info("Flux model loaded successfully with LoRA support!")
 
                 except Exception as nunchaku_error:
                     logger.error(
@@ -151,7 +159,8 @@ class DiffusionModelManager:
                         f"Failed to load Nunchaku model: {nunchaku_error}. Nunchaku is required for this model."
                     )
 
-            elif MODEL_TYPE == "qwen":
+            elif model_type == "qwen":
+                logger.info("Loading Qwen model...")
                 # Load the Nunchaku transformer on the same device
                 transformer_result = NunchakuQwenImageTransformer2DModel.from_pretrained(
                     f"{NUNCHAKU_QWEN_IMAGE_MODEL_ID}/svdq-{precision}_r32-qwen-image.safetensors"
@@ -189,13 +198,15 @@ class DiffusionModelManager:
                     f"Device consistency - Target: {device}, Transformer: {next(transformer.parameters()).device}, Pipeline: {self.pipe.device if hasattr(self.pipe, 'device') else 'unknown'}"
                 )
 
-                logger.info("Nunchaku model loaded successfully with LoRA support!")
+                logger.info("Qwen model loaded successfully with LoRA support!")
 
             self.model_loaded = True
+            # Set the current model type
+            self.current_model_type = model_type
             # Reset LoRA state when loading a new model
             self.current_lora = None
             self.current_weight = 1.0
-            logger.info(f"Diffusion model loaded successfully on {device}!")
+            logger.info(f"Diffusion model ({model_type}) loaded successfully on {device}!")
 
             # Perform CUDA Graph warm-up for better performance
             self._warmup_cuda_graph()
@@ -252,6 +263,10 @@ class DiffusionModelManager:
         if not self.model_loaded or self.pipe is None:
             raise RuntimeError("Model not loaded")
 
+        # Log which model type is being used for generation
+        current_model_type = getattr(self, 'current_model_type', 'unknown')
+        logger.info(f"Starting image generation with {current_model_type} model")
+
         # Ensure we're using GPU
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA not available. GPU required for image generation.")
@@ -280,7 +295,7 @@ class DiffusionModelManager:
             # Try with user-specified parameters first
             try:
                 logger.info(
-                    f"Generating with parameters: steps={num_inference_steps}, guidance={guidance_scale}, size={width}x{height}"
+                    f"Generating with {current_model_type} model - parameters: steps={num_inference_steps}, guidance={guidance_scale}, size={width}x{height}"
                 )
 
                 # Set seed if provided
@@ -302,15 +317,15 @@ class DiffusionModelManager:
                     generation_kwargs["negative_prompt"] = negative_prompt
 
                 result = self.pipe(**generation_kwargs)
-                logger.info("Image generation completed successfully")
+                logger.info(f"Image generation completed successfully with {current_model_type} model")
                 return result
 
             except Exception as memory_error:
                 if "CUDA" in str(memory_error) or "memory" in str(memory_error).lower():
                     logger.warning(
-                        f"CUDA memory error detected: {memory_error} (Type: {type(memory_error).__name__})"
+                        f"CUDA memory error detected with {current_model_type} model: {memory_error} (Type: {type(memory_error).__name__})"
                     )
-                    logger.info("Trying with reduced parameters...")
+                    logger.info(f"Trying with reduced parameters for {current_model_type} model...")
 
                     # Fallback with reduced parameters
                     fallback_steps = min(num_inference_steps // 2, 10)
@@ -329,24 +344,25 @@ class DiffusionModelManager:
 
                     result = self.pipe(**generation_kwargs)
                     logger.info(
-                        f"Image generation completed with reduced parameters: steps={fallback_steps}, guidance={fallback_guidance}"
+                        f"Image generation completed with {current_model_type} model using reduced parameters: steps={fallback_steps}, guidance={fallback_guidance}"
                     )
                     return result
                 else:
                     # Re-raise if it's not a memory error
                     logger.error(
-                        f"Non-memory error during image generation: {memory_error} (Type: {type(memory_error).__name__})"
+                        f"Non-memory error during image generation with {current_model_type} model: {memory_error} (Type: {type(memory_error).__name__})"
                     )
                     raise memory_error
 
         except Exception as e:
-            logger.error(f"Error in image generation: {e} (Type: {type(e).__name__})")
+            logger.error(f"Error in image generation with {current_model_type} model: {e} (Type: {type(e).__name__})")
             raise RuntimeError(f"Failed to generate image: {e}")
 
     def get_model_status(self) -> dict:
         """Get the current model status"""
         return {
             "model_loaded": self.model_loaded,
+            "model_type": getattr(self, 'current_model_type', 'qwen'),  # Default to qwen if not set
             "selected_gpu": self.gpu_manager.selected_gpu,
             "vram_usage_gb": f"{self.gpu_manager.get_vram_usage():.2f}GB",
         }
@@ -954,3 +970,44 @@ class DiffusionModelManager:
                 self._temp_lora_paths = []
         except Exception as e:
             logger.warning(f"Error cleaning up temporary LoRAs: {e}")
+
+    def switch_model(self, new_model_type: str) -> bool:
+        """Switch to a different model type"""
+        try:
+            logger.info(f"Attempting to switch model to: {new_model_type}")
+            if new_model_type not in ["flux", "qwen"]:
+                logger.error(f"Invalid model type: {new_model_type}")
+                return False
+            
+            # Check if we're already using the requested model type
+            if hasattr(self, 'current_model_type') and self.current_model_type == new_model_type:
+                logger.info(f"Already using {new_model_type} model")
+                return True
+            
+            logger.info(f"Switching from {getattr(self, 'current_model_type', 'unknown')} to {new_model_type}")
+            
+            # Unload current model if loaded
+            if self.model_loaded and self.pipe is not None:
+                current_type = getattr(self, 'current_model_type', 'unknown')
+                logger.info(f"Unloading current model ({current_type})...")
+                del self.pipe
+                self.pipe = None
+                self.model_loaded = False
+            
+            # Clear CUDA cache
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            # Load the new model with the specified type
+            if self.load_model(new_model_type):
+                self.current_model_type = new_model_type
+                logger.info(f"Successfully switched to {new_model_type} model")
+                logger.info(f"Model switch completed: {new_model_type} is now active")
+                return True
+            else:
+                logger.error(f"Failed to load {new_model_type} model")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error switching model: {e}")
+            return False

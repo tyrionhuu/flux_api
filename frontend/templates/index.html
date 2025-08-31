@@ -109,6 +109,23 @@
                         </div>
                     </div>
                     
+                    <!-- Model Type Selection Section -->
+                    <div class="parameter-group">
+                        <label for="model-type">Model Type</label>
+                        <div class="model-type-container">
+                            <select id="model-type" class="model-type-selector">
+                                <option value="qwen" selected>Qwen Image</option>
+                                <option value="flux">Flux</option>
+                            </select>
+                            <button id="switch-model-btn" class="btn btn-secondary">
+                                <i class="fas fa-sync-alt"></i> Switch Model
+                            </button>
+                        </div>
+                        <div class="model-info">
+                            <small id="current-model-info">Currently loaded: Qwen Image</small>
+                        </div>
+                    </div>
+                    
                     <div class="parameter-group">
                         <label for="prompt">Prompt</label>
                         <textarea id="prompt" placeholder="Describe the image you want to generate..." rows="3">A beautiful landscape with mountains and a lake</textarea>

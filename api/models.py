@@ -103,3 +103,17 @@ class ModelStatusResponse(BaseModel):
     system_memory_total_gb: str = Field(..., description="Total system memory in GB")
     lora_loaded: Optional[str] = Field(None, description="Currently loaded LoRA file")
     lora_weight: Optional[float] = Field(None, description="Current LoRA weight")
+
+
+class SwitchModelRequest(BaseModel):
+    """Request model for switching models"""
+
+    model_type: str = Field(..., description="Type of model to switch to (flux or qwen)")
+
+
+class SwitchModelResponse(BaseModel):
+    """Response model for model switching"""
+
+    message: str = Field(..., description="Success message")
+    model_type: str = Field(..., description="Type of model that was switched to")
+    previous_model_type: str = Field(..., description="Previous model type")

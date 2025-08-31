@@ -14,8 +14,12 @@ class FluxAPI {
     }
 
     init() {
+        console.log('Initializing FluxAPI...');
         this.setupEventListeners();
         this.loadAvailableLoras();
+        // Sync model status with backend on startup
+        console.log('Syncing model status with backend...');
+        this.updateModelStatus();
     }
 
     setupEventListeners() {
@@ -196,6 +200,18 @@ class FluxAPI {
                 this.closeModal();
             }
         });
+
+        // Model type switch
+        const switchModelBtn = document.getElementById('switch-model-btn');
+        if (switchModelBtn) {
+            switchModelBtn.addEventListener('click', () => this.switchModel());
+        }
+
+        // Model type selector change
+        const modelTypeSelector = document.getElementById('model-type');
+        if (modelTypeSelector) {
+            modelTypeSelector.addEventListener('change', () => this.updateModelInfo());
+        }
     }
 
     randomSeed() {
@@ -1092,6 +1108,151 @@ class FluxAPI {
             const d = new Date((ts || 0) * 1000);
             return d.toLocaleString();
         } catch { return ''; }
+    }
+
+    // ===== Model Type Switching =====
+    async switchModel() {
+        const modelType = document.getElementById('model-type').value;
+        const switchBtn = document.getElementById('switch-model-btn');
+        const originalText = switchBtn.innerHTML;
+        
+        try {
+            // Disable button and show loading state
+            switchBtn.disabled = true;
+            switchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Switching...';
+            
+            // Call backend to switch model
+            const response = await fetch(`${this.hostBase}/switch-model`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ model_type: modelType })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            
+            // Update UI to reflect the change
+            this.updateModelInfo();
+            this.showSuccess(`Model switched to ${modelType} successfully!`);
+            
+            // Refresh model status
+            await this.updateModelStatus();
+            
+        } catch (error) {
+            console.error('Error switching model:', error);
+            this.showError(`Failed to switch model: ${error.message}`);
+            
+            // Reset selector to current model if switch failed
+            await this.updateModelStatus();
+        } finally {
+            // Restore button state
+            switchBtn.disabled = false;
+            switchBtn.innerHTML = originalText;
+        }
+    }
+
+    updateModelInfo() {
+        const modelType = document.getElementById('model-type').value;
+        const modelInfo = document.getElementById('current-model-info');
+        if (modelInfo) {
+            const displayNames = {
+                'qwen': 'Qwen Image',
+                'flux': 'Flux'
+            };
+            const displayText = `Selected: ${displayNames[modelType] || modelType}`;
+            console.log(`updateModelInfo called - setting text to: ${displayText}`);
+            modelInfo.textContent = displayText;
+        }
+    }
+
+    async updateModelStatus() {
+        try {
+            console.log('Updating model status from backend...');
+            const response = await fetch(`${this.hostBase}/model-status`);
+            if (response.ok) {
+                const status = await response.json();
+                console.log('Backend model status:', status);
+                
+                // Update model type selector to match current loaded model
+                const modelTypeSelector = document.getElementById('model-type');
+                if (modelTypeSelector && status.model_type) {
+                    console.log(`Setting model selector to: ${status.model_type}`);
+                    modelTypeSelector.value = status.model_type;
+                    this.updateModelInfo();
+                }
+                
+                // Update model info display
+                const modelInfo = document.getElementById('current-model-info');
+                if (modelInfo) {
+                    const displayNames = {
+                        'qwen': 'Qwen Image',
+                        'flux': 'Flux'
+                    };
+                    const currentModel = displayNames[status.model_type] || status.model_type;
+                    console.log(`Setting model info to: Currently loaded: ${currentModel}`);
+                    modelInfo.textContent = `Currently loaded: ${currentModel}`;
+                }
+            } else {
+                console.error('Failed to get model status:', response.status, response.statusText);
+            }
+        } catch (error) {
+            console.error('Error updating model status:', error);
+        }
+    }
+
+    showSuccess(message) {
+        // Simple success notification
+        const notification = document.createElement('div');
+        notification.className = 'success-notification';
+        notification.textContent = message;
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    showError(message) {
+        // Simple error notification
+        const notification = document.createElement('div');
+        notification.className = 'error-notification';
+        notification.textContent = message;
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #ef4444;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 1);
+        `;
+        
+        notification.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
     }
 
 }
