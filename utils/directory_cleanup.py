@@ -2,14 +2,12 @@
 Directory cleanup utility for maintaining size limits on generated images and uploaded files.
 """
 
-import logging
 import os
 import shutil
 import time
 from pathlib import Path
 from typing import List, Tuple
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 class DirectoryCleanup:
@@ -201,12 +199,6 @@ def cleanup_directories_auto():
 
 
 if __name__ == "__main__":
-    # Set up logging for standalone testing
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
     # Test the cleanup functionality
     cleanup_manager = DirectoryCleanup()
 

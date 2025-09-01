@@ -5,8 +5,7 @@ Run this script to manually clean up directories and maintain size limits.
 """
 
 import argparse
-import logging
-import os
+import loguru
 import sys
 from pathlib import Path
 
@@ -17,19 +16,7 @@ from config.cleanup_settings import (GENERATED_IMAGES_SIZE_LIMIT_GB,
                                      UPLOADS_SIZE_LIMIT_GB)
 from utils.directory_cleanup import DirectoryCleanup
 
-
-def setup_logging(verbose: bool = False):
-    """Set up logging configuration."""
-    # Ensure logs directory exists
-    os.makedirs("logs", exist_ok=True)
-
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(), logging.FileHandler("logs/cleanup.log")],
-    )
-
+logger = loguru.logger
 
 def main():
     """Main cleanup function."""
@@ -83,10 +70,6 @@ Examples:
     )
 
     args = parser.parse_args()
-
-    # Setup logging
-    setup_logging(args.verbose)
-    logger = logging.getLogger(__name__)
 
     logger.info("Directory cleanup utility")
     logger.info(f"Generated images limit: {args.generated_limit}GB")

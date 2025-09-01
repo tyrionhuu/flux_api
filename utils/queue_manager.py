@@ -3,16 +3,14 @@ Queue manager for handling concurrent requests in the Diffusion API
 """
 
 import asyncio
-import logging
 import time
 import uuid
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, Optional
+from loguru import logger
 
 from config.settings import DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS
-
-logger = logging.getLogger(__name__)
 
 
 class RequestStatus(Enum):

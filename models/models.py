@@ -2,7 +2,6 @@
 Diffusion model management for the Diffusion API
 """
 
-import logging
 import os
 import shutil
 import tempfile
@@ -18,14 +17,12 @@ from nunchaku.pipeline.pipeline_qwenimage import NunchakuQwenImagePipeline
 from nunchaku.utils import get_precision
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
+from loguru import logger
 
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
                              MODEL_TYPE, NUNCHAKU_FLUX_MODEL_ID,
                              NUNCHAKU_QWEN_IMAGE_MODEL_ID)
 from utils.gpu_manager import GPUManager
-
-# Configure logging
-logger = logging.getLogger(__name__)
 
 
 class DiffusionModelManager:

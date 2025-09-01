@@ -2,7 +2,6 @@
 Main FastAPI application for the FP4 Diffusion API (Port 8002)
 """
 
-import logging
 import os
 import time
 
@@ -10,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from loguru import logger
 
 from api.routes import get_model_manager, router
 from config.settings import API_DESCRIPTION, API_PORT, API_TITLE, API_VERSION
@@ -18,46 +18,20 @@ from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("logs/diffusion_api.log")],
+# Configure loguru
+logger.remove()  # Remove default handler
+logger.add(
+    "logs/diffusion_api.log",
+    rotation="10 MB",
+    retention="7 days",
+    level="INFO",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}"
 )
-
-# Configure specific loggers for better error visibility
-logging.getLogger("api.routes").setLevel(logging.INFO)
-logging.getLogger("models.models").setLevel(logging.INFO)
-logging.getLogger("utils.cleanup_service").setLevel(logging.INFO)
-
-# Add a single enhanced console handler for better formatting
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-
-
-# Create a custom formatter that adds emojis and better structure
-class EnhancedFormatter(logging.Formatter):
-    def format(self, record):
-        # No emojis - just clean formatting
-        return super().format(record)
-
-
-# Apply the enhanced formatter
-enhanced_formatter = EnhancedFormatter(
-    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+logger.add(
+    lambda msg: print(msg, end=""),
+    level="INFO",
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>"
 )
-console_handler.setFormatter(enhanced_formatter)
-
-# Get root logger and replace the default stream handler
-root_logger = logging.getLogger()
-# Remove existing stream handlers
-for handler in root_logger.handlers[:]:
-    if isinstance(handler, logging.StreamHandler) and not isinstance(
-        handler, logging.FileHandler
-    ):
-        root_logger.removeHandler(handler)
-# Add our enhanced handler
-root_logger.addHandler(console_handler)
 
 # Create FastAPI app with lifespan context manager
 from contextlib import asynccontextmanager
@@ -69,39 +43,39 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         start_cleanup_service()
-        logging.info("FP4 Diffusion API started with cleanup service")
+        logger.info("FP4 Diffusion API started with cleanup service")
 
         # Auto-load the Diffusion model
-        logging.info("Auto-loading Diffusion model...")
+        logger.info("Auto-loading Diffusion model...")
 
         model_manager = get_model_manager()
 
         if model_manager.load_model():
-            logging.info("Diffusion model loaded successfully during startup")
+            logger.info("Diffusion model loaded successfully during startup")
         else:
-            logging.error("Failed to load Diffusion model during startup")
+            logger.error("Failed to load Diffusion model during startup")
 
         time.sleep(2)
 
         # Verify model is ready
         if model_manager.is_loaded():
-            logging.info("Diffusion model verified and ready for requests")
+            logger.info("Diffusion model verified and ready for requests")
         else:
-            logging.warning(
+            logger.warning(
                 "Diffusion model may not be fully ready - some requests may fail"
             )
 
     except Exception as e:
-        logging.error(f"Failed to start services: {e}")
+        logger.error(f"Failed to start services: {e}")
 
     yield
 
     # Shutdown
     try:
         stop_cleanup_service()
-        logging.info("FP4 Diffusion API shutdown, cleanup service stopped")
+        logger.info("FP4 Diffusion API shutdown, cleanup service stopped")
     except Exception as e:
-        logging.error(f"Error stopping cleanup service: {e}")
+        logger.error(f"Error stopping cleanup service: {e}")
 
 
 app = FastAPI(

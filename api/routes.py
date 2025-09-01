@@ -3,7 +3,6 @@ API routes for the Diffusion API
 """
 
 import json
-import logging
 import os
 import shutil
 import time
@@ -12,6 +11,7 @@ from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
+from loguru import logger
 
 from api.models import GenerateRequest, SwitchModelRequest, SwitchModelResponse
 from config.settings import DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS
@@ -20,9 +20,6 @@ from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name)
 from utils.queue_manager import QueueManager
 from utils.system_utils import get_system_memory
-
-# Configure logging
-logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter()

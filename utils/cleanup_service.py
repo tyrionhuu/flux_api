@@ -3,12 +3,12 @@ Background cleanup service for automatic directory maintenance.
 """
 
 import asyncio
-import logging
 import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+from loguru import logger
 
 from config.cleanup_settings import (CLEANUP_ENABLED, CLEANUP_INTERVAL_SECONDS,
                                      CLEANUP_ON_GENERATION, CLEANUP_ON_UPLOAD,
@@ -16,8 +16,6 @@ from config.cleanup_settings import (CLEANUP_ENABLED, CLEANUP_INTERVAL_SECONDS,
                                      PRIORITY_FILE_EXTENSIONS)
 
 from .directory_cleanup import DirectoryCleanup
-
-logger = logging.getLogger(__name__)
 
 
 class CleanupService:
@@ -180,11 +178,6 @@ def cleanup_after_generation():
 
 if __name__ == "__main__":
     # Test the cleanup service
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
     service = CleanupService()
 
     print("Starting cleanup service...")

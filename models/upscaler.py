@@ -3,20 +3,17 @@ Diffusion Framework Upscaler using Remacri ESRGAN model
 Provides high-quality 2x and 4x upscaling capabilities
 """
 
-import logging
 import os
 import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Optional, Tuple, Union
+from loguru import logger
 
 import cv2
 import numpy as np
 import torch
 from PIL import Image
-
-# Configure logging
-logger = logging.getLogger(__name__)
 
 # Import ESRGAN architecture
 try:

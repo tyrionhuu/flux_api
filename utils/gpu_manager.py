@@ -3,17 +3,15 @@ Comprehensive GPU Management for Diffusion API
 Handles GPU selection, service assignment, monitoring, and dynamic adaptation.
 """
 
-import logging
 import os
 import subprocess
 import threading
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
+from loguru import logger
 
 import torch
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
