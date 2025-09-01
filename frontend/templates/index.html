@@ -75,6 +75,9 @@
                         <button id="apply-lora-btn" class="btn btn-primary">
                             <i class="fas fa-magic"></i> Apply LoRA
                         </button>
+                        <button id="unfuse-loras-btn" class="btn btn-danger" style="display: none;">
+                            <i class="fas fa-unlink"></i> Unfuse LoRAs
+                        </button>
                         
                         <!-- Hidden file input for LoRA upload -->
                         <input type="file" id="lora-file-input" accept=".safetensors,.bin,.pt,.pth" style="display: none;">
@@ -114,15 +117,15 @@
                         <label for="model-type">Model Type</label>
                         <div class="model-type-container">
                             <select id="model-type" class="model-type-selector">
-                                <option value="qwen" selected>Qwen Image</option>
-                                <option value="flux">Flux</option>
+                                <option value="flux" selected>Flux</option>
+                                <option value="qwen">Qwen Image</option>
                             </select>
                             <button id="switch-model-btn" class="btn btn-secondary">
                                 <i class="fas fa-sync-alt"></i> Switch Model
                             </button>
                         </div>
                         <div class="model-info">
-                            <small id="current-model-info">Currently loaded: Qwen Image</small>
+                            <small id="current-model-info">Currently loaded: Flux</small>
                         </div>
                     </div>
                     

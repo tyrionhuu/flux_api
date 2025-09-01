@@ -9,6 +9,10 @@ class FluxAPI {
         this.appliedLoras = [];
         this.availableLoras = [];
         this.uploadedFiles = new Map();
+        // LoRA fusion state
+        this.fusedLoras = [];
+        this.isFused = false;
+        this.fusedTimestamp = null;
         
         this.init();
     }
@@ -20,6 +24,8 @@ class FluxAPI {
         // Sync model status with backend on startup
         console.log('Syncing model status with backend...');
         this.updateModelStatus();
+        // Check fusion status on startup
+        this.checkFusionStatus();
     }
 
     setupEventListeners() {
@@ -65,10 +71,22 @@ class FluxAPI {
         if (applyLoraBtn) {
             applyLoraBtn.addEventListener('click', () => {
                 console.log('Apply LoRA button clicked!');
-                this.showApiCommand();
+                if (this.isFused) {
+                    this.showError('LoRAs are already fused. Unfuse first to apply new LoRAs.');
+                } else {
+                    this.applyLorasPermanently();
+                }
             });
         } else {
             console.error('Apply LoRA button not found!');
+        }
+
+        // Unfuse LoRAs button
+        const unfuseLorasBtn = document.getElementById('unfuse-loras-btn');
+        if (unfuseLorasBtn) {
+            unfuseLorasBtn.addEventListener('click', () => {
+                this.unfuseLoras();
+            });
         }
 
         // Drag-and-drop reordering for LoRA list (only if manual list exists)
@@ -1253,6 +1271,229 @@ class FluxAPI {
         setTimeout(() => {
             notification.remove();
         }, 5000);
+    }
+
+    // Apply LoRAs permanently (fusion)
+    async applyLorasPermanently() {
+        if (this.appliedLoras.length === 0) {
+            this.showError('No LoRAs to apply. Please add LoRAs first.');
+            return;
+        }
+
+        try {
+            this.showLoading('Fusing LoRAs...');
+            
+            const response = await fetch(`${this.hostBase}/apply-lora-permanent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    loras: this.appliedLoras.map(lora => ({
+                        name: lora.storedName || lora.name,
+                        weight: lora.weight
+                    }))
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to fuse LoRAs');
+            }
+
+            const result = await response.json();
+            
+            // Update fusion state
+            this.isFused = true;
+            this.fusedLoras = [...this.appliedLoras];
+            this.fusedTimestamp = Date.now();
+            
+            this.updateFusedState();
+            this.showSuccess(result.message);
+            
+            // Update button text
+            const applyBtn = document.getElementById('apply-lora-btn');
+            if (applyBtn) {
+                applyBtn.innerHTML = '<i class="fas fa-link"></i> LoRAs Fused';
+                applyBtn.className = 'btn btn-success';
+            }
+
+        } catch (error) {
+            console.error('LoRA fusion error:', error);
+            this.showError(error.message);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    // Unfuse LoRAs
+    async unfuseLoras() {
+        try {
+            this.showLoading('Unfusing LoRAs...');
+            
+            const response = await fetch(`${this.hostBase}/unfuse-loras`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to unfuse LoRAs');
+            }
+
+            const result = await response.json();
+            
+            // Reset fusion state
+            this.isFused = false;
+            this.fusedLoras = [];
+            this.fusedTimestamp = null;
+            
+            // Clear applied LoRAs to prevent them from being sent during generation
+            this.appliedLoras = [];
+            
+            // Update the UI to reflect no LoRAs are selected
+            this.renderAppliedLoras();
+            
+            // Also reset the LoRA dropdown selection
+            const dropdown = document.getElementById('lora-dropdown');
+            if (dropdown) {
+                dropdown.value = '';
+            }
+            
+            this.updateFusedState();
+            this.showSuccess(result.message);
+            
+            // Update button text
+            const applyBtn = document.getElementById('apply-lora-btn');
+            if (applyBtn) {
+                applyBtn.innerHTML = '<i class="fas fa-magic"></i> Apply LoRA';
+                applyBtn.className = 'btn btn-primary';
+            }
+
+        } catch (error) {
+            console.error('LoRA unfusion error:', error);
+            this.showError(error.message);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    // Update UI to reflect fused state
+    updateFusedState() {
+        const applyBtn = document.getElementById('apply-lora-btn');
+        const unfuseBtn = document.getElementById('unfuse-loras-btn');
+        
+        if (this.isFused) {
+            // Show fused state
+            if (applyBtn) {
+                applyBtn.innerHTML = '<i class="fas fa-link"></i> LoRAs Fused';
+                applyBtn.className = 'btn btn-success';
+                applyBtn.disabled = true;
+            }
+            
+            if (unfuseBtn) {
+                unfuseBtn.style.display = 'block';
+            }
+            
+            this.showFusedStatus();
+        } else {
+            // Show normal state
+            if (applyBtn) {
+                applyBtn.innerHTML = '<i class="fas fa-magic"></i> Apply LoRA';
+                applyBtn.className = 'btn btn-primary';
+                applyBtn.disabled = false;
+            }
+            
+            if (unfuseBtn) {
+                unfuseBtn.style.display = 'none';
+            }
+            
+            this.hideFusedStatus();
+        }
+    }
+
+    // Show fused LoRA status
+    showFusedStatus() {
+        let statusContainer = document.getElementById('fused-lora-status');
+        if (!statusContainer) {
+            statusContainer = document.createElement('div');
+            statusContainer.id = 'fused-lora-status';
+            statusContainer.className = 'fused-lora-status';
+            
+            // Insert after the apply button
+            const applyBtn = document.getElementById('apply-lora-btn');
+            if (applyBtn && applyBtn.parentNode) {
+                applyBtn.parentNode.insertBefore(statusContainer, applyBtn.nextSibling);
+            }
+        }
+
+        const timestamp = this.fusedTimestamp ? new Date(this.fusedTimestamp).toLocaleString() : 'Unknown';
+        const loraNames = this.fusedLoras.map(lora => lora.name).join(', ');
+        
+        statusContainer.innerHTML = `
+            <div class="fused-status-info">
+                <div class="fused-status-header">
+                    <i class="fas fa-link"></i> LoRAs Currently Fused
+                </div>
+                <div class="fused-status-details">
+                    <div><strong>Fused LoRAs:</strong> ${loraNames}</div>
+                    <div><strong>Fused at:</strong> ${timestamp}</div>
+                    <div><strong>Status:</strong> <span class="status-fused">Active</span></div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Hide fused LoRA status
+    hideFusedStatus() {
+        const statusContainer = document.getElementById('fused-lora-status');
+        if (statusContainer) {
+            statusContainer.remove();
+        }
+    }
+
+    // Check fusion status on startup
+    async checkFusionStatus() {
+        try {
+            const response = await fetch(`${this.hostBase}/fused-lora-status`);
+            if (response.ok) {
+                const status = await response.json();
+                this.isFused = status.is_fused;
+                if (status.fused_info) {
+                    this.fusedLoras = status.fused_info.fused_lora_configs || [];
+                    this.fusedTimestamp = status.fused_info.fused_timestamp;
+                }
+                this.updateFusedState();
+            }
+        } catch (error) {
+            console.error('Error checking fusion status:', error);
+        }
+    }
+
+    // Utility methods for loading and notifications
+    showLoading(message) {
+        // Simple loading indicator
+        const loading = document.createElement('div');
+        loading.id = 'loading-indicator';
+        loading.textContent = message;
+        loading.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1f2937;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        `;
+        
+        document.body.appendChild(loading);
+    }
+
+    hideLoading() {
+        const loading = document.getElementById('loading-indicator');
+        if (loading) {
+            loading.remove();
+        }
     }
 
 }
