@@ -15,7 +15,6 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
-from utils.infer_utils import kontext_preprocess
 from rembg import remove
 
 from api.models import GenerateRequest
@@ -28,6 +27,7 @@ from utils.cleanup_service import (cleanup_after_generation,
 from utils.image_utils import (extract_image_from_result,
                                save_image_with_unique_name,
                                save_uploaded_image, validate_uploaded_image)
+from utils.infer_utils import kontext_preprocess
 from utils.queue_manager import QueueManager
 from utils.system_utils import get_system_memory
 

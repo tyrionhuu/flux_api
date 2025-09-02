@@ -2,13 +2,13 @@
 FLUX model management for the FLUX API
 """
 
+import gc
 import hashlib
 import logging
 import os
 import shutil
 import tempfile
 from typing import Any, Optional, Union
-import gc
 
 import torch
 from diffusers.pipelines.flux.pipeline_flux_kontext import FluxKontextPipeline
@@ -297,7 +297,6 @@ class FluxModelManager:
             )
             return False
 
-
     def generate_image(
         self,
         prompt: str,
@@ -383,7 +382,7 @@ class FluxModelManager:
         except Exception as e:
             logger.error(f"Error in image generation: {e} (Type: {type(e).__name__})")
             raise RuntimeError(f"Failed to generate image: {e}")
-        
+
         finally:
             torch.cuda.empty_cache()
             gc.collect()
@@ -451,7 +450,7 @@ class FluxModelManager:
                         f"Failed to create torch generator with seed {seed}: {seed_error}"
                     )
                     generator = None
-                    
+
             # Prepare generation kwargs for image-to-image
             generation_kwargs = {
                 "prompt": prompt,
@@ -487,13 +486,13 @@ class FluxModelManager:
 
             result = self.pipe(**generation_kwargs)
             logger.info("Image-to-image generation completed successfully")
-            
+
             return result
 
         except Exception as e:
             logger.error(f"Error during image-to-image generation: {e}")
             raise RuntimeError(f"Image generation failed: {e}")
-        
+
         finally:
             torch.cuda.empty_cache()
             gc.collect()
@@ -819,7 +818,7 @@ class FluxModelManager:
 
             logger.info(f"LoRA(s) removed successfully")
             return True
-        
+
         except Exception as e:
             logger.error(f"Error removing LoRA: {e}")
             return False
