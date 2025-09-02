@@ -234,7 +234,6 @@ class FluxModelManager:
                 )
                 try:
                     transformer.set_lora_strength(DEFAULT_LORA_WEIGHT)
-                    logger.info(f"   - Default LoRA strength set successfully")
                 except Exception as strength_error:
                     logger.warning(
                         f"   - Failed to set default LoRA strength: {strength_error}"
