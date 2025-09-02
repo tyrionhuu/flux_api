@@ -43,6 +43,14 @@ class FluxAPI {
         formData.append('prompt', params.prompt || values.prompt);
         // width/height are auto-computed on the backend
 
+        // Inference parameters
+        if (params.numInferenceSteps || values.numInferenceSteps) {
+            formData.append('num_inference_steps', params.numInferenceSteps || values.numInferenceSteps);
+        }
+        if (params.guidanceScale || values.guidanceScale) {
+            formData.append('guidance_scale', params.guidanceScale || values.guidanceScale);
+        }
+
         // Optional parameters
         if (params.seed || values.seed) {
             formData.append('seed', params.seed || values.seed);
@@ -66,6 +74,10 @@ class FluxAPI {
         const removeBgCheckbox = this.getElement('remove-background');
         if (removeBgCheckbox && removeBgCheckbox.checked) {
             formData.append('remove_background', 'true');
+            const bgStrength = this.getElement('bg_strength');
+            if (bgStrength && bgStrength.value) {
+                formData.append('bg_strength', bgStrength.value);
+            }
         }
 
         return formData;
