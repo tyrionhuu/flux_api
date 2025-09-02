@@ -4,7 +4,7 @@ FLUX model management for the FLUX API
 
 import gc
 import hashlib
-import logging
+import loguru
 import os
 import shutil
 import tempfile
@@ -22,7 +22,7 @@ from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_LORA_NAME,
 from utils.gpu_manager import GPUManager
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = loguru.logger
 
 
 
