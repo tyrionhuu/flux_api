@@ -170,9 +170,6 @@ class FluxModelManager:
             self.current_weight = 1.0
             logger.info(f"FLUX model loaded successfully on {device}!")
 
-            # Perform CUDA Graph warm-up for better performance
-            self._warmup_cuda_graph()
-
             # Apply default LoRA
             self._apply_default_lora()
 
@@ -181,41 +178,6 @@ class FluxModelManager:
         except Exception as e:
             logger.error(f"Error loading FLUX model: {e} (Type: {type(e).__name__})")
             return False
-
-    def _warmup_cuda_graph(self):
-        """Perform CUDA Graph warm-up for better performance"""
-        try:
-            if self.pipe is not None and torch.cuda.is_available():
-                logger.info("Performing CUDA Graph warm-up...")
-
-                # Warm-up with multiple iterations to optimize CUDA graphs
-                for i in range(2):
-                    logger.info(f"CUDA Graph warm-up iteration {i+1}/2")
-                    # Create a dummy image for warmup (Kontext requires image input)
-                    current_device = torch.cuda.current_device()
-                    dummy_image = torch.randn(1, 3, 512, 512).to(
-                        f"cuda:{current_device}"
-                    )
-                    _ = self.pipe(
-                        image=dummy_image,
-                        prompt="warmup prompt",
-                        num_inference_steps=INFERENCE_STEPS,
-                        guidance_scale=DEFAULT_GUIDANCE_SCALE,
-                    )
-
-                    # Clear CUDA cache between warm-up iterations
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-
-                logger.info("CUDA Graph warm-up completed successfully")
-            else:
-                logger.warning(
-                    "Skipping CUDA Graph warm-up - pipeline not loaded or CUDA not available"
-                )
-        except Exception as e:
-            logger.warning(
-                f"CUDA Graph warm-up failed: {e} - continuing without warm-up"
-            )
 
     def _apply_default_lora(self):
         """Apply the default LoRA after model loading"""
