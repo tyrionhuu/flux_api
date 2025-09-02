@@ -8,6 +8,7 @@ import os
 import shutil
 import tempfile
 from typing import Any, Optional, Union
+import gc
 
 import torch
 from diffusers.pipelines.flux.pipeline_flux_kontext import FluxKontextPipeline
@@ -296,7 +297,6 @@ class FluxModelManager:
             )
             return False
 
-    # Removed _integrate_quantized_weights - now using Nunchaku pipeline directly
 
     def generate_image(
         self,
@@ -388,6 +388,10 @@ class FluxModelManager:
         except Exception as e:
             logger.error(f"Error in image generation: {e} (Type: {type(e).__name__})")
             raise RuntimeError(f"Failed to generate image: {e}")
+        
+        finally:
+            torch.cuda.empty_cache()
+            gc.collect()
 
     def generate_image_with_image(
         self,
@@ -493,11 +497,16 @@ class FluxModelManager:
 
             result = self.pipe(**generation_kwargs)
             logger.info("Image-to-image generation completed successfully")
+            
             return result
 
         except Exception as e:
             logger.error(f"Error during image-to-image generation: {e}")
             raise RuntimeError(f"Image generation failed: {e}")
+        
+        finally:
+            torch.cuda.empty_cache()
+            gc.collect()
 
     def get_model_status(self) -> dict:
         """Get the current model status"""
@@ -820,6 +829,7 @@ class FluxModelManager:
 
             logger.info(f"LoRA(s) removed successfully")
             return True
+        
         except Exception as e:
             logger.error(f"Error removing LoRA: {e}")
             return False
