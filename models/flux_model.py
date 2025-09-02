@@ -25,6 +25,7 @@ from utils.gpu_manager import GPUManager
 logger = logging.getLogger(__name__)
 
 
+
 class FluxModelManager:
     """Manages FLUX model loading and quantization"""
 
@@ -56,7 +57,37 @@ class FluxModelManager:
             self._cleanup_temp_loras()
         except:
             pass  # Ignore errors during cleanup
+        
+    def _warmup_cuda_graph(self):
+        """Perform CUDA Graph warm-up for better performance"""
+        try:
+            if self.pipe is not None and torch.cuda.is_available():
+                logger.info("Performing CUDA Graph warm-up...")
+                current_device = torch.cuda.current_device()
+                dummy_image = torch.randn(1, 3, 512, 512).to(
+                    f"cuda:{current_device}"
+                )
+                _ = self.pipe(
+                    image=dummy_image,
+                    prompt="warmup prompt",
+                    num_inference_steps=INFERENCE_STEPS,
+                    guidance_scale=DEFAULT_GUIDANCE_SCALE,
+                )
 
+                # Clear CUDA cache between warm-up iterations
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+
+                logger.info("CUDA Graph warm-up completed successfully")
+            else:
+                logger.warning(
+                    "Skipping CUDA Graph warm-up - pipeline not loaded or CUDA not available"
+                )
+        except Exception as e:
+            logger.warning(
+                f"CUDA Graph warm-up failed: {e} - continuing without warm-up"
+            )
+            
     def load_model(self) -> bool:
         """Load the FLUX model with GPU-only support and quantization"""
         try:
@@ -156,6 +187,18 @@ class FluxModelManager:
                 self.model_type = MODEL_TYPE_QUANTIZED_GPU
                 logger.info("Nunchaku model loaded successfully with LoRA support!")
 
+                # Optionally compile the transformer for speedups (PyTorch 2.3+)
+                try:
+                    if hasattr(self.pipe, "transformer") and callable(getattr(torch, "compile", None)):
+                        # Torch compile has best support on single-GPU. Avoid when using device_map sharding.
+                        if device_map is None:
+                            logger.info("Compiling transformer with torch.compile(mode='max-autotune')")
+                            self.pipe.transformer = torch.compile(self.pipe.transformer, mode="max-autotune")
+                        else:
+                            logger.info("Skipping torch.compile due to multi-GPU device_map")
+                except Exception as compile_err:
+                    logger.warning(f"torch.compile failed or unavailable: {compile_err}")
+
             except Exception as nunchaku_error:
                 logger.error(
                     f"Error loading Nunchaku model: {nunchaku_error} (Type: {type(nunchaku_error).__name__})"
@@ -170,7 +213,8 @@ class FluxModelManager:
             self.current_weight = 1.0
             logger.info(f"FLUX model loaded successfully on {device}!")
 
-            # Apply default LoRA
+            self._warmup_cuda_graph()
+            
             self._apply_default_lora()
 
             return True
