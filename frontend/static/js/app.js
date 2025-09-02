@@ -29,8 +29,6 @@ class FluxAPI {
     getFormValues() {
         return {
             prompt: this.getElement('prompt').value.trim(),
-            width: this.getElement('width').value,
-            height: this.getElement('height').value,
             seed: this.getElement('seed').value,
             numInferenceSteps: this.getElement('inference_steps').value,
             guidanceScale: this.getElement('guidance_scale').value
@@ -43,8 +41,7 @@ class FluxAPI {
 
         // Common parameters
         formData.append('prompt', params.prompt || values.prompt);
-        formData.append('width', params.width || values.width);
-        formData.append('height', params.height || values.height);
+        // width/height are auto-computed on the backend
 
         // Optional parameters
         if (params.seed || values.seed) {
@@ -114,9 +111,7 @@ class FluxAPI {
         const removeBgCheckbox = this.getElement('remove-background');
 
         const jsonPayload = {
-            prompt: values.prompt,
-            width: parseInt(values.width),
-            height: parseInt(values.height)
+            prompt: values.prompt
         };
 
         if (includeInferenceParams) {
@@ -348,13 +343,12 @@ class FluxAPI {
 
         // Auto-update API command when parameters change
         const promptInput = this.getElement('prompt');
-        const widthSelect = this.getElement('width');
-        const heightSelect = this.getElement('height');
+        const widthSelect = null;
+        const heightSelect = null;
         const seedInput = this.getElement('seed');
 
         if (promptInput) promptInput.addEventListener('input', () => this.updateApiCommand());
-        if (widthSelect) widthSelect.addEventListener('change', () => this.updateApiCommand());
-        if (heightSelect) heightSelect.addEventListener('change', () => this.updateApiCommand());
+        // width/height removed
         if (seedInput) seedInput.addEventListener('input', () => this.updateApiCommand());
 
         // Also update API command when image upload changes
@@ -1114,7 +1108,7 @@ class FluxAPI {
             // Build command for generate-with-image-and-return endpoint
             // Show the filename but remind user to use full local path
             const imageFileName = this.uploadedImageFile ? this.uploadedImageFile.name : 'your_image.jpg';
-            command = `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@${imageFileName}" -F "prompt=${this.escapeForShell(values.prompt)}" -F "width=${values.width}" -F "height=${values.height}"`;
+            command = `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@${imageFileName}" -F "prompt=${this.escapeForShell(values.prompt)}"`;
 
             if (values.seed) {
                 command += ` -F "seed=${values.seed}"`;

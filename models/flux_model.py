@@ -325,7 +325,6 @@ class FluxModelManager:
         else:
             try:
                 torch.cuda.set_device(0)
-                logger.info("Generating on cuda:0 (single GPU)")
             except Exception as gpu_error:
                 logger.error(
                     f"GPU error during device selection: {gpu_error} (Type: {type(gpu_error).__name__})"
@@ -375,10 +374,6 @@ class FluxModelManager:
                 logger.info("Generator added to generation kwargs")
                 logger.info(
                     f"Final generation kwargs: {list(generation_kwargs.keys())}"
-                )
-            else:
-                logger.info(
-                    "No generator in generation kwargs - using random generation"
                 )
 
             result = self.pipe(**generation_kwargs)
@@ -435,7 +430,6 @@ class FluxModelManager:
         else:
             try:
                 torch.cuda.set_device(0)
-                logger.info("Generating on cuda:0 (single GPU)")
             except Exception as gpu_error:
                 logger.error(f"GPU error during device selection: {gpu_error}")
                 raise RuntimeError(f"GPU error: {gpu_error}")
@@ -489,10 +483,6 @@ class FluxModelManager:
                 logger.info("Generator added to generation kwargs")
                 logger.info(
                     f"Final generation kwargs: {list(generation_kwargs.keys())}"
-                )
-            else:
-                logger.info(
-                    "No generator in generation kwargs - using random generation"
                 )
 
             result = self.pipe(**generation_kwargs)

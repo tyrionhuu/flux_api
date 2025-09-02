@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
+from utils.infer_utils import kontext_preprocess
 from rembg import remove
 
 from api.models import GenerateRequest
@@ -213,9 +214,9 @@ def download_image(filename: str):
     file_path = Path(base_dir) / "generated_images" / safe_filename
 
     logger.info(f"Download request for filename: {filename}")
-    logger.info(f"Safe filename: {safe_filename}")
-    logger.info(f"Base directory: {base_dir}")
-    logger.info(f"Full file path: {file_path}")
+    logger.debug(f"Safe filename: {safe_filename}")
+    logger.debug(f"Base directory: {base_dir}")
+    logger.debug(f"Full file path: {file_path}")
     logger.info(f"File exists: {file_path.exists()}")
 
     if not file_path.exists():
@@ -491,10 +492,11 @@ async def generate_and_return_image(request: GenerateRequest):
             loras_to_apply, remove_all_loras
         )
 
+        # Auto-size for txt2img: default to 1024x1024 and ignore client-provided size
         result = await _queue_txt2img_and_get_result(
             enhanced_prompt,
-            request.width or 512,
-            request.height or 512,
+            1024,
+            1024,
             request.seed,
             request.upscale or False,
             request.upscale_factor or 2,
@@ -563,8 +565,8 @@ async def generate_image(request: GenerateRequest):
                 "FLUX",
                 lora_applied,
                 lora_weight_applied,
-                request.width or 512,
-                request.height or 512,
+                1024,
+                1024,
                 request.seed,
                 request.upscale or False,
                 request.upscale_factor or 2,
@@ -575,8 +577,8 @@ async def generate_image(request: GenerateRequest):
             loras=loras_to_apply if loras_to_apply else None,
             lora_name=lora_applied,
             lora_weight=lora_weight_applied or 1.0,
-            width=request.width or 512,
-            height=request.height or 512,
+            width=1024,
+            height=1024,
             seed=request.seed,
             processor=processor,
             context={},
@@ -681,6 +683,7 @@ async def generate_with_image_and_return(
         try:
             raw = await image.read()
             img = Image.open(io.BytesIO(raw)).convert("RGB")
+            pre_img, tgt_w, tgt_h = kontext_preprocess(img)
         except Exception as img_error:
             logger.error(f"Failed to load image: {img_error}")
             raise HTTPException(
@@ -707,7 +710,7 @@ async def generate_with_image_and_return(
             )
             return model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
-                image=img,
+                image=pre_img,
                 num_inference_steps=_req.num_inference_steps,
                 guidance_scale=_req.guidance_scale,
                 width=_req.width,
@@ -719,8 +722,8 @@ async def generate_with_image_and_return(
         try:
             result = await queue_manager.submit_and_wait(
                 prompt=enhanced_prompt,
-                width=width or 512,
-                height=height or 512,
+                width=tgt_w,
+                height=tgt_h,
                 seed=seed,
                 num_inference_steps=num_inference_steps or INFERENCE_STEPS,
                 guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
@@ -878,6 +881,7 @@ async def generate_with_image(
         try:
             raw = await image.read()
             img = Image.open(io.BytesIO(raw)).convert("RGB")
+            pre_img, tgt_w, tgt_h = kontext_preprocess(img)
         except Exception as img_error:
             logger.error(f"Failed to load image: {img_error}")
             raise HTTPException(
@@ -903,7 +907,7 @@ async def generate_with_image(
             )
             return model_manager.generate_image_with_image(
                 prompt=enhanced_prompt,
-                image=img,
+                image=pre_img,
                 num_inference_steps=_req.num_inference_steps,
                 guidance_scale=_req.guidance_scale,
                 width=_req.width,
@@ -915,8 +919,8 @@ async def generate_with_image(
         try:
             result = await queue_manager.submit_and_wait(
                 prompt=enhanced_prompt,
-                width=width or 512,
-                height=height or 512,
+                width=tgt_w,
+                height=tgt_h,
                 seed=seed,
                 num_inference_steps=num_inference_steps or INFERENCE_STEPS,
                 guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
@@ -1002,8 +1006,8 @@ async def generate_with_image(
             "generation_time": formatted_generation_time,
             "lora_applied": None,  # No LoRA support in image-to-image currently
             "lora_weight": None,
-            "width": width or 512,
-            "height": height or 512,
+            "width": tgt_w,
+            "height": tgt_h,
             "seed": seed,
         }
 
