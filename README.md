@@ -31,26 +31,32 @@ A dual-model AI image generation API service featuring FLUX models with LoRA sup
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone git@github.com:tyrionhuu/flux_api.git
    cd flux_api
+   git checkout img2img
    ```
 
-2. **Install dependencies from requirements.txt**
+2. **Create conda environment**
+   ```bash
+   conda create -n flux_api python=3.12
+   conda activate flux_api
+   ```
+
+3. **Install dependencies from requirements.txt**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Install PyTorch with CUDA support**
+4. **Install PyTorch with CUDA support**
    ```bash
    pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
    ```
 
-4. **Install Nunchaku package**
+5. **Install Nunchaku package**
    ```bash
    pip install https://github.com/nunchaku-tech/nunchaku/releases/download/v0.3.2/nunchaku-0.3.2+torch2.8-cp312-cp312-linux_x86_64.whl
    ```
 
-**Note**: The Nunchaku package is required for FLUX model support and must be installed after PyTorch.
 
 ## Quick Start
 
