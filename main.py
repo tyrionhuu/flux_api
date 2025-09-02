@@ -93,14 +93,6 @@ async def lifespan(app: FastAPI):
 
         time.sleep(2)
 
-        # Verify model is ready
-        if model_manager.is_loaded():
-            logging.info("FLUX model verified and ready for requests")
-        else:
-            logging.warning(
-                "FLUX model may not be fully ready - some requests may fail"
-            )
-
     except Exception as e:
         logging.error(f"Failed to start services: {e}")
 
