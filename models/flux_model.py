@@ -20,10 +20,11 @@ from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_LORA_NAME,
                              DEFAULT_LORA_WEIGHT, INFERENCE_STEPS,
                              MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
 from utils.gpu_manager import GPUManager
+from nunchaku import NunchakuFluxTransformer2dModel
+from nunchaku.utils import get_precision
 
 # Configure logging
 logger = loguru.logger
-
 
 
 class FluxModelManager:
@@ -57,37 +58,7 @@ class FluxModelManager:
             self._cleanup_temp_loras()
         except:
             pass  # Ignore errors during cleanup
-        
-    def _warmup_cuda_graph(self):
-        """Perform CUDA Graph warm-up for better performance"""
-        try:
-            if self.pipe is not None and torch.cuda.is_available():
-                logger.info("Performing CUDA Graph warm-up...")
-                current_device = torch.cuda.current_device()
-                dummy_image = torch.randn(1, 3, 512, 512).to(
-                    f"cuda:{current_device}"
-                )
-                _ = self.pipe(
-                    image=dummy_image,
-                    prompt="warmup prompt",
-                    num_inference_steps=INFERENCE_STEPS,
-                    guidance_scale=DEFAULT_GUIDANCE_SCALE,
-                )
 
-                # Clear CUDA cache between warm-up iterations
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-
-                logger.info("CUDA Graph warm-up completed successfully")
-            else:
-                logger.warning(
-                    "Skipping CUDA Graph warm-up - pipeline not loaded or CUDA not available"
-                )
-        except Exception as e:
-            logger.warning(
-                f"CUDA Graph warm-up failed: {e} - continuing without warm-up"
-            )
-            
     def load_model(self) -> bool:
         """Load the FLUX model with GPU-only support and quantization"""
         try:
@@ -140,9 +111,6 @@ class FluxModelManager:
             logger.info("Loading Nunchaku model with LoRA support...")
 
             try:
-                from nunchaku import NunchakuFluxTransformer2dModel
-                from nunchaku.utils import get_precision
-
                 precision = get_precision()  # auto-detect precision
                 logger.info(f"Detected precision: {precision}")
 
@@ -150,16 +118,20 @@ class FluxModelManager:
                 transformer_result = NunchakuFluxTransformer2dModel.from_pretrained(
                     f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-kontext-dev.safetensors"
                 )
-
+                
                 # Handle the tuple return: (transformer, config_dict)
                 if isinstance(transformer_result, tuple):
-                    transformer = transformer_result[0].to(
-                        device
-                    )  # Extract transformer from tuple
+                    transformer = transformer_result[0]  # Extract transformer from tuple
                 else:
-                    transformer = transformer_result.to(
-                        device
-                    )  # Direct transformer object
+                    transformer = transformer_result  # Direct transformer object
+                
+                # Set attention implementation (this may return None, so don't reassign)
+                if hasattr(transformer, 'set_attention_impl'):
+                    transformer.set_attention_impl("nunchaku-fp16")
+                    logger.info("Set attention implementation to nunchaku-fp16")
+                
+                # Move to device
+                transformer = transformer.to(device)
 
                 # Create FluxKontextPipeline with the Nunchaku transformer
                 if device_map == "balanced":
@@ -187,18 +159,6 @@ class FluxModelManager:
                 self.model_type = MODEL_TYPE_QUANTIZED_GPU
                 logger.info("Nunchaku model loaded successfully with LoRA support!")
 
-                # Optionally compile the transformer for speedups (PyTorch 2.3+)
-                try:
-                    if hasattr(self.pipe, "transformer") and callable(getattr(torch, "compile", None)):
-                        # Torch compile has best support on single-GPU. Avoid when using device_map sharding.
-                        if device_map is None:
-                            logger.info("Compiling transformer with torch.compile(mode='max-autotune')")
-                            self.pipe.transformer = torch.compile(self.pipe.transformer, mode="max-autotune")
-                        else:
-                            logger.info("Skipping torch.compile due to multi-GPU device_map")
-                except Exception as compile_err:
-                    logger.warning(f"torch.compile failed or unavailable: {compile_err}")
-
             except Exception as nunchaku_error:
                 logger.error(
                     f"Error loading Nunchaku model: {nunchaku_error} (Type: {type(nunchaku_error).__name__})"
@@ -213,8 +173,10 @@ class FluxModelManager:
             self.current_weight = 1.0
             logger.info(f"FLUX model loaded successfully on {device}!")
 
+            # Perform CUDA Graph warm-up for better performance
             self._warmup_cuda_graph()
-            
+
+            # Apply default LoRA
             self._apply_default_lora()
 
             return True
@@ -222,6 +184,41 @@ class FluxModelManager:
         except Exception as e:
             logger.error(f"Error loading FLUX model: {e} (Type: {type(e).__name__})")
             return False
+
+    def _warmup_cuda_graph(self):
+        """Perform CUDA Graph warm-up for better performance"""
+        try:
+            if self.pipe is not None and torch.cuda.is_available():
+                logger.info("Performing CUDA Graph warm-up...")
+
+                # Warm-up with multiple iterations to optimize CUDA graphs
+                for i in range(2):
+                    logger.info(f"CUDA Graph warm-up iteration {i+1}/2")
+                    # Create a dummy image for warmup (Kontext requires image input)
+                    current_device = torch.cuda.current_device()
+                    dummy_image = torch.randn(1, 3, 512, 512).to(
+                        f"cuda:{current_device}"
+                    )
+                    _ = self.pipe(
+                        image=dummy_image,
+                        prompt="warmup prompt",
+                        num_inference_steps=INFERENCE_STEPS,
+                        guidance_scale=DEFAULT_GUIDANCE_SCALE,
+                    )
+
+                    # Clear CUDA cache between warm-up iterations
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+
+                logger.info("CUDA Graph warm-up completed successfully")
+            else:
+                logger.warning(
+                    "Skipping CUDA Graph warm-up - pipeline not loaded or CUDA not available"
+                )
+        except Exception as e:
+            logger.warning(
+                f"CUDA Graph warm-up failed: {e} - continuing without warm-up"
+            )
 
     def _apply_default_lora(self):
         """Apply the default LoRA after model loading"""
@@ -278,6 +275,7 @@ class FluxModelManager:
                 )
                 try:
                     transformer.set_lora_strength(DEFAULT_LORA_WEIGHT)
+                    logger.info(f"   - Default LoRA strength set successfully")
                 except Exception as strength_error:
                     logger.warning(
                         f"   - Failed to set default LoRA strength: {strength_error}"

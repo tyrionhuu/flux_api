@@ -161,7 +161,6 @@ if os.path.exists("generated_images"):
     logger.info("Mounted generated_images directory for static file serving")
 
     files = os.listdir("generated_images")
-    logger.info(f"Generated images directory contains: {files}")
 else:
     logger.warning("generated_images directory not found - downloads may not work")
 
