@@ -727,9 +727,6 @@ async def generate_with_image_and_return(
                 processor=processor,
                 context={},
             )
-            logger.info(
-                f"Model generation completed successfully, result type: {type(result)}"
-            )
         except Exception as gen_error:
             logger.error(f"Model generation failed: {gen_error}")
             raise HTTPException(
@@ -925,9 +922,6 @@ async def generate_with_image(
                 guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
                 processor=processor,
                 context={},
-            )
-            logger.info(
-                f"Model generation completed successfully, result type: {type(result)}"
             )
         except Exception as gen_error:
             logger.error(f"Model generation failed: {gen_error}")

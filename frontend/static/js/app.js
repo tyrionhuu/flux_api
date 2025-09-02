@@ -75,27 +75,35 @@ class FluxAPI {
     }
 
     async handleFetchResponse(response) {
-        const responseClone = response.clone();
-
         if (!response.ok) {
             let detail = 'Unknown error';
             try {
-                const error = await responseClone.json();
+                const error = await response.json();
                 detail = error.detail || JSON.stringify(error);
             } catch (_) {
-                const bodyText = await responseClone.text();
-                detail = bodyText?.slice(0, 500) || detail;
+                try {
+                    const bodyText = await response.text();
+                    detail = bodyText?.slice(0, 500) || detail;
+                } catch (textError) {
+                    detail = `HTTP ${response.status}: ${response.statusText}`;
+                }
             }
             throw new Error(`Request failed: ${detail}`);
         }
-
+    
         try {
             return await response.json();
         } catch (parseError) {
-            const responseText = await response.text();
-            console.error('JSON parse error:', parseError);
-            console.error('Response text:', responseText);
-            throw new Error(`Invalid JSON response: ${responseText?.slice(0, 500) || 'empty body'}`);
+            try {
+                const responseText = await response.text();
+                console.error('JSON parse error:', parseError);
+                console.error('Response text:', responseText);
+                throw new Error(`Invalid JSON response: ${responseText?.slice(0, 500) || 'empty body'}`);
+            } catch (textError) {
+                console.error('JSON parse error:', parseError);
+                console.error('Failed to read response text:', textError);
+                throw new Error(`Invalid JSON response: Unable to read response body`);
+            }
         }
     }
 
@@ -1289,14 +1297,41 @@ class FluxAPI {
     }
 
     updateGenerateButton(generating) {
-        const btn = this.getElement('generate-btn');
+        const generateBtn = this.getElement('generate-btn');
+        const generateWithImageBtn = this.getElement('generate-with-image-btn');
 
         if (generating) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            // Disable and dim the generate button
+            if (generateBtn) {
+                generateBtn.disabled = true;
+                generateBtn.style.opacity = '0.5';
+                generateBtn.style.cursor = 'not-allowed';
+                generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            }
+            
+            // Disable and dim the generate with image button
+            if (generateWithImageBtn) {
+                generateWithImageBtn.disabled = true;
+                generateWithImageBtn.style.opacity = '0.5';
+                generateWithImageBtn.style.cursor = 'not-allowed';
+                generateWithImageBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            }
         } else {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-play"></i> Generate';
+            // Re-enable and restore the generate button
+            if (generateBtn) {
+                generateBtn.disabled = false;
+                generateBtn.style.opacity = '1';
+                generateBtn.style.cursor = 'pointer';
+                generateBtn.innerHTML = '<i class="fas fa-play"></i> Generate';
+            }
+            
+            // Re-enable and restore the generate with image button
+            if (generateWithImageBtn) {
+                generateWithImageBtn.disabled = false;
+                generateWithImageBtn.style.opacity = '1';
+                generateWithImageBtn.style.cursor = 'pointer';
+                generateWithImageBtn.innerHTML = '<i class="fas fa-image"></i> Generate';
+            }
         }
     }
 

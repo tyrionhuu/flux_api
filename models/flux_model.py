@@ -352,8 +352,6 @@ class FluxModelManager:
                         f"Failed to create torch generator with seed {seed}: {seed_error}"
                     )
                     generator = None
-            else:
-                logger.info("No seed provided, using random generation")
 
             # Prepare generation kwargs
             generation_kwargs = {
@@ -455,9 +453,7 @@ class FluxModelManager:
                         f"Failed to create torch generator with seed {seed}: {seed_error}"
                     )
                     generator = None
-            else:
-                logger.info("No seed provided, using random generation")
-
+                    
             # Prepare generation kwargs for image-to-image
             generation_kwargs = {
                 "prompt": prompt,
