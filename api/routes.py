@@ -181,7 +181,6 @@ async def remove_lora_from_index(stored_name: str):
 @router.get("/")
 def read_root():
     """Root endpoint for testing"""
-    logger.info("=== ROOT ENDPOINT CALLED ===")
     return {
         "message": "FLUX API is running!",
         "endpoints": [
