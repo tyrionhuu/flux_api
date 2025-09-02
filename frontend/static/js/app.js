@@ -77,9 +77,6 @@ class FluxAPI {
             console.error('Apply LoRA button not found!');
         }
 
-
-
-
         // Upscaler checkbox
         const upscaleCheckbox = document.getElementById('upscale');
         if (upscaleCheckbox) {
@@ -1097,8 +1094,6 @@ class FluxAPI {
         this.currentModalData = null;
     }
 
-
-
     showApiCommand() {
         const commandSection = document.getElementById('api-command-section');
         const commandElement = document.getElementById('api-command');
@@ -1353,15 +1348,6 @@ class FluxAPI {
         }
     }
     
-
-    
-    
-    
-
-    
-
-
-
 
     async downloadCurrentImage() {
         if (!this.currentModalData) return;
@@ -1634,10 +1620,3 @@ class FluxAPI {
 document.addEventListener('DOMContentLoaded', () => {
     new FluxAPI();
 });
-
-// Add some helpful keyboard shortcuts info
-console.log(`
-🎨 FLUX API Frontend Shortcuts:
-Ctrl/Cmd + Enter: Generate image
-Escape: Close modal
-`);
