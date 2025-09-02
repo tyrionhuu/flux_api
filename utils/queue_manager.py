@@ -3,7 +3,7 @@ Queue manager for handling concurrent requests in the FLUX API
 """
 
 import asyncio
-import logging
+import loguru
 import time
 import uuid
 from dataclasses import dataclass
@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, Optional
 
 from config.settings import DEFAULT_GUIDANCE_SCALE, INFERENCE_STEPS
 
-logger = logging.getLogger(__name__)
+logger = loguru.logger
 
 
 class RequestStatus(Enum):

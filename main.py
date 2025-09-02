@@ -2,7 +2,8 @@
 Main FastAPI application for the FP4 FLUX API (Port 8002)
 """
 
-import logging
+import loguru
+import sys
 import os
 import time
 import traceback
@@ -27,50 +28,24 @@ os.makedirs("generated_images", exist_ok=True)
 current_dir = os.getcwd()
 script_dir = os.path.dirname(os.path.abspath(__file__))
 generated_images_abs = os.path.abspath("generated_images")
-logging.info(f"Current working directory: {current_dir}")
-logging.info(f"Script directory: {script_dir}")
-logging.info(f"Generated images absolute path: {generated_images_abs}")
+
+logger = loguru.logger
+
+logger.info(f"Current working directory: {current_dir}")
+logger.info(f"Script directory: {script_dir}")
+logger.info(f"Generated images absolute path: {generated_images_abs}")
 
 # Configure logging (base setup; uvicorn log_config below ensures file logging too)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("logs/flux_api.log")],
-)
+logger.add("logs/flux_api.log", level="INFO")
 
 # Configure specific loggers for better error visibility
-logging.getLogger("api.routes").setLevel(logging.INFO)
-logging.getLogger("models.flux_model").setLevel(logging.INFO)
-logging.getLogger("utils.cleanup_service").setLevel(logging.INFO)
+logger.add("logs/api_routes.log", level="INFO")
+logger.add("logs/models_flux_model.log", level="INFO")
+logger.add("logs/utils_cleanup_service.log", level="INFO")
 
-# Add a single enhanced console handler for better formatting
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-
-
-# Create a custom formatter that adds emojis and better structure
-class EnhancedFormatter(logging.Formatter):
-    def format(self, record):
-        # No emojis - just clean formatting
-        return super().format(record)
-
-
-# Apply the enhanced formatter
-enhanced_formatter = EnhancedFormatter(
-    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-console_handler.setFormatter(enhanced_formatter)
-
-# Get root logger and replace the default stream handler
-root_logger = logging.getLogger()
-# Remove existing stream handlers
-for handler in root_logger.handlers[:]:
-    if isinstance(handler, logging.StreamHandler) and not isinstance(
-        handler, logging.FileHandler
-    ):
-        root_logger.removeHandler(handler)
-# Add our enhanced handler
-root_logger.addHandler(console_handler)
+# Configure console output via Loguru (simple, compatible)
+logger.remove()
+logger.add(sys.stdout, level="INFO", format="{time} - {name} - {level} - {message}")
 
 
 @asynccontextmanager
@@ -79,31 +54,31 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         start_cleanup_service()
-        logging.info("FP4 FLUX API started with cleanup service")
+        logger.info("FP4 FLUX API started with cleanup service")
 
         # Auto-load the FLUX model
-        logging.info("Auto-loading FLUX model...")
+        logger.info("Auto-loading FLUX model...")
 
         model_manager = get_model_manager()
 
         if model_manager.load_model():
-            logging.info("FLUX model loaded successfully during startup")
+            logger.info("FLUX model loaded successfully during startup")
         else:
-            logging.error("Failed to load FLUX model during startup")
+            logger.error("Failed to load FLUX model during startup")
 
         time.sleep(2)
 
     except Exception as e:
-        logging.error(f"Failed to start services: {e}")
+        logger.error(f"Failed to start services: {e}")
 
     yield
 
     # Shutdown
     try:
         stop_cleanup_service()
-        logging.info("FP4 FLUX API shutdown, cleanup service stopped")
+        logger.info("FP4 FLUX API shutdown, cleanup service stopped")
     except Exception as e:
-        logging.error(f"Error stopping cleanup service: {e}")
+        logger.error(f"Error stopping cleanup service: {e}")
 
 
 app = FastAPI(
@@ -128,8 +103,8 @@ app.add_middleware(
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler to catch any unhandled errors"""
     # Log the full error with traceback
-    logging.error(f"Unhandled exception in {request.url}: {exc}")
-    logging.error(f"Traceback: {traceback.format_exc()}")
+    logger.error(f"Unhandled exception in {request.url}: {exc}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
 
     # Return a proper JSON error response
     return JSONResponse(
@@ -151,7 +126,7 @@ async def validate_requests(request, call_next):
         # Check if request has valid headers
         if not request.headers.get("host"):
             # Log and reject malformed requests
-            logging.warning(
+            logger.warning(
                 f"Rejecting malformed request from {request.client.host if request.client else 'unknown'}"
             )
             return JSONResponse(
@@ -162,7 +137,7 @@ async def validate_requests(request, call_next):
         response = await call_next(request)
         return response
     except Exception as e:
-        logging.error(f"Error in request validation middleware: {e}")
+        logger.error(f"Error in request validation middleware: {e}")
         return JSONResponse(
             status_code=500,
             content={"error": "Internal server error", "detail": str(e)},
@@ -183,12 +158,12 @@ if os.path.exists("generated_images"):
         StaticFiles(directory="generated_images"),
         name="generated_images",
     )
-    logging.info("Mounted generated_images directory for static file serving")
+    logger.info("Mounted generated_images directory for static file serving")
 
     files = os.listdir("generated_images")
-    logging.info(f"Generated images directory contains: {files}")
+    logger.info(f"Generated images directory contains: {files}")
 else:
-    logging.warning("generated_images directory not found - downloads may not work")
+    logger.warning("generated_images directory not found - downloads may not work")
 
 
 @app.get("/ui", response_class=HTMLResponse)

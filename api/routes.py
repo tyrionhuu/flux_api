@@ -4,7 +4,7 @@ API routes for the FLUX API
 
 import io
 import json
-import logging
+import loguru
 import os
 import shutil
 import threading
@@ -32,7 +32,7 @@ from utils.queue_manager import QueueManager
 from utils.system_utils import get_system_memory
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = loguru.logger
 
 # Create router
 router = APIRouter()
