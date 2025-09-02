@@ -78,11 +78,7 @@ class FluxAPI {
         }
 
 
-        // Clear history (optional element)
-        const clearHistoryBtn = document.getElementById('clear-history');
-        if (clearHistoryBtn) {
-            clearHistoryBtn.addEventListener('click', () => this.clearHistory());
-        }
+
 
         // Upscaler checkbox
         const upscaleCheckbox = document.getElementById('upscale');
@@ -1388,12 +1384,7 @@ class FluxAPI {
         }
     }
 
-    clearHistory() {
-        if (confirm('Clear all generated images?')) {
-            const gallery = document.getElementById('image-gallery');
-            gallery.innerHTML = '';
-        }
-    }
+
 
     showGenerationStatus(show) {
         const status = document.getElementById('generation-status');
