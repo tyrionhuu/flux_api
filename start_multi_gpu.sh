@@ -17,12 +17,12 @@ VENV_PATH="${VENV_PATH:-venv}"  # Allow override via environment
 
 # Parse command line arguments
 MODEL_TYPE="fp4_sekai"  # Default to fp4 for lower memory usage
-NGINX_CONFIG="/home/pingzhi/flux_api/nginx.conf"
+NGINX_CONFIG_OVERRIDE=""  # Will use this if provided, otherwise auto-select
 
 usage() {
     echo "Usage: $0 [-m <model_type>] [-c <nginx_config>]"
     echo "  -m <model_type>    Model type: fp4 or bf16 (default: fp4)"
-    echo "  -c <nginx_config>  Path to nginx config (default: nginx.conf)"
+    echo "  -c <nginx_config>  Path to nginx config (default: auto-select based on GPU count)"
     echo "  -h                 Show this help message"
 }
 
@@ -36,7 +36,7 @@ while getopts ":m:c:h" opt; do
       fi
       ;;
     c)
-      NGINX_CONFIG="$OPTARG"
+      NGINX_CONFIG_OVERRIDE="$OPTARG"
       ;;
     h)
       usage
@@ -319,6 +319,28 @@ wait_for_services() {
 start_nginx() {
     echo "🔄 Starting Nginx load balancer..."
     
+    # Determine which nginx config to use
+    if [ -n "$NGINX_CONFIG_OVERRIDE" ]; then
+        # Use the override if provided
+        NGINX_CONFIG="$NGINX_CONFIG_OVERRIDE"
+        echo "   Using specified nginx config: $NGINX_CONFIG"
+    else
+        # Auto-select based on GPU count
+        NGINX_CONFIG="configs/nginx-${NUM_GPUS}.conf"
+        echo "   Auto-selected nginx config for $NUM_GPUS GPUs: $NGINX_CONFIG"
+    fi
+    
+    # Check if config file exists
+    if [ ! -f "$NGINX_CONFIG" ]; then
+        echo "❌ Nginx config file not found: $NGINX_CONFIG"
+        if [ -z "$NGINX_CONFIG_OVERRIDE" ]; then
+            echo "   Please ensure configs/nginx-${NUM_GPUS}.conf exists"
+            echo "   Available configs: $(ls configs/nginx-*.conf 2>/dev/null | xargs basename -a | tr '\n' ' ')"
+        fi
+        echo "   Services are running on ports ${BASE_PORT}-$((BASE_PORT + NUM_GPUS - 1))"
+        return 1
+    fi
+    
     # Check if nginx is installed
     if ! command -v nginx &> /dev/null; then
         echo "⚠️  Nginx not installed. Install with: sudo apt-get install nginx"
@@ -354,7 +376,7 @@ start_nginx() {
     fi
     
     # Start nginx with our config
-    echo "   Starting nginx with custom config..."
+    echo "   Starting nginx with config: $NGINX_CONFIG"
     if sudo nginx -c "$PWD/$NGINX_CONFIG"; then
         # Verify nginx started successfully and is listening on port 8080
         sleep 2

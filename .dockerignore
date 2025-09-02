@@ -1,0 +1,63 @@
+# Git files
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Virtual environments
+venv/
+env/
+ENV/
+flux_env/
+flux_api/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs and temporary files
+logs/
+*.log
+generated_images/
+uploads/
+*.pid
+*.pids
+
+# Model files (will be downloaded at runtime)
+*.safetensors
+*.bin
+*.ckpt
+*.pth
+
+# Documentation
+docs/
+*.md
+!CLAUDE.md
+
+# Test files
+test_*.py
+*_test.py
+tests/
+
+# Shell scripts (not needed in container)
+*.sh
+
+# Config files for local development
+nginx.conf
+configs/
+
+# Output files
+output.png
+output.txt
