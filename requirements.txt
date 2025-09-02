@@ -82,3 +82,5 @@ uvicorn==0.35.0
 wcwidth==0.2.13
 wheel==0.45.1
 zipp==3.23.0
+# Add loguru for better logging
+loguru>=0.7.0

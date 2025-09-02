@@ -284,66 +284,66 @@ async def generate_image(request: GenerateRequest):
             else:
                 # Apply multiple LoRAs simultaneously
                 logger.info(f"Applying {len(loras_to_apply)} LoRAs to loaded model")
-                try:
-                    # Validate all LoRA names first
-                    for lora_config in loras_to_apply:
-                        if not lora_config["name"]:
-                            raise HTTPException(
-                                status_code=400, detail="LoRA name cannot be empty"
-                            )
+            try:
+                # Validate all LoRA names first
+                for lora_config in loras_to_apply:
+                    if not lora_config["name"]:
+                        raise HTTPException(
+                            status_code=400, detail="LoRA name cannot be empty"
+                        )
 
-                        # Allow uploaded file paths (uploads/lora_files/...)
-                        if lora_config["name"].startswith("uploaded_lora_"):
-                            # This is an uploaded file, validate it exists
-                            import os
+                    # Allow uploaded file paths (uploads/lora_files/...)
+                    if lora_config["name"].startswith("uploaded_lora_"):
+                        # This is an uploaded file, validate it exists
+                        import os
 
-                            upload_path = f"uploads/lora_files/{lora_config['name']}"
-                            if not os.path.exists(upload_path):
-                                raise HTTPException(
-                                    status_code=400,
-                                    detail=f"Uploaded LoRA file not found: {lora_config['name']}",
-                                )
-                        elif "/" not in lora_config["name"]:
-                            # Must be a Hugging Face repository ID or local path
+                        upload_path = f"uploads/lora_files/{lora_config['name']}"
+                        if not os.path.exists(upload_path):
                             raise HTTPException(
                                 status_code=400,
-                                detail=f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name'), local path, or uploaded file path",
+                                detail=f"Uploaded LoRA file not found: {lora_config['name']}",
                             )
-
-                    # Apply all LoRAs at once using the new method
-                    if not model_manager.apply_multiple_loras(loras_to_apply):
-                        logger.error(
-                            f"Multiple LoRA application failed - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is None}"
-                        )
-                        raise HTTPException(
-                            status_code=500,
-                            detail=f"Failed to apply LoRAs. Please check if the LoRAs exist and are compatible.",
-                        )
-                    else:
-                        logger.info(f"All {len(loras_to_apply)} LoRAs applied successfully")
-
-                    # Get the updated LoRA info
-                    current_lora = model_manager.get_lora_info()
-                    if current_lora:
-                        lora_applied = current_lora.get("name")
-                        lora_weight_applied = current_lora.get("weight")
-                        logger.info(
-                            f"Multiple LoRAs applied successfully. Current LoRAs: {lora_applied} with total weight {lora_weight_applied}"
-                        )
-                except Exception as lora_error:
-                    logger.error(
-                        f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})"
-                    )
-                    if "not found" in str(lora_error).lower() or "404" in str(lora_error):
+                    elif "/" not in lora_config["name"]:
+                        # Must be a Hugging Face repository ID or local path
                         raise HTTPException(
                             status_code=400,
-                            detail=f"One or more LoRAs not found. Please check the repository IDs.",
+                            detail=f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name'), local path, or uploaded file path",
                         )
-                    else:
-                        raise HTTPException(
-                            status_code=500,
-                            detail=f"Failed to apply LoRAs: {str(lora_error)}",
-                        )
+
+                # Apply all LoRAs at once using the new method
+                if not model_manager.apply_multiple_loras(loras_to_apply):
+                    logger.error(
+                        f"Multiple LoRA application failed - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is None}"
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to apply LoRAs. Please check if the LoRAs exist and are compatible.",
+                    )
+                else:
+                    logger.info(f"All {len(loras_to_apply)} LoRAs applied successfully")
+
+                # Get the updated LoRA info
+                current_lora = model_manager.get_lora_info()
+                if current_lora:
+                    lora_applied = current_lora.get("name")
+                    lora_weight_applied = current_lora.get("weight")
+                    logger.info(
+                        f"Multiple LoRAs applied successfully. Current LoRAs: {lora_applied} with total weight {lora_weight_applied}"
+                    )
+            except Exception as lora_error:
+                logger.error(
+                    f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})"
+                )
+                if "not found" in str(lora_error).lower() or "404" in str(lora_error):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"One or more LoRAs not found. Please check the repository IDs.",
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to apply LoRAs: {str(lora_error)}",
+                    )
         elif remove_all_loras:
             # Explicit removal requested
             if model_manager.get_lora_info():
