@@ -420,6 +420,8 @@ async def _queue_txt2img_and_get_result(
     lora_applied: Optional[str],
     lora_weight_applied: Optional[float],
     loras_to_apply: Optional[list],
+    num_inference_steps: int,
+    guidance_scale: float,
 ):
     def processor(_req, _ctx):
         return generate_image_internal(
@@ -432,6 +434,9 @@ async def _queue_txt2img_and_get_result(
             seed,
             upscale or False,
             upscale_factor or 2,
+            None,
+            num_inference_steps,
+            guidance_scale,
         )
 
     return await queue_manager.submit_and_wait(
@@ -442,6 +447,8 @@ async def _queue_txt2img_and_get_result(
         width=width or 512,
         height=height or 512,
         seed=seed,
+        num_inference_steps=num_inference_steps,
+        guidance_scale=guidance_scale,
         processor=processor,
         context={},
     )
@@ -503,6 +510,8 @@ async def generate_and_return_image(request: GenerateRequest):
             lora_applied,
             lora_weight_applied,
             loras_to_apply,
+            request.num_inference_steps or INFERENCE_STEPS,
+            request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
         )
 
         # Extract the download URL from the result
@@ -570,6 +579,9 @@ async def generate_image(request: GenerateRequest):
                 request.seed,
                 request.upscale or False,
                 request.upscale_factor or 2,
+                None,
+                _req.num_inference_steps,
+                _req.guidance_scale,
             )
 
         result = await queue_manager.submit_and_wait(
@@ -580,6 +592,8 @@ async def generate_image(request: GenerateRequest):
             width=1024,
             height=1024,
             seed=request.seed,
+            num_inference_steps=request.num_inference_steps or INFERENCE_STEPS,
+            guidance_scale=request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
             processor=processor,
             context={},
         )
@@ -1265,6 +1279,8 @@ def generate_image_internal(
     upscale: bool = False,
     upscale_factor: int = 2,
     prompt_prefix: Optional[str] = None,
+    num_inference_steps: int = INFERENCE_STEPS,
+    guidance_scale: float = DEFAULT_GUIDANCE_SCALE,
 ):
     """Internal function to generate images - used by both endpoints"""
     # Apply prompt prefix if provided, otherwise use the original prompt
@@ -1318,8 +1334,8 @@ def generate_image_internal(
         # Generate the image
         result = model_manager.generate_image(
             enhanced_prompt,
-            INFERENCE_STEPS,
-            DEFAULT_GUIDANCE_SCALE,
+            num_inference_steps,
+            guidance_scale,
             width,
             height,
             seed,
