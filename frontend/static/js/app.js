@@ -7,7 +7,6 @@ class FluxAPI {
         this.appliedLoras = []; // 已应用的LoRA列表
         this.availableLoras = []; // 可选择的LoRA列表
         this.uploadedFiles = new Map(); // 存储上传的文件映射
-        
         this.init();
     }
 
@@ -77,7 +76,6 @@ class FluxAPI {
         } else {
             console.error('Apply LoRA button not found!');
         }
-
 
 
         // Clear history (optional element)
@@ -545,10 +543,6 @@ class FluxAPI {
         if (this.isGenerating) return;
 
         const prompt = document.getElementById('prompt').value.trim();
-        if (!prompt) {
-            this.showError('Please enter a prompt');
-            return;
-        }
 
         this.isGenerating = true;
         this.showGenerationStatus(true);
@@ -570,26 +564,33 @@ class FluxAPI {
                 });
             }
 
+            // Clone response for error handling to avoid consuming the body
+            const responseClone = response.clone();
+            
             if (!response.ok) {
                 let detail = 'Unknown error';
-                const bodyText = await response.text();
                 try {
-                    const error = JSON.parse(bodyText);
+                    const error = await responseClone.json();
                     detail = error.detail || JSON.stringify(error);
                 } catch (_) {
+                    const bodyText = await responseClone.text();
                     detail = bodyText?.slice(0, 500) || detail;
                 }
                 throw new Error(`Generation failed: ${detail}`);
             }
 
-            // Robust JSON parsing (handle proxies returning empty/HTML)
+            // Parse the main response
             let result;
-            const okText = await response.text();
             try {
-                result = JSON.parse(okText);
-            } catch (_) {
-                throw new Error(`Invalid JSON response: ${okText?.slice(0, 500) || 'empty body'}`);
+                result = await response.json();
+            } catch (parseError) {
+                // Fallback to text parsing with better error info
+                const responseText = await response.text();
+                console.error('JSON parse error:', parseError);
+                console.error('Response text:', responseText);
+                throw new Error(`Invalid JSON response: ${responseText?.slice(0, 500) || 'empty body'}`);
             }
+            
             console.log('Generation completed');
             
             // Show single image without model identification
@@ -608,6 +609,7 @@ class FluxAPI {
     }
     
     async generateImageWithUpload() {
+        const endpoint = '/generate-with-image';
         const formData = new FormData();
         
         if (this.serverUploadedImagePath) {
@@ -643,7 +645,42 @@ class FluxAPI {
             formData.append('remove_background', 'true');
         }
         
-        return fetch(`${this.hostBase}/upload-image-generate`, { method: 'POST', body: formData });
+        const response = await fetch(`${this.hostBase}${endpoint}`, { 
+            method: 'POST', 
+            body: formData 
+        });
+
+        // Clone response for error handling
+        const responseClone = response.clone();
+
+        if (!response.ok) {
+            let detail = 'Unknown error';
+            try {
+                const error = await responseClone.json();
+                detail = error.detail || JSON.stringify(error);
+            } catch (_) {
+                const bodyText = await responseClone.text();
+                detail = bodyText?.slice(0, 500) || detail;
+            }
+            throw new Error(`Generation failed: ${detail}`);
+        }
+
+        let result;
+        try {
+            result = await response.json();
+        } catch (parseError) {
+            const responseText = await response.text();
+            console.error('JSON parse error:', parseError);
+            console.error('Response text:', responseText);
+            throw new Error(`Invalid JSON response: ${responseText?.slice(0, 500) || 'empty body'}`);
+        }
+        
+        console.log('Image-to-image generation completed');
+        
+        // Show single image
+        const params = this.getGenerationParams();
+        this.showSingleImage(result, params);
+        this.showSuccess('Image generated successfully!');
     }
 
     async generateImageWithImage() {
