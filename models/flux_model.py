@@ -299,7 +299,6 @@ class FluxModelManager:
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,
-        negative_prompt: Optional[str] = None,
     ) -> Any:
         """Generate image using the loaded Nunchaku model - GPU only"""
         if not self.model_loaded or self.pipe is None:
@@ -357,10 +356,6 @@ class FluxModelManager:
                 "_auto_resize": False,
             }
 
-            # Add negative prompt if provided
-            if negative_prompt:
-                generation_kwargs["negative_prompt"] = negative_prompt
-
             # Add generator if seed is set
             if generator:
                 generation_kwargs["generator"] = generator
@@ -390,7 +385,6 @@ class FluxModelManager:
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,
-        negative_prompt: Optional[str] = None,
     ) -> Any:
         """Generate image using image + text input (image-to-image generation)"""
         if not self.model_loaded or self.pipe is None:
@@ -465,11 +459,7 @@ class FluxModelManager:
             logger.info(
                 f"Using requested dimensions: {width}x{height} with max_area={width * height},_auto_resize=False"
             )
-
-            # Add negative prompt if provided
-            if negative_prompt:
-                generation_kwargs["negative_prompt"] = negative_prompt
-
+            
             # Add generator if seed is set
             if generator:
                 generation_kwargs["generator"] = generator

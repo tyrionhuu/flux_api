@@ -3,7 +3,7 @@ FLUX Framework Upscaler using Remacri ESRGAN model
 Provides high-quality 2x and 4x upscaling capabilities
 """
 
-import logging
+import loguru
 import os
 import time
 from collections import OrderedDict
@@ -15,7 +15,7 @@ import torch
 from PIL import Image
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = loguru.logger
 
 # Import ESRGAN architecture
 try:
@@ -434,14 +434,13 @@ if __name__ == "__main__":
 
 # API Integration Functions
 def apply_upscaling(
-    image, upscale: bool, upscale_factor: int, save_original_func
+    image, upscale_factor: int, save_original_func
 ) -> Tuple[str, Optional[str], int, int]:
     """
     Apply upscaling to the generated image if requested
 
     Args:
         image: The generated image (PIL Image or numpy array)
-        upscale: Whether to apply upscaling
         upscale_factor: Upscaling factor (2 or 4)
         save_original_func: Function to save the original image
 
@@ -450,20 +449,12 @@ def apply_upscaling(
     """
     # Convert PIL Image to numpy array if needed
     if hasattr(image, "size"):  # PIL Image
-
         image_array = np.array(image)
         # Convert RGB to BGR for OpenCV compatibility
         if len(image_array.shape) == 3 and image_array.shape[2] == 3:
             image_array = image_array[:, :, [2, 1, 0]]  # RGB to BGR
     else:  # Already numpy array
         image_array = image
-
-    if not upscale:
-        # Save original image without upscaling
-        image_filename = save_original_func(image)
-        # Get original dimensions from the image
-        h, w = image_array.shape[:2]
-        return image_filename, None, w, h
 
     try:
         logger.info(f"Starting upscaling with factor {upscale_factor}x...")

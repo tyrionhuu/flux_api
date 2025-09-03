@@ -31,7 +31,6 @@ from utils.infer_utils import kontext_preprocess
 from utils.queue_manager import QueueManager
 from utils.system_utils import get_system_memory
 
-# Configure logging
 logger = loguru.logger
 
 
@@ -642,10 +641,8 @@ async def generate_with_image_and_return(
     width: Optional[int] = Form(512),
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
-    negative_prompt: Optional[str] = Form(None),
     remove_background: Optional[bool] = Form(False),
     bg_strength: Optional[float] = Form(None),
-    # LoRA support via form-data
     lora_name: Optional[str] = Form(None),
     lora_weight: Optional[float] = Form(None),
     loras_json: Optional[str] = Form(None),
@@ -772,7 +769,6 @@ async def generate_with_image_and_return(
                 width=_req.width,
                 height=_req.height,
                 seed=_req.seed,
-                negative_prompt=negative_prompt,
             )
 
         try:
@@ -876,7 +872,6 @@ async def generate_with_image(
     width: Optional[int] = Form(512),
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
-    negative_prompt: Optional[str] = Form(None),
     remove_background: Optional[bool] = Form(False),
     bg_strength: Optional[float] = Form(None),
     # LoRA support via form-data
@@ -1004,7 +999,6 @@ async def generate_with_image(
                 width=_req.width,
                 height=_req.height,
                 seed=_req.seed,
-                negative_prompt=negative_prompt,
             )
 
         try:
@@ -1389,35 +1383,27 @@ def generate_image_internal(
             width,
             height,
             seed,
-            None,  # No negative prompt
         )
-
         image = extract_image_from_result(result)
+        image_filename = save_image_with_unique_name(image)
+        final_width = width
+        final_height = height
 
-        # End timing
-        end_time = time.time()
-        generation_time = end_time - start_time
-
-        # Apply upscaling if requested
-        try:
-
-            image_filename, _, final_width, final_height = apply_upscaling(
-                image, upscale, upscale_factor, save_image_with_unique_name
+        if upscale:
+            image_filename, upscaled_image_filename, final_width, final_height = apply_upscaling(
+                image, upscale_factor, image_filename
             )
-        except Exception as upscale_error:
-            logger.error(f"Upscaling failed with error: {upscale_error}")
-            # Fall back to saving original image without upscaling
-            image_filename = save_image_with_unique_name(image)
-            final_width = width
-            final_height = height
-            upscaled_image_path = None
-            logger.info(f"Falling back to original image: {image_filename}")
+            image_filename = upscaled_image_filename
 
         # Get the actual LoRA status from the model manager
         actual_lora_info = model_manager.get_lora_info()
         filename = os.path.basename(image_filename)
         download_url = f"/download/{filename}"
-
+        
+        # End timing
+        end_time = time.time()
+        generation_time = end_time - start_time
+        
         return {
             "message": f"Generated {model_type_name} image for prompt: {prompt}",
             "image_url": image_filename,

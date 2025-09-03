@@ -204,7 +204,6 @@ curl -X POST "http://localhost:9000/generate-with-image-and-return" \
   -F "width=512" \
   -F "height=512" \
   -F "seed=123" \
-  -F "negative_prompt=blurry, low-res" \
   -F "remove_background=true" \
   -F "bg_strength=0.6" \
   -F 'loras_json=[{"name":"username/model-name","weight":1.0}]' \
@@ -219,7 +218,6 @@ Parameters (multipart/form-data):
 - `width` (int, optional, default derived from preprocessing): Must be 256–1024.
 - `height` (int, optional, default derived from preprocessing): Must be 256–1024.
 - `seed` (int, optional): Random seed for reproducibility.
-- `negative_prompt` (string, optional): Negative guidance text.
 - `remove_background` (bool, optional, default false): If true, applies background removal to the final image.
 - `bg_strength` (float 0..1, optional): Controls background removal aggressiveness when `remove_background=true`.
 - `loras_json` (JSON array, optional): Multiple LoRAs, e.g., `[{"name":"user/model","weight":1.0}]`. Use empty array `[]` to remove all LoRAs.
