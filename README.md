@@ -49,7 +49,7 @@ A dual-model AI image generation API service featuring FLUX models with LoRA sup
 
 4. **Install PyTorch with CUDA support**
    ```bash
-   pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
+   pip install torch==2.8.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
    ```
 
 5. **Install Nunchaku package**

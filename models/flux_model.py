@@ -25,7 +25,7 @@ from nunchaku.utils import get_precision
 
 # Configure logging
 logger = loguru.logger
-
+PROFILE = False
 
 class FluxModelManager:
     """Manages FLUX model loading and quantization"""
@@ -319,6 +319,7 @@ class FluxModelManager:
             raise RuntimeError("CUDA not available. GPU required for image generation.")
 
         # Set device for generation based on mode
+
         visible_gpu_count = torch.cuda.device_count()
         if visible_gpu_count > 1:
             logger.info(
@@ -377,8 +378,27 @@ class FluxModelManager:
                 logger.info(
                     f"Final generation kwargs: {list(generation_kwargs.keys())}"
                 )
-
-            result = self.pipe(**generation_kwargs)
+            if PROFILE:
+                from torch.profiler import ProfilerActivity, profile, schedule
+                logger.info(f"[Profile] Warm up profiling...")
+                result = self.pipe(**generation_kwargs)
+                logger.info("[Profile] Start profiling....")
+                with profile(
+                    activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                    record_shapes=True,
+                    profile_memory=True,
+                    with_stack=True,
+                ) as prof:
+                    with torch.inference_mode():
+                        result = self.pipe(**generation_kwargs)
+                    torch.cuda.synchronize()
+                logger.info("[Profile] End profiling....")
+                # Export to Chrome trace format (Perfetto-compatible)
+                prof.export_chrome_trace("kontext_trace.json")
+                # Print summary
+                print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=20))
+            else:            
+                result = self.pipe(**generation_kwargs)
             logger.info("Image generation completed successfully")
             return result
 
@@ -486,8 +506,27 @@ class FluxModelManager:
                 logger.info(
                     f"Final generation kwargs: {list(generation_kwargs.keys())}"
                 )
-
-            result = self.pipe(**generation_kwargs)
+            if PROFILE:
+                from torch.profiler import ProfilerActivity, profile, schedule
+                logger.info(f"[Profile] Warm up profiling...")
+                result = self.pipe(**generation_kwargs)
+                logger.info("[Profile] Start profiling....")
+                with profile(
+                    activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                    record_shapes=True,
+                    profile_memory=True,
+                    with_stack=True,
+                ) as prof:
+                    with torch.inference_mode():
+                        result = self.pipe(**generation_kwargs)
+                    torch.cuda.synchronize()
+                logger.info("[Profile] End profiling....")
+                # Export to Chrome trace format (Perfetto-compatible)
+                prof.export_chrome_trace("kontext_ti2i_trace.json")
+                # Print summary
+                print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=20))
+            else:            
+                result = self.pipe(**generation_kwargs)
             logger.info("Image-to-image generation completed successfully")
 
             return result
