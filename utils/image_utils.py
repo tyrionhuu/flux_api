@@ -2,7 +2,8 @@
 Image utilities for the FLUX API
 """
 
-import logging
+from math import log
+import loguru
 import os
 import uuid
 from pathlib import Path
@@ -12,13 +13,10 @@ from fastapi import HTTPException, UploadFile
 from PIL import Image
 
 from config.settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
-
+logger = loguru.logger
 
 def extract_image_from_result(result: Any) -> Image.Image:
     """Extract image from FLUX pipeline result"""
-
-    logger = logging.getLogger(__name__)
-
     try:
         # Handle different possible return types from FLUX pipeline
         if hasattr(result, "images") and result.images:
