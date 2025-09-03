@@ -2,7 +2,7 @@
 Background cleanup service for automatic directory maintenance.
 """
 
-import logging
+import loguru
 import threading
 import time
 from datetime import datetime, timedelta
@@ -14,7 +14,7 @@ from config.cleanup_settings import (CLEANUP_INTERVAL_SECONDS,
 
 from .cleanup_directories import DirectoryCleanup
 
-logger = logging.getLogger(__name__)
+logger = loguru.logger
 
 
 class CleanupService:
@@ -176,12 +176,6 @@ def cleanup_after_generation():
 
 
 if __name__ == "__main__":
-    # Test the cleanup service
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
     service = CleanupService()
 
     print("Starting cleanup service...")
