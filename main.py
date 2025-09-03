@@ -2,13 +2,13 @@
 Main FastAPI application for the FP4 FLUX API (Port 8002)
 """
 
-import loguru
-import sys
 import os
+import sys
 import time
 import traceback
 from contextlib import asynccontextmanager
 
+import loguru
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

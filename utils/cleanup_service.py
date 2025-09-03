@@ -2,12 +2,13 @@
 Background cleanup service for automatic directory maintenance.
 """
 
-import loguru
 import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+
+import loguru
 
 from config.cleanup_settings import (CLEANUP_INTERVAL_SECONDS,
                                      CLEANUP_ON_GENERATION, CLEANUP_ON_UPLOAD)

@@ -5,11 +5,12 @@ Run this script to manually clean up directories and maintain size limits.
 """
 
 import argparse
-import loguru
 import os
 import sys
 from pathlib import Path
 from typing import List, Tuple
+
+import loguru
 
 from config.cleanup_settings import (GENERATED_IMAGES_SIZE_LIMIT_GB,
                                      UPLOADS_SIZE_LIMIT_GB)
@@ -49,7 +50,9 @@ class DirectoryCleanup:
             generated_images_limit_gb * 1024 * 1024 * 1024
         )
         self.uploads_limit_bytes = int(uploads_limit_gb * 1024 * 1024 * 1024)
-        self.uploads_images_limit_bytes = int(uploads_images_limit_gb * 1024 * 1024 * 1024)
+        self.uploads_images_limit_bytes = int(
+            uploads_images_limit_gb * 1024 * 1024 * 1024
+        )
 
         # Ensure directories exist
         self.generated_images_dir.mkdir(parents=True, exist_ok=True)
@@ -61,7 +64,9 @@ class DirectoryCleanup:
             f"  Generated images: {self.generated_images_dir} (limit: {generated_images_limit_gb}GB)"
         )
         logger.info(f"  Uploads: {self.uploads_dir} (limit: {uploads_limit_gb}GB)")
-        logger.info(f"  Uploads images: {self.uploads_images_dir} (limit: {uploads_images_limit_gb}GB)")
+        logger.info(
+            f"  Uploads images: {self.uploads_images_dir} (limit: {uploads_images_limit_gb}GB)"
+        )
 
     def get_directory_size(self, directory: Path) -> int:
         """Calculate total size of a directory in bytes."""
@@ -218,7 +223,8 @@ class DirectoryCleanup:
                 "current_size_gb": uploads_images_size / (1024**3),
                 "limit_bytes": self.uploads_images_limit_bytes,
                 "limit_gb": self.uploads_images_limit_bytes / (1024**3),
-                "usage_percent": (uploads_images_size / self.uploads_images_limit_bytes) * 100,
+                "usage_percent": (uploads_images_size / self.uploads_images_limit_bytes)
+                * 100,
             },
         }
 
@@ -354,7 +360,7 @@ Examples:
                         target_dir = cleanup_manager.uploads_images_dir
                     else:
                         continue
-                    
+
                     files = cleanup_manager.get_file_info(target_dir)
                     files.sort(key=lambda x: x[2])  # Sort by modification time
 

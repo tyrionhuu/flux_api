@@ -4,14 +4,16 @@ FLUX model management for the FLUX API
 
 import gc
 import hashlib
-import loguru
 import os
 import shutil
 import tempfile
 from typing import Any, Optional, Union
 
+import loguru
 import torch
 from diffusers.pipelines.flux.pipeline_flux_kontext import FluxKontextPipeline
+from nunchaku import NunchakuFluxTransformer2dModel
+from nunchaku.utils import get_precision
 from PIL import Image
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
@@ -20,8 +22,6 @@ from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_LORA_NAME,
                              DEFAULT_LORA_WEIGHT, INFERENCE_STEPS,
                              MODEL_TYPE_QUANTIZED_GPU, NUNCHAKU_MODEL_ID)
 from utils.gpu_manager import GPUManager
-from nunchaku import NunchakuFluxTransformer2dModel
-from nunchaku.utils import get_precision
 
 # Configure logging
 logger = loguru.logger
@@ -118,18 +118,20 @@ class FluxModelManager:
                 transformer_result = NunchakuFluxTransformer2dModel.from_pretrained(
                     f"{NUNCHAKU_MODEL_ID}/svdq-{precision}_r32-flux.1-kontext-dev.safetensors"
                 )
-                
+
                 # Handle the tuple return: (transformer, config_dict)
                 if isinstance(transformer_result, tuple):
-                    transformer = transformer_result[0]  # Extract transformer from tuple
+                    transformer = transformer_result[
+                        0
+                    ]  # Extract transformer from tuple
                 else:
                     transformer = transformer_result  # Direct transformer object
-                
+
                 # Set attention implementation (this may return None, so don't reassign)
-                if hasattr(transformer, 'set_attention_impl'):
+                if hasattr(transformer, "set_attention_impl"):
                     transformer.set_attention_impl("nunchaku-fp16")
                     logger.info("Set attention implementation to nunchaku-fp16")
-                
+
                 # Move to device
                 transformer = transformer.to(device)
 

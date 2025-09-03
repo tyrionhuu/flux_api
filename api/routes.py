@@ -4,7 +4,6 @@ API routes for the FLUX API
 
 import io
 import json
-import loguru
 import os
 import shutil
 import threading
@@ -12,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
+import loguru
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
@@ -744,9 +744,13 @@ async def generate_with_image_and_return(
                     raise ValueError("LoRA weight must be between 0 and 2.0")
                 loras_to_apply.append({"name": name, "weight": w})
             elif use_default_lora:
-                loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
+                loras_to_apply = [
+                    {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
+                ]
         except (ValueError, json.JSONDecodeError) as e:
-            raise HTTPException(status_code=400, detail=f"Invalid LoRA parameters: {str(e)}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid LoRA parameters: {str(e)}"
+            )
 
         # Apply LoRAs if requested
         if loras_to_apply or remove_all_loras:
@@ -984,9 +988,13 @@ async def generate_with_image(
                     raise ValueError("LoRA weight must be between 0 and 2.0")
                 loras_to_apply.append({"name": name, "weight": w})
             elif use_default_lora:
-                loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
+                loras_to_apply = [
+                    {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
+                ]
         except (ValueError, json.JSONDecodeError) as e:
-            raise HTTPException(status_code=400, detail=f"Invalid LoRA parameters: {str(e)}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid LoRA parameters: {str(e)}"
+            )
 
         # Apply LoRAs if requested
         if loras_to_apply or remove_all_loras:

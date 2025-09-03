@@ -3,12 +3,13 @@ Queue manager for handling concurrent requests in the FLUX API
 """
 
 import asyncio
-import loguru
 import time
 import uuid
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, Optional
+
+import loguru
 
 from config.settings import DEFAULT_GUIDANCE_SCALE, INFERENCE_STEPS
 
