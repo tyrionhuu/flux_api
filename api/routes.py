@@ -1050,8 +1050,12 @@ async def generate_with_image(
         # Optionally apply upscaling to saved file
         try:
             if upscale:
-                image_filename, upscaled_image_filename, final_w, final_h = apply_upscaling(
-                    generated_image, upscale_factor or 2, save_image_with_unique_name
+                image_filename, upscaled_image_filename, final_w, final_h = (
+                    apply_upscaling(
+                        generated_image,
+                        upscale_factor or 2,
+                        save_image_with_unique_name,
+                    )
                 )
                 image_filename = upscaled_image_filename or image_filename
                 tgt_w, tgt_h = final_w, final_h
@@ -1415,8 +1419,8 @@ def generate_image_internal(
         final_height = height
 
         if upscale:
-            image_filename, upscaled_image_filename, final_width, final_height = apply_upscaling(
-                image, upscale_factor, image_filename
+            image_filename, upscaled_image_filename, final_width, final_height = (
+                apply_upscaling(image, upscale_factor, image_filename)
             )
             image_filename = upscaled_image_filename
 
@@ -1424,11 +1428,11 @@ def generate_image_internal(
         actual_lora_info = model_manager.get_lora_info()
         filename = os.path.basename(image_filename)
         download_url = f"/download/{filename}"
-        
+
         # End timing
         end_time = time.time()
         generation_time = end_time - start_time
-        
+
         return {
             "message": f"Generated {model_type_name} image for prompt: {prompt}",
             "image_url": image_filename,

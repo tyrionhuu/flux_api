@@ -3,13 +3,13 @@ FLUX Framework Upscaler using Remacri ESRGAN model
 Provides high-quality 2x and 4x upscaling capabilities
 """
 
-import loguru
 import os
 import time
 from collections import OrderedDict
 from typing import Optional, Tuple
 
 import cv2
+import loguru
 import numpy as np
 import torch
 from PIL import Image

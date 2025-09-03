@@ -459,7 +459,7 @@ class FluxModelManager:
             logger.info(
                 f"Using requested dimensions: {width}x{height} with max_area={width * height},_auto_resize=False"
             )
-            
+
             # Add generator if seed is set
             if generator:
                 generation_kwargs["generator"] = generator

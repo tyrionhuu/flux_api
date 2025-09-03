@@ -1,5 +1,6 @@
-from PIL import Image
 import loguru
+from PIL import Image
+
 # Same list the community and diffusers issues reference for Kontext
 logger = loguru.logger
 
@@ -25,7 +26,7 @@ PREFERRED_KONTEXT_RESOLUTIONS = [
 
 # Extend with halved resolutions for more flexibility
 _halved = []
-for (w, h) in PREFERRED_KONTEXT_RESOLUTIONS:
+for w, h in PREFERRED_KONTEXT_RESOLUTIONS:
     hw, hh = max(1, w // 2), max(1, h // 2)
     _halved.append((hw, hh))
 
@@ -40,7 +41,9 @@ for wh in _halved:
 
 def nearest_kontext_size(w: int, h: int) -> tuple[int, int]:
     # Prefer candidates that do not exceed the current image size (avoid upscaling when possible)
-    candidates = [(tw, th) for (tw, th) in EXTENDED_KONTEXT_RESOLUTIONS if tw <= w and th <= h]
+    candidates = [
+        (tw, th) for (tw, th) in EXTENDED_KONTEXT_RESOLUTIONS if tw <= w and th <= h
+    ]
 
     def dist2(wh):
         tw, th = wh
