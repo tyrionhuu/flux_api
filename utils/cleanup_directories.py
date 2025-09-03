@@ -26,8 +26,10 @@ class DirectoryCleanup:
         self,
         generated_images_dir: str = "generated_images",
         uploads_dir: str = "uploads/lora_files",
+        uploads_images_dir: str = "uploads/images",
         generated_images_limit_gb: float = 1.0,
         uploads_limit_gb: float = 2.0,
+        uploads_images_limit_gb: float = 1.0,
     ):
         """
         Initialize the directory cleanup manager.
@@ -35,25 +37,31 @@ class DirectoryCleanup:
         Args:
             generated_images_dir: Path to generated images directory
             uploads_dir: Path to uploads directory
+            uploads_images_dir: Path to uploads images directory
             generated_images_limit_gb: Size limit for generated images in GB
             uploads_limit_gb: Size limit for uploads in GB
+            uploads_images_limit_gb: Size limit for uploads images in GB
         """
         self.generated_images_dir = Path(generated_images_dir)
         self.uploads_dir = Path(uploads_dir)
+        self.uploads_images_dir = Path(uploads_images_dir)
         self.generated_images_limit_bytes = int(
             generated_images_limit_gb * 1024 * 1024 * 1024
         )
         self.uploads_limit_bytes = int(uploads_limit_gb * 1024 * 1024 * 1024)
+        self.uploads_images_limit_bytes = int(uploads_images_limit_gb * 1024 * 1024 * 1024)
 
         # Ensure directories exist
         self.generated_images_dir.mkdir(parents=True, exist_ok=True)
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
+        self.uploads_images_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(f"Directory cleanup initialized:")
         logger.info(
             f"  Generated images: {self.generated_images_dir} (limit: {generated_images_limit_gb}GB)"
         )
         logger.info(f"  Uploads: {self.uploads_dir} (limit: {uploads_limit_gb}GB)")
+        logger.info(f"  Uploads images: {self.uploads_images_dir} (limit: {uploads_images_limit_gb}GB)")
 
     def get_directory_size(self, directory: Path) -> int:
         """Calculate total size of a directory in bytes."""
@@ -154,7 +162,7 @@ class DirectoryCleanup:
 
     def cleanup_all(self) -> dict:
         """
-        Clean up both directories to maintain their size limits.
+        Clean up all directories to maintain their size limits.
 
         Returns:
             Dictionary with cleanup results
@@ -173,12 +181,18 @@ class DirectoryCleanup:
             self.uploads_dir, self.uploads_limit_bytes, "Uploads"
         )
 
+        # Clean up uploads images
+        results["uploads_images"] = self.cleanup_directory(
+            self.uploads_images_dir, self.uploads_images_limit_bytes, "Uploads Images"
+        )
+
         return results
 
     def get_status(self) -> dict:
-        """Get current status of both directories."""
+        """Get current status of all directories."""
         generated_size = self.get_directory_size(self.generated_images_dir)
         uploads_size = self.get_directory_size(self.uploads_dir)
+        uploads_images_size = self.get_directory_size(self.uploads_images_dir)
 
         return {
             "generated_images": {
@@ -197,6 +211,14 @@ class DirectoryCleanup:
                 "limit_bytes": self.uploads_limit_bytes,
                 "limit_gb": self.uploads_limit_bytes / (1024**3),
                 "usage_percent": (uploads_size / self.uploads_limit_bytes) * 100,
+            },
+            "uploads_images": {
+                "path": str(self.uploads_images_dir),
+                "current_size_bytes": uploads_images_size,
+                "current_size_gb": uploads_images_size / (1024**3),
+                "limit_bytes": self.uploads_images_limit_bytes,
+                "limit_gb": self.uploads_images_limit_bytes / (1024**3),
+                "usage_percent": (uploads_images_size / self.uploads_images_limit_bytes) * 100,
             },
         }
 
@@ -243,6 +265,13 @@ Examples:
     )
 
     parser.add_argument(
+        "--uploads-images-limit",
+        type=float,
+        default=1.0,
+        help="Size limit for uploads images in GB (default: 1.0)",
+    )
+
+    parser.add_argument(
         "--status-only",
         action="store_true",
         help="Show directory status without performing cleanup",
@@ -266,12 +295,14 @@ Examples:
     logger.info("Directory cleanup utility")
     logger.info(f"Generated images limit: {args.generated_limit}GB")
     logger.info(f"Uploads limit: {args.uploads_limit}GB")
+    logger.info(f"Uploads images limit: {args.uploads_images_limit}GB")
 
     try:
         # Initialize cleanup manager
         cleanup_manager = DirectoryCleanup(
             generated_images_limit_gb=args.generated_limit,
             uploads_limit_gb=args.uploads_limit,
+            uploads_images_limit_gb=args.uploads_images_limit,
         )
 
         # Show current status
@@ -315,11 +346,16 @@ Examples:
             for dir_name, info in status.items():
                 if info["usage_percent"] > 100:
                     print(f"\n{dir_name}:")
-                    files = cleanup_manager.get_file_info(
-                        cleanup_manager.generated_images_dir
-                        if dir_name == "generated_images"
-                        else cleanup_manager.uploads_dir
-                    )
+                    if dir_name == "generated_images":
+                        target_dir = cleanup_manager.generated_images_dir
+                    elif dir_name == "uploads":
+                        target_dir = cleanup_manager.uploads_dir
+                    elif dir_name == "uploads_images":
+                        target_dir = cleanup_manager.uploads_images_dir
+                    else:
+                        continue
+                    
+                    files = cleanup_manager.get_file_info(target_dir)
                     files.sort(key=lambda x: x[2])  # Sort by modification time
 
                     current_size = info["current_size_bytes"]
