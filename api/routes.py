@@ -34,6 +34,12 @@ from utils.system_utils import get_system_memory
 # Configure logging
 logger = loguru.logger
 
+
+def handle_api_error(operation: str, error: Exception, status_code: int = 500) -> HTTPException:
+    """Standardized error handling for API endpoints"""
+    logger.error(f"Error in {operation}: {error}")
+    return HTTPException(status_code=status_code, detail=f"{operation} failed: {str(error)}")
+
 # Create router
 router = APIRouter()
 
@@ -534,8 +540,7 @@ async def generate_and_return_image(request: GenerateRequest):
         )
 
     except Exception as e:
-        logger.error(f"Error in generate_and_return_image: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_api_error("generate_and_return_image", e)
 
 
 @router.post("/generate")
@@ -624,10 +629,7 @@ async def generate_image(request: GenerateRequest):
 
         return result
     except Exception as e:
-        logger.error(f"Request processing failed: {e} (Type: {type(e).__name__})")
-        raise HTTPException(
-            status_code=500, detail=f"Request processing failed: {str(e)}"
-        )
+        raise handle_api_error("request processing", e)
 
 
 @router.post("/generate-with-image-and-return")
@@ -868,8 +870,7 @@ async def generate_with_image_and_return(
         return Response(content=out_bytes, media_type="image/png")
 
     except Exception as e:
-        logger.error(f"Error in generate_with_image_and_return: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_api_error("generate_with_image_and_return", e)
 
 
 @router.post("/generate-with-image")
@@ -1006,9 +1007,6 @@ async def generate_with_image(
 
         def processor(_req, _ctx):
             logger.info(
-                f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}"
-            )
-            logger.info(
                 f"Using parameters from request: num_inference_steps={_req.num_inference_steps}, guidance_scale={_req.guidance_scale}, width={_req.width}, height={_req.height}, seed={_req.seed}"
             )
             return model_manager.generate_image_with_image(
@@ -1120,8 +1118,7 @@ async def generate_with_image(
         }
 
     except Exception as e:
-        logger.error(f"Error in generate_with_image: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_api_error("generate_with_image", e)
 
 
 @router.post("/load-model")
@@ -1150,8 +1147,7 @@ def load_model():
                 )
                 raise HTTPException(status_code=500, detail="Failed to load FLUX model")
     except Exception as e:
-        logger.error(f"Exception during model loading: {e} (Type: {type(e).__name__})")
-        raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
+        raise handle_api_error("model loading", e)
 
 
 @router.get("/model-status")
@@ -1205,12 +1201,7 @@ async def apply_lora(lora_name: str, weight: float = 1.0):
                 status_code=500, detail=f"Failed to apply LoRA {lora_name}"
             )
     except Exception as e:
-        logger.error(
-            f"Exception during LoRA application: {e} (Type: {type(e).__name__})"
-        )
-        raise HTTPException(
-            status_code=500, detail=f"LoRA application failed: {str(e)}"
-        )
+        raise handle_api_error("LoRA application", e)
 
 
 @router.post("/remove-lora")
@@ -1230,8 +1221,7 @@ async def remove_lora():
             )
             raise HTTPException(status_code=500, detail="Failed to remove LoRA")
     except Exception as e:
-        logger.error(f"Exception during LoRA removal: {e} (Type: {type(e).__name__})")
-        raise HTTPException(status_code=500, detail=f"LoRA removal failed: {str(e)}")
+        raise handle_api_error("LoRA removal", e)
 
 
 # Queue management endpoints
@@ -1287,10 +1277,7 @@ async def submit_generation_request(request: GenerateRequest):
         }
 
     except Exception as e:
-        logger.error(f"Failed to submit request: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to submit request: {str(e)}"
-        )
+        raise handle_api_error("submit request", e)
 
 
 @router.get("/request-status/{request_id}")
@@ -1323,10 +1310,7 @@ async def get_request_status(request_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get request status: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get request status: {str(e)}"
-        )
+        raise handle_api_error("get request status", e)
 
 
 @router.delete("/cancel-request/{request_id}")
@@ -1340,14 +1324,8 @@ async def cancel_request(request_id: str):
             )
 
         return {"message": "Request cancelled successfully", "request_id": request_id}
-
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Failed to cancel request: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to cancel request: {str(e)}"
-        )
+        raise handle_api_error("cancel request", e)
 
 
 @router.get("/queue-stats")
@@ -1356,10 +1334,7 @@ async def get_queue_stats():
     try:
         return queue_manager.get_queue_stats()
     except Exception as e:
-        logger.error(f"Failed to get queue stats: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get queue stats: {str(e)}"
-        )
+        raise handle_api_error("get queue stats", e)
 
 
 def generate_image_internal(
@@ -1478,13 +1453,7 @@ def generate_image_internal(
         }
 
     except Exception as e:
-        logger.error(
-            f"Error generating {model_type_name} image: {e} (Type: {type(e).__name__})"
-        )
-        raise HTTPException(
-            status_code=500,
-            detail=f"{model_type_name} image generation failed: {str(e)}",
-        )
+        raise handle_api_error(f"{model_type_name} image generation", e)
 
 
 @router.get("/loras")
@@ -1529,10 +1498,7 @@ async def get_available_loras():
         }
 
     except Exception as e:
-        logger.error(f"Error getting available LoRAs: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get available LoRAs: {str(e)}"
-        )
+        raise handle_api_error("get available LoRAs", e)
 
 
 @router.post("/upload-lora")
@@ -1595,10 +1561,7 @@ async def upload_lora_file(file: UploadFile = File(...)):
         }
 
     except Exception as e:
-        logger.error(f"Error uploading LoRA file: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to upload LoRA file: {str(e)}"
-        )
+        raise handle_api_error("upload LoRA file", e)
 
 
 @router.delete("/remove-lora/{filename}")
@@ -1621,10 +1584,7 @@ async def remove_lora_file(filename: str):
         return {"message": f"LoRA file {filename} removed successfully"}
 
     except Exception as e:
-        logger.error(f"Error removing LoRA file: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to remove LoRA file: {str(e)}"
-        )
+        raise handle_api_error("remove LoRA file", e)
 
 
 @router.post("/upload-image")
@@ -1641,11 +1601,8 @@ async def upload_image(file: UploadFile = File(...)):
             "filename": filename,
             "file_path": file_path,
         }
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error uploading image: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
+        raise handle_api_error("upload image", e)
 
 def _apply_background_removal_to_saved(
     download_url: str, bg_strength: Optional[float] = None
