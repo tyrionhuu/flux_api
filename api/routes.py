@@ -647,6 +647,8 @@ async def generate_with_image_and_return(
     lora_weight: Optional[float] = Form(None),
     loras_json: Optional[str] = Form(None),
     use_default_lora: Optional[bool] = Form(False),
+    upscale: Optional[bool] = Form(False),
+    upscale_factor: Optional[int] = Form(2),
 ):
     """Generate image from uploaded image and return it directly as binary data"""
     try:
@@ -788,9 +790,6 @@ async def generate_with_image_and_return(
                 status_code=500, detail=f"Image generation failed: {str(gen_error)}"
             )
 
-        # Calculate generation time
-        generation_time = time.time() - generation_start_time
-
         # Extract and save the generated image
         try:
             generated_image = extract_image_from_result(result)
@@ -803,9 +802,23 @@ async def generate_with_image_and_return(
                 detail=f"Failed to extract generated image: {str(extract_error)}",
             )
 
+        # Optionally apply upscaling before returning bytes
+        final_image_path: Optional[str]
+        upscaled_image_path: Optional[str]
         try:
-            image_filename = save_image_with_unique_name(generated_image)
-            logger.info(f"Successfully saved image to: {image_filename}")
+            if upscale:
+                _, upscaled_image_path, final_w, final_h = apply_upscaling(
+                    generated_image, upscale_factor or 2, save_image_with_unique_name
+                )
+                final_image_path = upscaled_image_path or save_image_with_unique_name(
+                    generated_image
+                )
+                logger.info(
+                    f"Upscaling applied: factor={upscale_factor}, path={final_image_path}, size={final_w}x{final_h}"
+                )
+            else:
+                final_image_path = save_image_with_unique_name(generated_image)
+                logger.info(f"Saved image without upscaling to: {final_image_path}")
         except Exception as save_error:
             logger.error(f"Failed to save generated image: {save_error}")
             raise HTTPException(
@@ -813,8 +826,8 @@ async def generate_with_image_and_return(
                 detail=f"Failed to save generated image: {str(save_error)}",
             )
 
-        # Read the image file and return bytes (binary response)
-        file_path = image_filename
+        # Read the final image file and return bytes (binary response)
+        file_path = final_image_path
         if not os.path.exists(file_path):
             raise HTTPException(
                 status_code=404, detail="Generated image file not found"
@@ -874,11 +887,12 @@ async def generate_with_image(
     seed: Optional[int] = Form(None),
     remove_background: Optional[bool] = Form(False),
     bg_strength: Optional[float] = Form(None),
-    # LoRA support via form-data
     lora_name: Optional[str] = Form(None),
     lora_weight: Optional[float] = Form(None),
     loras_json: Optional[str] = Form(None),
     use_default_lora: Optional[bool] = Form(False),
+    upscale: Optional[bool] = Form(False),
+    upscale_factor: Optional[int] = Form(2),
 ):
     """Generate image using image + text input (image-to-image generation)"""
     try:
@@ -1033,9 +1047,20 @@ async def generate_with_image(
                 detail=f"Failed to extract generated image: {str(extract_error)}",
             )
 
+        # Optionally apply upscaling to saved file
         try:
-            image_filename = save_image_with_unique_name(generated_image)
-            logger.info(f"Successfully saved image to: {image_filename}")
+            if upscale:
+                image_filename, upscaled_image_filename, final_w, final_h = apply_upscaling(
+                    generated_image, upscale_factor or 2, save_image_with_unique_name
+                )
+                image_filename = upscaled_image_filename or image_filename
+                tgt_w, tgt_h = final_w, final_h
+                logger.info(
+                    f"Upscaling applied: factor={upscale_factor}, path={image_filename}, size={tgt_w}x{tgt_h}"
+                )
+            else:
+                image_filename = save_image_with_unique_name(generated_image)
+                logger.info(f"Successfully saved image to: {image_filename}")
         except Exception as save_error:
             logger.error(f"Failed to save generated image: {save_error}")
             raise HTTPException(
