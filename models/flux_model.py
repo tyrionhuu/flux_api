@@ -786,11 +786,6 @@ class FluxModelManager:
             )
             return False
 
-    def _apply_single_lora(self, lora_name: str, weight: float) -> bool:
-        """Internal method to apply a single LoRA - extracted for reuse"""
-        # Backward-compatibility wrapper
-        return self._apply_lora_to_transformer(lora_name, weight)
-
     def remove_lora(self) -> bool:
         """Remove currently applied LoRA(s) from the pipeline"""
         if not self.model_loaded or self.pipe is None:
