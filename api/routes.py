@@ -497,8 +497,6 @@ async def generate_and_return_image(request: GenerateRequest):
         # Clean up input
         prompt = request.prompt.strip()
 
-        enhanced_prompt = prompt
-
         _ensure_model_loaded()
 
         lora_applied, lora_weight_applied = _apply_loras(
@@ -507,7 +505,7 @@ async def generate_and_return_image(request: GenerateRequest):
 
         # Auto-size for txt2img: default to 1024x1024 and ignore client-provided size
         result = await _queue_txt2img_and_get_result(
-            enhanced_prompt,
+            prompt,
             1024,
             1024,
             request.seed,
@@ -565,8 +563,6 @@ async def generate_image(request: GenerateRequest):
         # Clean up input
         prompt = request.prompt.strip()
 
-        enhanced_prompt = prompt
-
         _ensure_model_loaded()
 
         lora_applied, lora_weight_applied = _apply_loras(
@@ -575,7 +571,7 @@ async def generate_image(request: GenerateRequest):
 
         def processor(_req, _ctx):
             return generate_image_internal(
-                enhanced_prompt,
+                prompt,
                 "FLUX",
                 lora_applied,
                 lora_weight_applied,
@@ -642,7 +638,6 @@ async def generate_with_image_and_return(
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
     negative_prompt: Optional[str] = Form(None),
-    prompt_prefix: Optional[str] = Form(None),
     remove_background: Optional[bool] = Form(False),
     bg_strength: Optional[float] = Form(None),
     # LoRA support via form-data
@@ -661,12 +656,6 @@ async def generate_with_image_and_return(
         logger.info(
             f"Image file: {image.filename}, content_type: {image.content_type}, size: {image.size}"
         )
-
-        # Apply prompt prefix if provided, otherwise use the original prompt
-        if prompt_prefix:
-            enhanced_prompt = f"{prompt_prefix}, {prompt}"
-        else:
-            enhanced_prompt = prompt
 
         if width and (width < 256 or width > 1024):
             raise HTTPException(
@@ -765,13 +754,13 @@ async def generate_with_image_and_return(
         # Generate image via queue processor
         def processor(_req, _ctx):
             logger.info(
-                f"Calling model_manager.generate_image_with_image with prompt: {enhanced_prompt}"
+                f"Calling model_manager.generate_image_with_image with prompt: {prompt}"
             )
             logger.info(
                 f"Using parameters from request: num_inference_steps={_req.num_inference_steps}, guidance_scale={_req.guidance_scale}, width={_req.width}, height={_req.height}, seed={_req.seed}"
             )
             return model_manager.generate_image_with_image(
-                prompt=enhanced_prompt,
+                prompt=prompt,
                 image=pre_img,
                 num_inference_steps=_req.num_inference_steps,
                 guidance_scale=_req.guidance_scale,
@@ -783,7 +772,7 @@ async def generate_with_image_and_return(
 
         try:
             result = await queue_manager.submit_and_wait(
-                prompt=enhanced_prompt,
+                prompt=prompt,
                 width=tgt_w,
                 height=tgt_h,
                 seed=seed,
@@ -882,8 +871,7 @@ async def generate_with_image(
     width: Optional[int] = Form(512),
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
-    negative_prompt: Optional[str] = Form(None),
-    prompt_prefix: Optional[str] = Form(None),
+    negative_prompt: Optional[str] = Form(None),    
     remove_background: Optional[bool] = Form(False),
     bg_strength: Optional[float] = Form(None),
     # LoRA support via form-data
@@ -901,12 +889,6 @@ async def generate_with_image(
         logger.info(
             f"Image file: {image.filename}, content_type: {image.content_type}, size: {image.size}"
         )
-
-        # Apply prompt prefix if provided, otherwise use the original prompt
-        if prompt_prefix:
-            enhanced_prompt = f"{prompt_prefix}, {prompt}"
-        else:
-            enhanced_prompt = prompt
 
         # Validate parameters
         if not prompt or not prompt.strip():
@@ -1010,7 +992,7 @@ async def generate_with_image(
                 f"Using parameters from request: num_inference_steps={_req.num_inference_steps}, guidance_scale={_req.guidance_scale}, width={_req.width}, height={_req.height}, seed={_req.seed}"
             )
             return model_manager.generate_image_with_image(
-                prompt=enhanced_prompt,
+                prompt=prompt,
                 image=pre_img,
                 num_inference_steps=_req.num_inference_steps,
                 guidance_scale=_req.guidance_scale,
@@ -1022,7 +1004,7 @@ async def generate_with_image(
 
         try:
             result = await queue_manager.submit_and_wait(
-                prompt=enhanced_prompt,
+                prompt=prompt,
                 width=tgt_w,
                 height=tgt_h,
                 seed=seed,
@@ -1105,7 +1087,7 @@ async def generate_with_image(
         actual_lora_info = model_manager.get_lora_info()
 
         return {
-            "message": f"Generated image from uploaded image for prompt: {enhanced_prompt}",
+            "message": f"Generated image from uploaded image for prompt: {prompt}",
             "image_url": image_filename,
             "download_url": download_url,
             "filename": filename,
@@ -1347,17 +1329,11 @@ def generate_image_internal(
     seed: Optional[int] = None,
     upscale: bool = False,
     upscale_factor: int = 2,
-    prompt_prefix: Optional[str] = None,
     num_inference_steps: int = INFERENCE_STEPS,
     guidance_scale: float = DEFAULT_GUIDANCE_SCALE,
 ):
     """Internal function to generate images - used by both endpoints"""
-    # Apply prompt prefix if provided, otherwise use the original prompt
-    if prompt_prefix:
-        enhanced_prompt = f"{prompt_prefix}, {prompt}"
-    else:
-        enhanced_prompt = prompt
-    logger.info(f"Starting image generation for prompt: {enhanced_prompt}")
+    logger.info(f"Starting image generation for prompt: {prompt}")
 
     # Model should already be loaded at this point
     if not model_manager.is_loaded():
@@ -1402,7 +1378,7 @@ def generate_image_internal(
 
         # Generate the image
         result = model_manager.generate_image(
-            enhanced_prompt,
+            prompt,
             num_inference_steps,
             guidance_scale,
             width,
@@ -1420,7 +1396,7 @@ def generate_image_internal(
         # Apply upscaling if requested
         try:
 
-            image_filename, upscaled_image_path, final_width, final_height = (
+            image_filename, _, final_width, final_height = (
                 apply_upscaling(
                     image, upscale, upscale_factor, save_image_with_unique_name
                 )
@@ -1440,7 +1416,7 @@ def generate_image_internal(
         download_url = f"/download/{filename}"
 
         return {
-            "message": f"Generated {model_type_name} image for prompt: {enhanced_prompt}",
+            "message": f"Generated {model_type_name} image for prompt: {prompt}",
             "image_url": image_filename,
             "download_url": download_url,
             "filename": filename,
