@@ -38,7 +38,7 @@ API_VERSION = "1.0.0"
 HUGGINGFACE_CACHE_DIR = "~/.cache/huggingface/hub"
 
 # File Paths
-GENERATED_IMAGES_DIR = "generated_images"
+GENERATED_IMAGES_DIR = "/data/pingzhi/generated_images"
 STATIC_IMAGES_DIR = "static"
 
 # LoRA Configuration

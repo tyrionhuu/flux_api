@@ -94,7 +94,7 @@ def download_image(filename: str):
 
     # Security: only allow files from generated_images directory
     safe_filename = os.path.basename(filename)  # Remove any path traversal
-    file_path = Path("generated_images") / safe_filename
+    file_path = Path("/data/pingzhi/generated_images") / safe_filename
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")
