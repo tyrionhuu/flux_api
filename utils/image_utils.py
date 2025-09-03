@@ -2,18 +2,20 @@
 Image utilities for the FLUX API
 """
 
-from math import log
-import loguru
 import os
 import uuid
+from math import log
 from pathlib import Path
 from typing import Any, Optional
 
+import loguru
 from fastapi import HTTPException, UploadFile
 from PIL import Image
 
 from config.settings import DEFAULT_IMAGE_SIZE, PLACEHOLDER_COLORS
+
 logger = loguru.logger
+
 
 def extract_image_from_result(result: Any) -> Image.Image:
     """Extract image from FLUX pipeline result"""

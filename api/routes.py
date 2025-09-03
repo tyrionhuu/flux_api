@@ -35,10 +35,15 @@ from utils.system_utils import get_system_memory
 logger = loguru.logger
 
 
-def handle_api_error(operation: str, error: Exception, status_code: int = 500) -> HTTPException:
+def handle_api_error(
+    operation: str, error: Exception, status_code: int = 500
+) -> HTTPException:
     """Standardized error handling for API endpoints"""
     logger.error(f"Error in {operation}: {error}")
-    return HTTPException(status_code=status_code, detail=f"{operation} failed: {str(error)}")
+    return HTTPException(
+        status_code=status_code, detail=f"{operation} failed: {str(error)}"
+    )
+
 
 # Create router
 router = APIRouter()
@@ -871,7 +876,7 @@ async def generate_with_image(
     width: Optional[int] = Form(512),
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
-    negative_prompt: Optional[str] = Form(None),    
+    negative_prompt: Optional[str] = Form(None),
     remove_background: Optional[bool] = Form(False),
     bg_strength: Optional[float] = Form(None),
     # LoRA support via form-data
@@ -1396,10 +1401,8 @@ def generate_image_internal(
         # Apply upscaling if requested
         try:
 
-            image_filename, _, final_width, final_height = (
-                apply_upscaling(
-                    image, upscale, upscale_factor, save_image_with_unique_name
-                )
+            image_filename, _, final_width, final_height = apply_upscaling(
+                image, upscale, upscale_factor, save_image_with_unique_name
             )
         except Exception as upscale_error:
             logger.error(f"Upscaling failed with error: {upscale_error}")
@@ -1579,6 +1582,7 @@ async def upload_image(file: UploadFile = File(...)):
         }
     except Exception as e:
         raise handle_api_error("upload image", e)
+
 
 def _apply_background_removal_to_saved(
     download_url: str, bg_strength: Optional[float] = None
