@@ -1647,13 +1647,6 @@ async def upload_image(file: UploadFile = File(...)):
         logger.error(f"Error uploading image: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
 
-
-def _absolute_generated_path_from_download(download_url: str) -> Path:
-    filename = download_url.split("/")[-1]
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return Path(base_dir) / "generated_images" / filename
-
-
 def _apply_background_removal_to_saved(
     download_url: str, bg_strength: Optional[float] = None
 ) -> str:
@@ -1662,7 +1655,9 @@ def _apply_background_removal_to_saved(
     bg_strength: optional float 0..1 mapped to remove parameters.
     """
     try:
-        abs_path = _absolute_generated_path_from_download(download_url)
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        filename = download_url.split("/")[-1]
+        abs_path = Path(base_dir) / "generated_images" / filename
         with Image.open(abs_path).convert("RGBA") as im:
             output_im = remove(im, **_removal_params_from_strength(bg_strength))
         new_rel = save_image_with_unique_name(output_im)  # saves into generated_images
