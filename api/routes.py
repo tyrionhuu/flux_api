@@ -643,6 +643,11 @@ async def generate_with_image_and_return(
     prompt_prefix: Optional[str] = Form(None),
     remove_background: Optional[bool] = Form(False),
     bg_strength: Optional[float] = Form(None),
+    # LoRA support via form-data
+    lora_name: Optional[str] = Form(None),
+    lora_weight: Optional[float] = Form(None),
+    loras_json: Optional[str] = Form(None),
+    use_default_lora: Optional[bool] = Form(False),
 ):
     """Generate image from uploaded image and return it directly as binary data"""
     try:
@@ -710,6 +715,43 @@ async def generate_with_image_and_return(
                 logger.info("Model not loaded, loading it first...")
                 if not model_manager.load_model():
                     raise HTTPException(status_code=500, detail="Failed to load model")
+
+        # Parse LoRA parameters from form-data
+        loras_to_apply = []
+        remove_all_loras = False
+        try:
+            if loras_json is not None:
+                parsed = json.loads(loras_json)
+                if not isinstance(parsed, list):
+                    raise ValueError("loras_json must be a JSON array")
+                if len(parsed) == 0:
+                    remove_all_loras = True
+                else:
+                    for item in parsed:
+                        name = (item.get("name") or "").strip()
+                        weight = float(item.get("weight", 1.0))
+                        if not name:
+                            raise ValueError("LoRA name cannot be empty")
+                        if weight < 0 or weight > 2.0:
+                            raise ValueError("LoRA weight must be between 0 and 2.0")
+                        loras_to_apply.append({"name": name, "weight": weight})
+            elif lora_name:
+                name = lora_name.strip()
+                if not name:
+                    raise ValueError("LoRA name cannot be empty")
+                w = 1.0 if lora_weight is None else float(lora_weight)
+                if w < 0 or w > 2.0:
+                    raise ValueError("LoRA weight must be between 0 and 2.0")
+                loras_to_apply.append({"name": name, "weight": w})
+            elif use_default_lora:
+                loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
+        except (ValueError, json.JSONDecodeError) as e:
+            raise HTTPException(status_code=400, detail=f"Invalid LoRA parameters: {str(e)}")
+
+        # Apply LoRAs if requested
+        if loras_to_apply or remove_all_loras:
+            _ensure_model_loaded()
+            _apply_loras(loras_to_apply, remove_all_loras)
 
         # Start timing
         generation_start_time = time.time()
@@ -839,6 +881,11 @@ async def generate_with_image(
     prompt_prefix: Optional[str] = Form(None),
     remove_background: Optional[bool] = Form(False),
     bg_strength: Optional[float] = Form(None),
+    # LoRA support via form-data
+    lora_name: Optional[str] = Form(None),
+    lora_weight: Optional[float] = Form(None),
+    loras_json: Optional[str] = Form(None),
+    use_default_lora: Optional[bool] = Form(False),
 ):
     """Generate image using image + text input (image-to-image generation)"""
     try:
@@ -908,6 +955,43 @@ async def generate_with_image(
                 logger.info("Model not loaded, loading it first...")
                 if not model_manager.load_model():
                     raise HTTPException(status_code=500, detail="Failed to load model")
+
+        # Parse LoRA parameters from form-data
+        loras_to_apply = []
+        remove_all_loras = False
+        try:
+            if loras_json is not None:
+                parsed = json.loads(loras_json)
+                if not isinstance(parsed, list):
+                    raise ValueError("loras_json must be a JSON array")
+                if len(parsed) == 0:
+                    remove_all_loras = True
+                else:
+                    for item in parsed:
+                        name = (item.get("name") or "").strip()
+                        weight = float(item.get("weight", 1.0))
+                        if not name:
+                            raise ValueError("LoRA name cannot be empty")
+                        if weight < 0 or weight > 2.0:
+                            raise ValueError("LoRA weight must be between 0 and 2.0")
+                        loras_to_apply.append({"name": name, "weight": weight})
+            elif lora_name:
+                name = lora_name.strip()
+                if not name:
+                    raise ValueError("LoRA name cannot be empty")
+                w = 1.0 if lora_weight is None else float(lora_weight)
+                if w < 0 or w > 2.0:
+                    raise ValueError("LoRA weight must be between 0 and 2.0")
+                loras_to_apply.append({"name": name, "weight": w})
+            elif use_default_lora:
+                loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
+        except (ValueError, json.JSONDecodeError) as e:
+            raise HTTPException(status_code=400, detail=f"Invalid LoRA parameters: {str(e)}")
+
+        # Apply LoRAs if requested
+        if loras_to_apply or remove_all_loras:
+            _ensure_model_loaded()
+            _apply_loras(loras_to_apply, remove_all_loras)
 
         # Start timing
         generation_start_time = time.time()
@@ -1012,14 +1096,16 @@ async def generate_with_image(
         # Format generation time
         formatted_generation_time = f"{generation_time:.2f}s"
 
+        actual_lora_info = model_manager.get_lora_info()
+
         return {
             "message": f"Generated image from uploaded image for prompt: {enhanced_prompt}",
             "image_url": image_filename,
             "download_url": download_url,
             "filename": filename,
             "generation_time": formatted_generation_time,
-            "lora_applied": None,  # No LoRA support in image-to-image currently
-            "lora_weight": None,
+            "lora_applied": actual_lora_info.get("name") if actual_lora_info else None,
+            "lora_weight": actual_lora_info.get("weight") if actual_lora_info else None,
             "width": tgt_w,
             "height": tgt_h,
             "seed": seed,
