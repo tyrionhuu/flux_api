@@ -37,27 +37,16 @@ class FluxModelManager:
         self.model_loaded = False
         self.model_type = "none"
         self.gpu_manager = GPUManager()
-        # LoRA state - can be single LoRA (str) or multiple LoRAs (list)
         self.current_lora: Optional[Union[str, list]] = None
         self.current_weight: float = 1.0
-        # Track temporary LoRA files for cleanup
         self._temp_lora_paths: list = []
-        # Persistent cache directory for merged LoRAs and nunchaku conversions
         self._lora_cache_dir = os.path.join("cache", "merged_loras")
         self._nunchaku_cache_dir = os.path.join("cache", "nunchaku_loras")
         try:
             os.makedirs(self._lora_cache_dir, exist_ok=True)
             os.makedirs(self._nunchaku_cache_dir, exist_ok=True)
         except Exception:
-            # If cache dir can't be created, we will fall back to temp-only
-            pass
-
-    def __del__(self):
-        """Cleanup when object is destroyed"""
-        try:
-            self._cleanup_temp_loras()
-        except:
-            pass  # Ignore errors during cleanup
+            logger.error("Failed to create LoRA cache directories")
 
     def load_model(self) -> bool:
         """Load the FLUX model with GPU-only support and quantization"""
@@ -94,7 +83,7 @@ class FluxModelManager:
                 try:
                     torch.cuda.set_device(0)
                 except Exception:
-                    pass
+                    logger.error("Failed to set CUDA device")
 
                 # Verify device is set correctly
                 current_device = torch.cuda.current_device()
