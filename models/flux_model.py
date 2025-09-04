@@ -173,7 +173,7 @@ class FluxModelManager:
             return True
 
         except Exception as e:
-            logger.error(f"Error loading FLUX model: {e} (Type: {type(e).__name__})")
+            logger.error(f"Error loading FLUX model: {e})", exc_info=True)
             return False
 
     def _warmup_cuda_graph(self):
