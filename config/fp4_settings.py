@@ -29,6 +29,10 @@ PLACEHOLDER_COLORS = {
     "placeholder": "lightblue",
 }
 
+# Image Output Format Configuration
+SAVE_AS_JPEG = False  # Keep PNG for fp4
+JPEG_QUALITY = 70     # JPEG quality if enabled
+
 # API Configuration
 API_TITLE = "FLUX API"
 API_DESCRIPTION = "High-performance image generation using FLUX model"
@@ -38,7 +42,7 @@ API_VERSION = "1.0.0"
 HUGGINGFACE_CACHE_DIR = "~/.cache/huggingface/hub"
 
 # File Paths
-GENERATED_IMAGES_DIR = "generated_images"
+GENERATED_IMAGES_DIR = "/data/pingzhi/generated_images"
 STATIC_IMAGES_DIR = "static"
 
 # LoRA Configuration

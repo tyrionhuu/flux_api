@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from models.bf16_flux_model import BF16FluxModelManager
 from api.models import GenerateRequest, ModelStatusResponse
-from config.bf16_settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT
+from config.bf16_settings import DEFAULT_LORA_NAME, DEFAULT_LORA_WEIGHT, SAVE_AS_JPEG, JPEG_QUALITY
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
 from utils.system_utils import get_system_memory
 import time
@@ -469,13 +469,15 @@ def generate_image_internal(
 
             image_filename, upscaled_image_path, final_width, final_height = (
                 apply_upscaling(
-                    image, upscale, upscale_factor, save_image_with_unique_name
+                    image, upscale, upscale_factor, 
+                    lambda img: save_image_with_unique_name(img, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY),
+                    save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY
                 )
             )
         except Exception as upscale_error:
             logger.error(f"Upscaling failed with error: {upscale_error}")
             # Fall back to saving original image without upscaling
-            image_filename = save_image_with_unique_name(image)
+            image_filename = save_image_with_unique_name(image, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY)
             final_width = width
             final_height = height
             upscaled_image_path = None

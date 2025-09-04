@@ -20,6 +20,10 @@ PLACEHOLDER_COLORS = {
     "placeholder": "lightblue",
 }
 
+# Image Output Format Configuration
+SAVE_AS_JPEG = False  # Keep PNG for bf16
+JPEG_QUALITY = 70     # JPEG quality if enabled
+
 # API Configuration
 API_TITLE = "FLUX API (bf16)"
 API_DESCRIPTION = "High-performance image generation using FLUX.1-schnell bf16 model"

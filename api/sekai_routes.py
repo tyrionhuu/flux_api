@@ -19,6 +19,8 @@ from config.sekai_settings import (
     LORA_2_WEIGHT,
     LORA_3_NAME,
     LORA_3_WEIGHT,
+    SAVE_AS_JPEG,
+    JPEG_QUALITY,
 )
 from api.models import GenerateRequest
 
@@ -717,13 +719,15 @@ def generate_image_internal(
 
             image_filename, upscaled_image_path, final_width, final_height = (
                 apply_upscaling(
-                    image, upscale, upscale_factor, save_image_with_unique_name
+                    image, upscale, upscale_factor, 
+                    lambda img: save_image_with_unique_name(img, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY),
+                    save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY
                 )
             )
         except Exception as upscale_error:
             logger.error(f"Upscaling failed with error: {upscale_error}")
             # Fall back to saving original image without upscaling
-            image_filename = save_image_with_unique_name(image)
+            image_filename = save_image_with_unique_name(image, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY)
             final_width = width
             final_height = height
             upscaled_image_path = None
@@ -745,9 +749,11 @@ def generate_image_internal(
         # Return binary image if requested
         if response_format == "binary":
             from fastapi.responses import FileResponse
+            # Determine media type based on configuration
+            media_type = "image/jpeg" if SAVE_AS_JPEG else "image/png"
             return FileResponse(
                 image_filename,
-                media_type="image/png",
+                media_type=media_type,
                 filename=filename,
                 headers={"Content-Disposition": f"inline; filename={filename}"}
             )
@@ -1004,18 +1010,20 @@ async def upload_image_and_generate(
 
             generated_image = extract_image_from_result(result)
 
-            image_filename = save_image_with_unique_name(generated_image)
+            image_filename = save_image_with_unique_name(generated_image, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY)
 
             if upscale:
                 try:
                     from models.upscaler import apply_upscaling
                     image_filename, upscaled_image_path, final_width, final_height = apply_upscaling(
-                        generated_image, upscale, upscale_factor, save_image_with_unique_name
+                        generated_image, upscale, upscale_factor, 
+                        lambda img: save_image_with_unique_name(img, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY),
+                        save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY
                     )
                     logger.info(f"Image upscaled by {upscale_factor}x: {image_filename}")
                 except Exception as upscale_error:
                     logger.warning(f"Upscaling failed: {upscale_error}")
-                    image_filename = save_image_with_unique_name(generated_image)
+                    image_filename = save_image_with_unique_name(generated_image, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY)
 
             # Create download URL
             import os

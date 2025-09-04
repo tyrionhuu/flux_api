@@ -15,6 +15,8 @@ from config.fp4_settings import (
     STATIC_IMAGES_DIR,
     DEFAULT_LORA_NAME,
     DEFAULT_LORA_WEIGHT,
+    SAVE_AS_JPEG,
+    JPEG_QUALITY,
 )
 from api.models import GenerateRequest
 
@@ -94,7 +96,7 @@ def download_image(filename: str):
 
     # Security: only allow files from generated_images directory
     safe_filename = os.path.basename(filename)  # Remove any path traversal
-    file_path = Path("generated_images") / safe_filename
+    file_path = Path("/data/pingzhi/generated_images") / safe_filename
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")
@@ -660,13 +662,15 @@ def generate_image_internal(
 
             image_filename, upscaled_image_path, final_width, final_height = (
                 apply_upscaling(
-                    image, upscale, upscale_factor, save_image_with_unique_name
+                    image, upscale, upscale_factor, 
+                    lambda img: save_image_with_unique_name(img, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY),
+                    save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY
                 )
             )
         except Exception as upscale_error:
             logger.error(f"Upscaling failed with error: {upscale_error}")
             # Fall back to saving original image without upscaling
-            image_filename = save_image_with_unique_name(image)
+            image_filename = save_image_with_unique_name(image, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY)
             final_width = width
             final_height = height
             upscaled_image_path = None
@@ -937,18 +941,20 @@ async def upload_image_and_generate(
 
             generated_image = extract_image_from_result(result)
 
-            image_filename = save_image_with_unique_name(generated_image)
+            image_filename = save_image_with_unique_name(generated_image, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY)
 
             if upscale:
                 try:
                     from models.upscaler import apply_upscaling
                     image_filename, upscaled_image_path, final_width, final_height = apply_upscaling(
-                        generated_image, upscale, upscale_factor, save_image_with_unique_name
+                        generated_image, upscale, upscale_factor, 
+                        lambda img: save_image_with_unique_name(img, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY),
+                        save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY
                     )
                     logger.info(f"Image upscaled by {upscale_factor}x: {image_filename}")
                 except Exception as upscale_error:
                     logger.warning(f"Upscaling failed: {upscale_error}")
-                    image_filename = save_image_with_unique_name(generated_image)
+                    image_filename = save_image_with_unique_name(generated_image, save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY)
 
             # Create download URL
             import os

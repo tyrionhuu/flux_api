@@ -322,6 +322,7 @@ class FLUXUpscaler:
         output_path: str,
         scale_factor: int = 2,
         method: str = "lanczos",
+        jpeg_quality: int = 70,
     ) -> bool:
         """
         Upscale image file and save result
@@ -356,8 +357,14 @@ class FLUXUpscaler:
             if output_dir:
                 os.makedirs(output_dir, exist_ok=True)
 
-            # Save upscaled image
-            success = cv2.imwrite(output_path, upscaled_image)
+            # Save upscaled image with proper format
+            if output_path.lower().endswith(('.jpg', '.jpeg')):
+                # Save as JPEG with quality setting
+                success = cv2.imwrite(output_path, upscaled_image, 
+                                    [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality])
+            else:
+                # Save as PNG or other format
+                success = cv2.imwrite(output_path, upscaled_image)
 
             if success is not None and success:
                 logger.info(f"Upscaled image saved to: {output_path}")
@@ -434,7 +441,8 @@ if __name__ == "__main__":
 
 # API Integration Functions
 def apply_upscaling(
-    image, upscale: bool, upscale_factor: int, save_original_func
+    image, upscale: bool, upscale_factor: int, save_original_func,
+    save_as_jpeg: bool = False, jpeg_quality: int = 70
 ) -> Tuple[str, Optional[str], int, int]:
     """
     Apply upscaling to the generated image if requested
@@ -444,6 +452,8 @@ def apply_upscaling(
         upscale: Whether to apply upscaling
         upscale_factor: Upscaling factor (2 or 4)
         save_original_func: Function to save the original image
+        save_as_jpeg: If True, save as JPEG; otherwise PNG
+        jpeg_quality: JPEG quality (1-100) when save_as_jpeg is True
 
     Returns:
         Tuple of (final_image_path, upscaled_image_path, final_width, final_height)
@@ -482,16 +492,18 @@ def apply_upscaling(
         # Save the original image first
         original_image_filename = save_original_func(image)
 
-        # Create upscaled filename
+        # Create upscaled filename with correct extension
         base_name = os.path.splitext(original_image_filename)[0]
-        upscaled_image_path = f"{base_name}_upscaled_{upscale_factor}x.png"
+        ext = ".jpg" if save_as_jpeg else ".png"
+        upscaled_image_path = f"{base_name}_upscaled_{upscale_factor}x{ext}"
 
         # Perform upscaling
         logger.info(
             f"Calling upscaler.upscale_file with: {original_image_filename} -> {upscaled_image_path}, factor: {upscale_factor}"
         )
         success = upscaler.upscale_file(
-            original_image_filename, upscaled_image_path, upscale_factor
+            original_image_filename, upscaled_image_path, upscale_factor,
+            jpeg_quality=jpeg_quality
         )
         logger.info(f"Upscaling result: {success}")
 

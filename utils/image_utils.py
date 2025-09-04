@@ -49,15 +49,29 @@ def create_placeholder_image(
 
 
 def save_image_with_unique_name(
-    image: Image.Image, directory: str = "generated_images"
+    image: Image.Image, directory: str = "generated_images",
+    save_as_jpeg: bool = False, jpeg_quality: int = 70
 ) -> str:
-    """Save image with a unique filename and return the filename"""
+    """Save image with a unique filename and return the filename
+    
+    Args:
+        image: PIL Image to save
+        directory: Directory to save the image
+        save_as_jpeg: If True, save as JPEG; otherwise save as PNG
+        jpeg_quality: JPEG quality (1-100) when save_as_jpeg is True
+    """
     import os
     import uuid
 
     os.makedirs(directory, exist_ok=True)
-    filename = f"{directory}/{uuid.uuid4()}.png"
-    image.save(filename)
+    
+    if save_as_jpeg:
+        filename = f"{directory}/{uuid.uuid4()}.jpg"
+        image.save(filename, 'JPEG', quality=jpeg_quality, optimize=True)
+    else:
+        filename = f"{directory}/{uuid.uuid4()}.png"
+        image.save(filename)
+    
     return filename
 
 
