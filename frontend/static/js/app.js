@@ -166,6 +166,12 @@ class FluxAPI {
             }
         }
 
+        // Downscale settings
+        const downscaleCheckbox = this.getElement('downscale');
+        if (downscaleCheckbox) {
+            jsonPayload.downscale = downscaleCheckbox.checked;
+        }
+
         return jsonPayload;
     }
 
@@ -1160,6 +1166,17 @@ class FluxAPI {
             const removeBgCheckbox = this.getElement('remove-background');
             if (removeBgCheckbox && removeBgCheckbox.checked) {
                 command += ` -F "remove_background=true"`;
+                const bgStrength = this.getElement('bg_strength');
+                if (bgStrength && bgStrength.value) {
+                    command += ` -F "bg_strength=${bgStrength.value}"`;
+                }
+            }
+
+            // Downscale settings
+            const downscaleCheckbox = this.getElement('downscale');
+            if (downscaleCheckbox) {
+                const downscaleValue = downscaleCheckbox.checked ? 'true' : 'false';
+                command += ` -F "downscale=${downscaleValue}"`;
             }
 
             // Direct output to file - no need for jq or second curl
