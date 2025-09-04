@@ -113,8 +113,13 @@ start_api() {
     echo "   FP4_API_PORT=$FP4_API_PORT"
     echo "   NVIDIA_VISIBLE_DEVICES=$NVIDIA_VISIBLE_DEVICES"
     
-    # Start the service
-    exec python3 main.py
+    # Start the service using uvicorn directly to ensure proper logging setup
+    exec python3 -c "
+import main
+import uvicorn
+from config.settings import FP4_API_PORT
+uvicorn.run(main.app, host='0.0.0.0', port=FP4_API_PORT, log_config=main.LOG_CONFIG)
+"
 }
 
 # Main execution

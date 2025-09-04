@@ -56,8 +56,8 @@ RUN conda config --set always_yes true && \
 # Create conda environment from environment.yml
 RUN conda env create -f environment.yml
 
-# Install PyTorch with CUDA support from PyTorch index
-RUN conda run -n img2img pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
+# Install PyTorch with CUDA support from PyTorch index (stable version)
+RUN conda run -n img2img pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
 RUN conda run -n img2img pip install https://github.com/nunchaku-tech/nunchaku/releases/download/v0.3.2/nunchaku-0.3.2+torch2.8-cp312-cp312-linux_x86_64.whl
 
 # Make RUN commands use the new environment

@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: flux-img2img-api
     restart: unless-stopped
+    runtime: nvidia
     
     # GPU configuration - enable all GPUs by default
     deploy:
@@ -13,7 +14,11 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
+              capabilities: 
+                - gpu
+                - compute
+                - utility
+    gpus: all
     
     # Environment variables
     environment:
