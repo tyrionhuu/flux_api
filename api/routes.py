@@ -770,8 +770,8 @@ async def generate_with_image_and_return(
                 image=pre_img,
                 num_inference_steps=_req.num_inference_steps,
                 guidance_scale=_req.guidance_scale,
-                width=_req.width,
-                height=_req.height,
+                width=tgt_w,
+                height=tgt_h,
                 seed=_req.seed,
             )
 
