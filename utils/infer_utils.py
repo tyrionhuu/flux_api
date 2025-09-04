@@ -39,10 +39,18 @@ for wh in _halved:
         _seen.add(wh)
 
 
-def nearest_kontext_size(w: int, h: int) -> tuple[int, int]:
+def nearest_kontext_size(w: int, h: int, use_halved: bool = True) -> tuple[int, int]:
+    # Choose resolution list based on downscale setting
+    if use_halved:
+        resolution_list = EXTENDED_KONTEXT_RESOLUTIONS
+        logger.info(f"Using extended resolutions (including halved) for {w}x{h} image")
+    else:
+        resolution_list = PREFERRED_KONTEXT_RESOLUTIONS
+        logger.info(f"Using original resolutions (no halved) for {w}x{h} image")
+    
     # Prefer candidates that do not exceed the current image size (avoid upscaling when possible)
     candidates = [
-        (tw, th) for (tw, th) in EXTENDED_KONTEXT_RESOLUTIONS if tw <= w and th <= h
+        (tw, th) for (tw, th) in resolution_list if tw <= w and th <= h
     ]
 
     def dist2(wh):
@@ -58,7 +66,7 @@ def nearest_kontext_size(w: int, h: int) -> tuple[int, int]:
     # If none fit, fall back to the closest overall (allows upscaling)
     ar = w / h if h else 1.0
     return min(
-        EXTENDED_KONTEXT_RESOLUTIONS,
+        resolution_list,
         key=lambda wh: (dist2(wh), abs((wh[0] / wh[1]) - ar)),
     )
 
@@ -80,14 +88,19 @@ def letterbox_to(
     return canvas
 
 
-def kontext_preprocess(image_pil: Image.Image) -> tuple[Image.Image, int, int]:
-    # If input image exceeds 512x512 in either dimension, downscale by half first
+def kontext_preprocess(
+    image_pil: Image.Image, downscale: bool = True
+) -> tuple[Image.Image, int, int]:
+    # If downscale is enabled and input image exceeds 512x512 in either dimension, downscale by half first
     src_w, src_h = image_pil.width, image_pil.height
-    if src_w > 512 or src_h > 512:
+    logger.info(f"kontext_preprocess called with downscale={downscale}, image size={src_w}x{src_h}")
+    if downscale and (src_w > 512 or src_h > 512):
         logger.info(f"Downscaling image from {src_w}x{src_h} to {src_w//2}x{src_h//2}")
         down_w, down_h = max(1, src_w // 2), max(1, src_h // 2)
         image_pil = image_pil.resize((down_w, down_h), Image.Resampling.LANCZOS)
+    elif not downscale:
+        logger.info(f"Downscaling disabled, keeping original image size {src_w}x{src_h}")
 
-    tgt_w, tgt_h = nearest_kontext_size(image_pil.width, image_pil.height)
+    tgt_w, tgt_h = nearest_kontext_size(image_pil.width, image_pil.height, use_halved=downscale)
     processed = letterbox_to(image_pil, (tgt_w, tgt_h), bg=(255, 255, 255))
     return processed, tgt_w, tgt_h

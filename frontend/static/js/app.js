@@ -80,6 +80,14 @@ class FluxAPI {
             }
         }
 
+        // Downscale settings
+        const downscaleCheckbox = this.getElement('downscale');
+        if (downscaleCheckbox) {
+            const downscaleValue = downscaleCheckbox.checked ? 'true' : 'false';
+            console.log(`Downscale checkbox checked: ${downscaleCheckbox.checked}, sending: ${downscaleValue}`);
+            formData.append('downscale', downscaleValue);
+        }
+
         return formData;
     }
 

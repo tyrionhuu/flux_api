@@ -44,7 +44,6 @@ def handle_api_error(
     )
 
 
-# Create router
 router = APIRouter()
 
 
@@ -432,6 +431,7 @@ async def _queue_txt2img_and_get_result(
     loras_to_apply: Optional[list],
     num_inference_steps: int,
     guidance_scale: float,
+    downscale: Optional[bool] = True,
 ):
     def processor(_req, _ctx):
         return generate_image_internal(
@@ -444,7 +444,7 @@ async def _queue_txt2img_and_get_result(
             seed,
             upscale or False,
             upscale_factor or 2,
-            None,
+            downscale,
             num_inference_steps,
             guidance_scale,
         )
@@ -520,6 +520,7 @@ async def generate_and_return_image(request: GenerateRequest):
             loras_to_apply,
             request.num_inference_steps or INFERENCE_STEPS,
             request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
+            request.downscale if hasattr(request, "downscale") else True,
         )
 
         # Extract the download URL from the result
@@ -584,7 +585,7 @@ async def generate_image(request: GenerateRequest):
                 request.seed,
                 request.upscale or False,
                 request.upscale_factor or 2,
-                None,
+                request.downscale if hasattr(request, "downscale") else True,
                 _req.num_inference_steps,
                 _req.guidance_scale,
             )
@@ -649,13 +650,14 @@ async def generate_with_image_and_return(
     use_default_lora: Optional[bool] = Form(False),
     upscale: Optional[bool] = Form(False),
     upscale_factor: Optional[int] = Form(2),
+    downscale: Optional[bool] = Form(True),
 ):
     """Generate image from uploaded image and return it directly as binary data"""
     try:
 
         # Debug logging for form parameters
         logger.info(
-            f"Received generate-with-image request - prompt: {prompt}, num_inference_steps: {num_inference_steps}, guidance_scale: {guidance_scale}, width: {width}, height: {height}, seed: {seed}"
+            f"Received generate-with-image request - prompt: {prompt}, num_inference_steps: {num_inference_steps}, guidance_scale: {guidance_scale}, width: {width}, height: {height}, seed: {seed}, downscale: {downscale}"
         )
         logger.info(
             f"Image file: {image.filename}, content_type: {image.content_type}, size: {image.size}"
@@ -697,7 +699,7 @@ async def generate_with_image_and_return(
         try:
             raw = await image.read()
             img = Image.open(io.BytesIO(raw)).convert("RGB")
-            pre_img, tgt_w, tgt_h = kontext_preprocess(img)
+            pre_img, tgt_w, tgt_h = kontext_preprocess(img, downscale=downscale)
         except Exception as img_error:
             logger.error(f"Failed to load image: {img_error}")
             raise HTTPException(
@@ -893,12 +895,13 @@ async def generate_with_image(
     use_default_lora: Optional[bool] = Form(False),
     upscale: Optional[bool] = Form(False),
     upscale_factor: Optional[int] = Form(2),
+    downscale: Optional[bool] = Form(True),
 ):
     """Generate image using image + text input (image-to-image generation)"""
     try:
         # Debug logging for form parameters
         logger.info(
-            f"Received generate-with-image request - prompt: {prompt}, num_inference_steps: {num_inference_steps}, guidance_scale: {guidance_scale}, width: {width}, height: {height}, seed: {seed}"
+            f"Received generate-with-image request - prompt: {prompt}, num_inference_steps: {num_inference_steps}, guidance_scale: {guidance_scale}, width: {width}, height: {height}, seed: {seed}, downscale: {downscale}"
         )
         logger.info(
             f"Image file: {image.filename}, content_type: {image.content_type}, size: {image.size}"
@@ -943,7 +946,7 @@ async def generate_with_image(
         try:
             raw = await image.read()
             img = Image.open(io.BytesIO(raw)).convert("RGB")
-            pre_img, tgt_w, tgt_h = kontext_preprocess(img)
+            pre_img, tgt_w, tgt_h = kontext_preprocess(img, downscale=downscale)
         except Exception as img_error:
             logger.error(f"Failed to load image: {img_error}")
             raise HTTPException(
@@ -1033,7 +1036,6 @@ async def generate_with_image(
             )
 
         # Calculate generation time
-        generation_time = time.time() - generation_start_time
 
         # Extract and save the generated image
         try:
@@ -1065,6 +1067,7 @@ async def generate_with_image(
             else:
                 image_filename = save_image_with_unique_name(generated_image)
                 logger.info(f"Successfully saved image to: {image_filename}")
+
         except Exception as save_error:
             logger.error(f"Failed to save generated image: {save_error}")
             raise HTTPException(
@@ -1087,31 +1090,25 @@ async def generate_with_image(
                 new_filename = os.path.basename(new_rel)
 
                 # Clean up the original image
-                try:
-                    os.remove(abs_image_path)
-                except Exception:
-                    pass
+                os.remove(abs_image_path)
 
                 # Update variables to use the processed image
                 image_filename = new_rel
                 filename = new_filename
-
                 logger.info(f"Background removal completed, new image saved: {new_rel}")
 
             except Exception as e:
                 logger.error(f"Background removal failed: {e}")
-                # Keep the original image if background removal fails
                 filename = os.path.basename(image_filename)
 
         # Return JSON response in the same format as /generate endpoint
         if not remove_background:
             filename = os.path.basename(image_filename)
-
         download_url = f"/generated_images/{filename}"
 
         # Format generation time
+        generation_time = time.time() - generation_start_time
         formatted_generation_time = f"{generation_time:.2f}s"
-
         actual_lora_info = model_manager.get_lora_info()
 
         return {
@@ -1183,7 +1180,6 @@ def get_model_status():
             ),
         }
     )
-
     return status
 
 
@@ -1357,6 +1353,7 @@ def generate_image_internal(
     seed: Optional[int] = None,
     upscale: bool = False,
     upscale_factor: int = 2,
+    downscale: Optional[bool] = None,
     num_inference_steps: int = INFERENCE_STEPS,
     guidance_scale: float = DEFAULT_GUIDANCE_SCALE,
 ):
