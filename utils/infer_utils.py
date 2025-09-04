@@ -30,13 +30,8 @@ for w, h in PREFERRED_KONTEXT_RESOLUTIONS:
     tw, th = max(1, int(w * 2 // 3)), max(1, int(h * 2 // 3))
     _two_thirds.append((tw, th))
 
-# Deduplicate while preserving order: original list first, then unique 2/3 resolutions
-_seen = set(PREFERRED_KONTEXT_RESOLUTIONS)
-EXTENDED_KONTEXT_RESOLUTIONS = list(PREFERRED_KONTEXT_RESOLUTIONS)
-for wh in _two_thirds:
-    if wh not in _seen:
-        EXTENDED_KONTEXT_RESOLUTIONS.append(wh)
-        _seen.add(wh)
+# Replace original list with 2/3 resolutions instead of appending
+EXTENDED_KONTEXT_RESOLUTIONS = _two_thirds
 
 
 def nearest_kontext_size(w: int, h: int, use_extended: bool = True) -> tuple[int, int]:
@@ -48,27 +43,32 @@ def nearest_kontext_size(w: int, h: int, use_extended: bool = True) -> tuple[int
         resolution_list = PREFERRED_KONTEXT_RESOLUTIONS
         logger.info(f"Using original resolutions (no 2/3) for {w}x{h} image")
     
+    # Calculate target aspect ratio
+    target_ar = w / h if h else 1.0
+    logger.info(f"Target aspect ratio: {target_ar:.3f}")
+    
     # Prefer candidates that do not exceed the current image size (avoid upscaling when possible)
     candidates = [
         (tw, th) for (tw, th) in resolution_list if tw <= w and th <= h
     ]
 
-    def dist2(wh):
+    def aspect_ratio_diff(wh):
         tw, th = wh
-        dw, dh = (tw - w), (th - h)
-        return dw * dw + dh * dh
+        candidate_ar = tw / th if th else 1.0
+        return abs(candidate_ar - target_ar)
 
     if candidates:
-        # Pick the closest by Euclidean distance (squared), tie-break by AR closeness
-        ar = w / h if h else 1.0
-        return min(candidates, key=lambda wh: (dist2(wh), abs((wh[0] / wh[1]) - ar)))
+        # Pick the closest by aspect ratio difference
+        best_candidate = min(candidates, key=aspect_ratio_diff)
+        best_ar = best_candidate[0] / best_candidate[1] if best_candidate[1] else 1.0
+        logger.info(f"Selected candidate {best_candidate} with AR {best_ar:.3f} (diff: {aspect_ratio_diff(best_candidate):.3f})")
+        return best_candidate
 
-    # If none fit, fall back to the closest overall (allows upscaling)
-    ar = w / h if h else 1.0
-    return min(
-        resolution_list,
-        key=lambda wh: (dist2(wh), abs((wh[0] / wh[1]) - ar)),
-    )
+    # If none fit, fall back to the closest aspect ratio overall (allows upscaling)
+    best_overall = min(resolution_list, key=aspect_ratio_diff)
+    best_ar = best_overall[0] / best_overall[1] if best_overall[1] else 1.0
+    logger.info(f"Selected overall best {best_overall} with AR {best_ar:.3f} (diff: {aspect_ratio_diff(best_overall):.3f})")
+    return best_overall
 
 
 def letterbox_to(
@@ -104,3 +104,4 @@ def kontext_preprocess(
     tgt_w, tgt_h = nearest_kontext_size(image_pil.width, image_pil.height, use_extended=downscale)
     processed = letterbox_to(image_pil, (tgt_w, tgt_h), bg=(255, 255, 255))
     return processed, tgt_w, tgt_h
+
