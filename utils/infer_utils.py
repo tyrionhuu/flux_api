@@ -24,29 +24,29 @@ PREFERRED_KONTEXT_RESOLUTIONS = [
     (1568, 672),
 ]  # https://github.com/huggingface/diffusers/issues/11942
 
-# Extend with halved resolutions for more flexibility
-_halved = []
+# Extend with 2/3 resolutions for more flexibility
+_two_thirds = []
 for w, h in PREFERRED_KONTEXT_RESOLUTIONS:
-    hw, hh = max(1, w // 2), max(1, h // 2)
-    _halved.append((hw, hh))
+    tw, th = max(1, int(w * 2 // 3)), max(1, int(h * 2 // 3))
+    _two_thirds.append((tw, th))
 
-# Deduplicate while preserving order: original list first, then unique halves
+# Deduplicate while preserving order: original list first, then unique 2/3 resolutions
 _seen = set(PREFERRED_KONTEXT_RESOLUTIONS)
 EXTENDED_KONTEXT_RESOLUTIONS = list(PREFERRED_KONTEXT_RESOLUTIONS)
-for wh in _halved:
+for wh in _two_thirds:
     if wh not in _seen:
         EXTENDED_KONTEXT_RESOLUTIONS.append(wh)
         _seen.add(wh)
 
 
-def nearest_kontext_size(w: int, h: int, use_halved: bool = True) -> tuple[int, int]:
+def nearest_kontext_size(w: int, h: int, use_extended: bool = True) -> tuple[int, int]:
     # Choose resolution list based on downscale setting
-    if use_halved:
+    if use_extended:
         resolution_list = EXTENDED_KONTEXT_RESOLUTIONS
-        logger.info(f"Using extended resolutions (including halved) for {w}x{h} image")
+        logger.info(f"Using extended resolutions (including 2/3) for {w}x{h} image")
     else:
         resolution_list = PREFERRED_KONTEXT_RESOLUTIONS
-        logger.info(f"Using original resolutions (no halved) for {w}x{h} image")
+        logger.info(f"Using original resolutions (no 2/3) for {w}x{h} image")
     
     # Prefer candidates that do not exceed the current image size (avoid upscaling when possible)
     candidates = [
@@ -91,16 +91,16 @@ def letterbox_to(
 def kontext_preprocess(
     image_pil: Image.Image, downscale: bool = True
 ) -> tuple[Image.Image, int, int]:
-    # If downscale is enabled and input image exceeds 512x512 in either dimension, downscale by half first
+    # If downscale is enabled and input image exceeds 512x512 in either dimension, downscale by 2/3 first
     src_w, src_h = image_pil.width, image_pil.height
     logger.info(f"kontext_preprocess called with downscale={downscale}, image size={src_w}x{src_h}")
     if downscale and (src_w > 512 or src_h > 512):
-        logger.info(f"Downscaling image from {src_w}x{src_h} to {src_w//2}x{src_h//2}")
-        down_w, down_h = max(1, src_w // 2), max(1, src_h // 2)
+        logger.info(f"Downscaling image from {src_w}x{src_h} to {int(src_w * 2 // 3)}x{int(src_h * 2 // 3)}")
+        down_w, down_h = max(1, int(src_w * 2 // 3)), max(1, int(src_h * 2 // 3))
         image_pil = image_pil.resize((down_w, down_h), Image.Resampling.LANCZOS)
     elif not downscale:
         logger.info(f"Downscaling disabled, keeping original image size {src_w}x{src_h}")
 
-    tgt_w, tgt_h = nearest_kontext_size(image_pil.width, image_pil.height, use_halved=downscale)
+    tgt_w, tgt_h = nearest_kontext_size(image_pil.width, image_pil.height, use_extended=downscale)
     processed = letterbox_to(image_pil, (tgt_w, tgt_h), bg=(255, 255, 255))
     return processed, tgt_w, tgt_h
