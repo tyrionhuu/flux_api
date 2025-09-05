@@ -15,7 +15,7 @@ import loguru
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
-from rembg import remove
+from utils.birefnet_remover import remove_background_birefnet
 
 from api.models import GenerateRequest
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_LORA_NAME,
@@ -47,46 +47,24 @@ def handle_api_error(
 router = APIRouter()
 
 
-def _removal_params_from_strength(strength: Optional[float]) -> dict:
+def _get_bg_removal_strength(strength: Optional[float]) -> Optional[float]:
+    """
+    Get background removal strength parameter
+    BiRefNet current version doesn't support strength adjustment, but keeps API compatibility
+    
+    Args:
+        strength: Background removal strength (0.0-1.0)
+        
+    Returns:
+        Processed strength value, currently returns original value
+    """
+    if strength is None:
+        return None
     try:
-        if strength is None:
-            # Gentler default
-            return {
-                "alpha_matting": False,
-                "alpha_matting_foreground_threshold": 210,
-                "alpha_matting_background_threshold": 60,
-                "alpha_matting_erode_size": 0,
-                "post_process_mask": False,
-                "putalpha": True,
-            }
-        s = max(0.0, min(1.0, float(strength)))
-        if s <= 0.2:
-            # Very gentle: raw mask with alpha, no erosion
-            return {
-                "alpha_matting": False,
-                "alpha_matting_foreground_threshold": 190,
-                "alpha_matting_background_threshold": 90,
-                "alpha_matting_erode_size": 0,
-                "post_process_mask": False,
-                "putalpha": True,
-            }
-        # Progressive mapping
-        return {
-            "alpha_matting": True,
-            "alpha_matting_foreground_threshold": int(200 + 40 * s),
-            "alpha_matting_background_threshold": int(90 * (1.0 - s)),
-            "alpha_matting_erode_size": int(0 + 6 * s),
-            "post_process_mask": (s >= 0.5),
-        }
-    except Exception:
-        return {
-            "alpha_matting": False,
-            "alpha_matting_foreground_threshold": 210,
-            "alpha_matting_background_threshold": 60,
-            "alpha_matting_erode_size": 0,
-            "post_process_mask": False,
-            "putalpha": True,
-        }
+        # Ensure strength value is within valid range
+        return max(0.0, min(1.0, float(strength)))
+    except (ValueError, TypeError):
+        return None
 
 
 _model_manager_instance = None
@@ -857,8 +835,8 @@ async def generate_with_image_and_return(
                 )
                 with open(tmp_path, "wb") as f:
                     f.write(out_bytes)
-                with Image.open(tmp_path).convert("RGBA") as im:
-                    out_im = remove(im, **_removal_params_from_strength(bg_strength))
+                with Image.open(tmp_path).convert("RGB") as im:
+                    out_im = remove_background_birefnet(im, bg_strength)
                 new_rel = save_image_with_unique_name(out_im)
                 new_abs = Path(base_dir) / new_rel
                 with open(new_abs, "rb") as f:
@@ -1082,8 +1060,8 @@ async def generate_with_image(
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 abs_image_path = Path(base_dir) / image_filename
 
-                with Image.open(abs_image_path).convert("RGBA") as im:
-                    out_im = remove(im, **_removal_params_from_strength(bg_strength))
+                with Image.open(abs_image_path).convert("RGB") as im:
+                    out_im = remove_background_birefnet(im, bg_strength)
 
                 # Save the processed image with a new name
                 new_rel = save_image_with_unique_name(out_im)
@@ -1599,18 +1577,30 @@ async def upload_image(file: UploadFile = File(...)):
 def _apply_background_removal_to_saved(
     download_url: str, bg_strength: Optional[float] = None
 ) -> str:
-    """Open saved generated image by download_url, apply rembg.remove, save as new unique file, return new download_url. Leaves original file on disk; caller may clean up later.
-
-    bg_strength: optional float 0..1 mapped to remove parameters.
+    """
+    Apply BiRefNet background removal to saved image
+    
+    Args:
+        download_url: Image download URL
+        bg_strength: Background removal strength (0.0-1.0), currently unused
+        
+    Returns:
+        Processed image download URL
     """
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         filename = download_url.split("/")[-1]
         abs_path = Path(base_dir) / "generated_images" / filename
-        with Image.open(abs_path).convert("RGBA") as im:
-            output_im = remove(im, **_removal_params_from_strength(bg_strength))
+        
+        # Open image and convert to RGB format (BiRefNet requires RGB input)
+        with Image.open(abs_path).convert("RGB") as im:
+            # Use BiRefNet for background removal
+            output_im = remove_background_birefnet(im, bg_strength)
+        
+        # Save processed image
         new_rel = save_image_with_unique_name(output_im)  # saves into generated_images
         return f"/generated_images/{Path(new_rel).name}"
+        
     except Exception as e:
-        logger.error(f"Background removal post-process failed: {e}")
+        logger.error(f"BiRefNet background removal processing failed: {e}")
         return download_url

@@ -134,7 +134,11 @@ PyYAML==6.0.2
 questionary==2.1.0
 referencing==0.36.2
 regex==2025.7.34
-rembg==2.0.67
+# rembg==2.0.67  # 已替换为BiRefNet
+# BiRefNet依赖 (已包含在现有依赖中):
+# transformers==4.55.4  # 已存在
+# torch==2.8.0  # 已存在
+# torchvision==0.23.0  # 已存在
 requests==2.32.5
 rich==14.1.0
 rpds-py==0.27.0
