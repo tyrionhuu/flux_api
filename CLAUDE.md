@@ -1,139 +1,87 @@
 # CLAUDE.md
 
+RULE: ALWAYS CODE IN LINUS TORVALDS STYLE
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Architecture Overview
 
-FLUX API is a dual-model AI image generation service using FastAPI, featuring both FP4 (quantized) and BF16 (full-precision) FLUX models with LoRA support. The project provides RESTful APIs and a modern web interface for image generation.
+This is the Sekai API - a multi-GPU FLUX image generation service running 8 instances across 8 GPUs with nginx load balancing.
 
-## Common Development Commands
+The service uses:
+- **Nunchaku FLUX model** (nunchaku-tech/nunchaku-flux.1-dev) with FP4 quantization
+- **LoRA support** with automatic merging for multiple LoRA layers (max 3)
+- **Queue management** for concurrent request handling (max 2 concurrent, queue size 100)
+- **JPEG output** with 65% quality compression
 
-### Starting Services
+### Planned Features (see docs/Sekai_API_Update_Plan.md)
+- NSFW content detection using Falconsai/nsfw_image_detection model
+- S3 upload with pre-signed URLs (direct PUT to provided URLs)
+- Enhanced /generate endpoint with response_format, upscale, and enable_nsfw_check parameters
+
+## Key Commands
+
 ```bash
-# Start FP4 service (Port 8000, ~8GB VRAM)
-./start_fp4_api.sh
+# Start multi-GPU service (8 GPUs with load balancing)
+./start_multi_gpu.sh -m fp4_sekai
 
-# Start BF16 service (Port 8001, ~16GB VRAM)  
-./start_bf16_api.sh
+# Monitor running services
+./monitor_multi_gpu.sh
 
-# Start with specific GPU(s)
-./start_fp4_api.sh -g 0      # Use GPU 0
-./start_bf16_api.sh -g 1,2   # Use GPUs 1 and 2
+# Run pressure testing at 2 RPS
+./run_pressure_test.sh 2
 
-# Start frontend (Port 9000)
-cd frontend && python -m http.server 9000
-```
+# Start single instance for development
+python main_fp4_sekai.py  # Runs on port 8000
 
-### Code Quality Tools
-```bash
-# Format code with black
-black .
-
-# Run linter
-ruff check .
-ruff check --fix .  # Auto-fix issues
-```
-
-### Log Management
-```bash
-# Check log status
-./scripts/manage_logs.sh status
-
-# Clean large logs
-./scripts/manage_logs.sh clean
-
-# Follow logs in real-time
-./scripts/manage_logs.sh follow
-```
-
-### Service Management
-```bash
-# Install cleanup service
-sudo ./scripts/manage_services.sh install flux-cleanup
-
-# Check service status
-./scripts/manage_services.sh status flux-cleanup
+# Check GPU status and memory
+nvidia-smi
 
 # View service logs
-./scripts/manage_services.sh logs flux-cleanup
+tail -f logs/flux_api_fp4.log
+tail -f logs/multi_gpu/gpu_*.log
 ```
 
-## High-Level Architecture
+## Project Structure
 
-### Microservice Architecture
-The system consists of two independent FastAPI services that can run on different GPUs:
+- **api/sekai_routes.py**: Main API endpoints for Sekai service including /generate endpoint
+- **models/fp4_flux_model.py**: FLUX model manager with LoRA support and GPU management
+- **config/sekai_settings.py**: Configuration for Sekai deployment (ports, LoRA paths, image settings)
+- **utils/**: GPU manager, image utilities, queue management, cleanup service
+- **start_multi_gpu.sh**: Deployment script for multi-GPU setup with nginx load balancing
 
-1. **FP4 Service** (`main_fp4.py:` Port 8000)
-   - Quantized FLUX.1-schnell model using nunchaku library
-   - Optimized for lower VRAM (~8GB)
-   - LoRA merging for multiple LoRA support
-   - Model manager: `models/fp4_flux_model.py`
+## Development Notes
 
-2. **BF16 Service** (`main_bf16.py:` Port 8001)
-   - Full-precision FLUX.1-schnell model
-   - Higher quality output (~16GB VRAM)
-   - Native multi-LoRA support via diffusers
-   - Model manager: `models/bf16_flux_model.py`
+### Sekai API Current Implementation
+- Binary image output (JPEG format, 65% quality)
+- Default LoRAs at /home/pingzhi/checkpoints/
+- Multi-GPU deployment across 8 GPUs
+- Load balancing via nginx on port 8080
 
-### Request Processing Flow
-1. **API Routes** (`api/fp4_routes.py`, `api/bf16_routes.py`)
-   - Handle HTTP requests with Pydantic validation
-   - Manage LoRA file uploads to `uploads/lora_files/`
-   - Queue requests via `QueueManager`
+### Upcoming API Changes (per docs/Sekai_API_Update_Plan.md)
+- NSFW detection with 5-second timeout (failure/timeout returns nsfw:true)
+- S3 upload using pre-signed URLs (PUT request directly to provided URL)
+- Response format will include s3_url and nsfw_score
+- New parameters: response_format, upscale, s3_prefix, enable_nsfw_check
 
-2. **Queue Management** (`utils/queue_manager.py`)
-   - FIFO request processing
-   - Prevents GPU memory overflow
-   - Configurable queue size per service
+### GPU and Thread Management
+- Each instance auto-configures PyTorch threads based on NUM_GPU_INSTANCES environment variable
+- Uses CUDA_VISIBLE_DEVICES to isolate GPU per instance
+- Thread limits prevent oversubscription: threads_per_instance = max(1, num_cores // num_gpu_instances)
 
-3. **GPU Management** (`utils/gpu_manager.py`)
-   - Automatic GPU detection and allocation
-   - VRAM monitoring and load balancing
-   - CUDA_VISIBLE_DEVICES environment handling
+### LoRA Configuration
+Default LoRAs are configured in config/sekai_settings.py:
+- lora_1_weight_1.safetensors (weight: 1.0)
+- lora_2_weight_0_7.safetensors (weight: 0.7)  
+- lora_3_weight_0_5.safetensors (weight: 0.5)
 
-4. **Model Managers** 
-   - Lazy model loading for memory efficiency
-   - LoRA weight application and management
-   - Image generation with seed control
+### Testing
+Use run_pressure_test.sh for load testing - sends requests at controlled RPS to nginx load balancer on port 8080.
 
-5. **Cleanup Service** (`utils/cleanup_service.py`)
-   - Automatic temporary file cleanup
-   - Configurable retention periods
-   - Runs as systemd service or thread
+### Important File Paths
+- Generated images: /data/pingzhi/generated_images/
+- LoRA checkpoints: /home/pingzhi/checkpoints/
+- Uploaded LoRAs: uploads/lora_files/
 
-### Frontend Architecture
-- **Single-page application** (`frontend/templates/index.html`)
-- **ComfyUI-style interface** with vanilla JavaScript
-- **Direct API integration** with both model endpoints
-- **LoRA file upload** with drag-and-drop support
-
-### Configuration System
-- **Port configuration** via environment variables or CLI flags
-- **Service-specific settings** in `config/` directory
-- **Dynamic port allocation** in startup scripts
-- **GPU assignment** through startup script flags
-
-## Key Design Patterns
-
-1. **Service Isolation**: Each model runs as independent service with own port, queue, and GPU allocation
-2. **Lazy Loading**: Models loaded only when first request arrives to save memory
-3. **Resource Management**: Automatic cleanup, queue limits, and GPU monitoring
-4. **Graceful Degradation**: Services continue if cleanup fails, ports auto-freed on startup
-5. **Configuration Over Code**: Environment variables and CLI flags for all settings
-
-## Development Workflow
-
-When implementing new features:
-1. Check existing patterns in similar files (e.g., routes, models)
-2. Maintain separation between FP4 and BF16 implementations
-3. Use the established logging pattern with named loggers
-4. Follow the existing error handling with proper HTTP status codes
-5. Test with both model services if feature affects core functionality
-
-## Important Considerations
-
-- **No test suite**: Manual testing via API calls required
-- **GPU-dependent**: Features must handle CUDA availability gracefully  
-- **Memory constraints**: Monitor VRAM usage, especially for BF16 model
-- **Port conflicts**: Startup scripts handle port cleanup automatically
-- **File permissions**: Ensure write access to `uploads/`, `generated_images/`, `logs/`
+### Current Branch
+Working on prod/sekai branch (main branch is master).

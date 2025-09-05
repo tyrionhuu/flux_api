@@ -356,6 +356,10 @@ async def generate_image(request: GenerateRequest):
             request.upscale or False,
             request.upscale_factor or 2,
             request.response_format or "binary",
+            request.s3_prefix,
+            request.enable_nsfw_check if request.enable_nsfw_check is not None else True,
+            request.num_inference_steps or 15,
+            request.negative_prompt,
         )
 
         # Trigger cleanup after successful image generation
@@ -554,6 +558,7 @@ async def submit_generation_request(request: GenerateRequest):
             width=request.width or 512,
             height=request.height or 512,
             seed=request.seed,
+            negative_prompt=request.negative_prompt,
         )
 
         return {
@@ -594,6 +599,7 @@ async def get_request_status(request_id: str):
             "width": request.width,
             "height": request.height,
             "seed": request.seed,
+            "negative_prompt": request.negative_prompt,
         }
 
     except HTTPException:
@@ -649,6 +655,10 @@ def generate_image_internal(
     upscale: bool = False,
     upscale_factor: int = 2,
     response_format: str = "binary",
+    s3_prefix: Optional[str] = None,
+    enable_nsfw_check: bool = True,
+    num_inference_steps: int = 15,
+    negative_prompt: Optional[str] = None,
 ):
     """Internal function to generate images - used by both endpoints"""
     # Append "Use GHIBLISTYLE" to the start of the user prompt
@@ -699,12 +709,12 @@ def generate_image_internal(
         # Generate the image
         result = model_manager.generate_image(
             enhanced_prompt,
-            20,  # Fixed num_inference_steps
+            num_inference_steps,  # Use the parameter value
             4.0,  # Fixed guidance_scale
             width,
             height,
             seed,
-            None,  # No negative prompt
+            negative_prompt,  # Pass negative prompt
         )
 
         image = extract_image_from_result(result)
@@ -724,6 +734,11 @@ def generate_image_internal(
                     save_as_jpeg=SAVE_AS_JPEG, jpeg_quality=JPEG_QUALITY
                 )
             )
+            # Update image reference to upscaled version if available
+            if upscale and upscaled_image_path:
+                # Load the upscaled image for NSFW check and S3 upload
+                from PIL import Image as PILImage
+                image = PILImage.open(upscaled_image_path)
         except Exception as upscale_error:
             logger.error(f"Upscaling failed with error: {upscale_error}")
             # Fall back to saving original image without upscaling
@@ -732,6 +747,88 @@ def generate_image_internal(
             final_height = height
             upscaled_image_path = None
             logger.info(f"Falling back to original image: {image_filename}")
+        
+        # NSFW Detection (only for scoring, not blocking)
+        nsfw_score = 0.0
+        if enable_nsfw_check:
+            try:
+                from utils.nsfw_detector import check_image_nsfw
+                logger.info("Running NSFW detection...")
+                nsfw_score = check_image_nsfw(image, timeout=5.0)
+                logger.info(f"NSFW check complete: score={nsfw_score:.3f}")
+                        
+            except Exception as nsfw_error:
+                logger.error(f"NSFW detection error: {nsfw_error}")
+                # On error, set score to 1.0 but continue processing
+                nsfw_score = 1.0
+                logger.warning(f"NSFW detection failed, setting score to 1.0 and continuing")
+        
+        # S3 Upload for response_format="s3"
+        if response_format == "s3":
+            if not s3_prefix:
+                raise HTTPException(
+                    status_code=400,
+                    detail="s3_prefix is required when response_format='s3'"
+                )
+            
+            try:
+                from utils.s3_uploader import upload_to_s3
+                logger.info(f"Uploading to S3 with presigned URL...")
+                
+                # Calculate image hash first
+                import hashlib
+                import io
+                from PIL import Image as PILImage
+                img_buffer = io.BytesIO()
+                if image.mode in ('RGBA', 'LA', 'P'):
+                    rgb_image = PILImage.new('RGB', image.size, (255, 255, 255))
+                    rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+                    image_to_hash = rgb_image
+                else:
+                    image_to_hash = image
+                image_to_hash.save(img_buffer, format='JPEG', quality=JPEG_QUALITY)
+                image_hash = hashlib.md5(img_buffer.getvalue()).hexdigest()
+                
+                # Upload with the image hash to replace placeholder filename
+                success, error, s3_url, http_status = upload_to_s3(
+                    image,
+                    s3_prefix,
+                    jpeg_quality=JPEG_QUALITY,
+                    image_hash=image_hash
+                )
+                
+                if not success:
+                    logger.error(f"S3 upload failed: {error}, HTTP status: {http_status}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"S3 upload failed: {error}"
+                    )
+                
+                logger.info(f"S3 upload successful, HTTP status: {http_status}")
+                
+                # Return S3 format response
+                response_json = {
+                    "data": {
+                        "s3_url": s3_url,
+                        "nsfw_score": nsfw_score,
+                        "image_hash": image_hash,
+                        "s3_upload_status": http_status
+                    }
+                }
+                
+                # Log the final response JSON
+                logger.info(f"API Response: {response_json}")
+                
+                return response_json
+                
+            except HTTPException:
+                raise  # Re-raise HTTP exceptions
+            except Exception as s3_error:
+                logger.error(f"S3 upload error: {s3_error}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"S3 upload failed: {str(s3_error)}"
+                )
 
         # Get system information
         vram_usage = model_manager.gpu_manager.get_vram_usage()
@@ -758,7 +855,7 @@ def generate_image_internal(
                 headers={"Content-Disposition": f"inline; filename={filename}"}
             )
 
-        return {
+        response_json = {
             "message": f"Generated {model_type_name} image for prompt: {enhanced_prompt}",
             "image_url": image_filename,
             "download_url": download_url,
@@ -770,6 +867,11 @@ def generate_image_internal(
             "height": final_height,
             "seed": seed,
         }
+        
+        # Log the final response JSON
+        logger.info(f"API Response: {response_json}")
+        
+        return response_json
 
     except Exception as e:
         logger.error(
@@ -884,7 +986,8 @@ async def upload_image_and_generate(
     upscale_factor: int = Form(2),
     image_strength: float = Form(0.8),
     image_guidance_scale: float = Form(1.5),
-    uploaded_image_path: Optional[str] = Form(None)
+    uploaded_image_path: Optional[str] = Form(None),
+    negative_prompt: Optional[str] = Form(None)
 ):
     """Generate image using uploaded image (file or previously uploaded path) and prompt with optional LoRA support"""
     try:
@@ -1004,6 +1107,7 @@ async def upload_image_and_generate(
                 width=width,
                 height=height,
                 seed=seed,
+                negative_prompt=negative_prompt,
             )
 
             generation_time = time.time() - generation_start_time

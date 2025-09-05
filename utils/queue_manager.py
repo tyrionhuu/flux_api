@@ -44,6 +44,7 @@ class QueueRequest:
     width: int = 512
     height: int = 512
     seed: Optional[int] = None
+    negative_prompt: Optional[str] = None
 
 
 class QueueManager:
@@ -96,6 +97,7 @@ class QueueManager:
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,
+        negative_prompt: Optional[str] = None,
     ) -> str:
         """Submit a new request to the queue"""
         if self.queue.qsize() >= self.max_queue_size:
@@ -116,6 +118,7 @@ class QueueManager:
             width=width,
             height=height,
             seed=seed,
+            negative_prompt=negative_prompt,
         )
 
         await self.queue.put((priority, request))

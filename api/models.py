@@ -52,7 +52,20 @@ class GenerateRequest(BaseModel):
         2, ge=2, le=4, description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
     )
     response_format: Optional[str] = Field(
-        "json", description="Response format: 'json' for JSON response, 'binary' for raw image"
+        "json", description="Response format: 'json' for JSON response, 'binary' for raw image, 's3' for S3 upload"
+    )
+    # New fields for Sekai API requirements
+    s3_prefix: Optional[str] = Field(
+        None, description="Pre-signed S3 URL for direct PUT upload (required when response_format='s3')"
+    )
+    enable_nsfw_check: Optional[bool] = Field(
+        True, description="Enable NSFW content detection (default: true)"
+    )
+    num_inference_steps: Optional[int] = Field(
+        15, ge=1, le=50, description="Number of inference steps (1-50, default: 15)"
+    )
+    negative_prompt: Optional[str] = Field(
+        None, description="Negative prompt to exclude unwanted elements from image generation"
     )
 
 
@@ -100,6 +113,9 @@ class ImageUploadGenerateRequest(BaseModel):
     )
     image_guidance_scale: Optional[float] = Field(
         1.5, ge=1.0, le=20.0, description="Guidance scale for image conditioning (1.0 to 20.0)"
+    )
+    negative_prompt: Optional[str] = Field(
+        None, description="Negative prompt to exclude unwanted elements from image generation"
     )
 
 

@@ -31,7 +31,7 @@ PLACEHOLDER_COLORS = {
 
 # Image Output Format Configuration
 SAVE_AS_JPEG = True  # Save as JPEG for sekai
-JPEG_QUALITY = 70    # 70% JPEG compression quality
+JPEG_QUALITY = 65    # 70% JPEG compression quality
 
 # API Configuration
 API_TITLE = "FLUX API"

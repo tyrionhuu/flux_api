@@ -44,7 +44,7 @@ logger.info(f"PyTorch threads per instance: {torch.get_num_threads()}")
 logger.info(f"PyTorch inter-op threads: {torch.get_num_interop_threads()}")
 
 # Configure specific loggers for better error visibility
-logging.getLogger("api.fp4_routes").setLevel(logging.INFO)
+logging.getLogger("api.sekai_routes").setLevel(logging.INFO)
 logging.getLogger("models.fp4_flux_model").setLevel(logging.INFO)
 logging.getLogger("utils.cleanup_service").setLevel(logging.INFO)
 
