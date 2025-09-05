@@ -193,7 +193,7 @@ def start_service():
             pids = result.stdout.strip().split("\n")
             for pid in pids:
                 if pid.strip():
-                    try:e p
+                    try:
                         subprocess.run(["kill", "-9", pid.strip()], timeout=5)
                         print(f"   ✅ Killed process {pid.strip()}")
                     except Exception:
