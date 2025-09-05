@@ -55,3 +55,8 @@ LORA_3_NAME = f"{LORA_DIR}/lora_3_weight_0_5.safetensors"
 LORA_3_WEIGHT = 0.5
 MIN_LORA_WEIGHT = 0.0
 MAX_LORA_WEIGHT = 2.0
+
+# Request Queue Configuration
+MAX_CONCURRENT_REQUESTS = int(os.environ.get("MAX_CONCURRENT_REQUESTS", "1"))  # Process 1 request at a time per instance
+MAX_QUEUE_SIZE = int(os.environ.get("MAX_QUEUE_SIZE", "100"))  # Maximum requests to queue
+REQUEST_TIMEOUT = float(os.environ.get("REQUEST_TIMEOUT", "600.0"))  # Timeout in seconds (10 minutes)

@@ -2,6 +2,7 @@
 API routes for the FLUX API
 """
 
+import asyncio
 import logging
 import time
 from typing import Optional
@@ -11,6 +12,7 @@ from models.fp4_flux_model import FluxModelManager
 from utils.image_utils import extract_image_from_result, save_image_with_unique_name
 from utils.system_utils import get_system_memory
 from utils.queue_manager import QueueManager
+from utils.request_queue import RequestQueueManager
 from config.sekai_settings import (
     STATIC_IMAGES_DIR,
     LORA_1_NAME,
@@ -21,6 +23,9 @@ from config.sekai_settings import (
     LORA_3_WEIGHT,
     SAVE_AS_JPEG,
     JPEG_QUALITY,
+    MAX_CONCURRENT_REQUESTS,
+    MAX_QUEUE_SIZE,
+    REQUEST_TIMEOUT,
 )
 from api.models import GenerateRequest
 
@@ -55,8 +60,15 @@ def get_model_manager():
 
 model_manager = get_model_manager()
 
-# Global queue manager instance
+# Global queue manager instance (for the old queue endpoints - not used in main /generate)
 queue_manager = QueueManager(max_concurrent=2, max_queue_size=100)
+
+# Global request queue manager for synchronous processing with async queuing
+request_queue_manager = RequestQueueManager(
+    max_concurrent=MAX_CONCURRENT_REQUESTS,
+    max_queue_size=MAX_QUEUE_SIZE,
+    request_timeout=REQUEST_TIMEOUT
+)
 
 
 @router.get("/debug-version")
@@ -129,69 +141,69 @@ def download_image(filename: str):
     )
 
 
-@router.post("/generate")
-async def generate_image(request: GenerateRequest):
-    """Generate image using FLUX model with optional LoRA support - supports multiple LoRAs"""
-    try:
-        # Validate request parameters
-        if not request.prompt or request.prompt.strip() == "":
-            raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+def generate_image_sync(request: GenerateRequest):
+    """Synchronous image generation function for use with the queue"""
+    # This function contains the actual generation logic
+    # It will be called by the queue manager in a thread pool
+    # Validate request parameters
+    if not request.prompt or request.prompt.strip() == "":
+        raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
-        # Handle multiple LoRA support
-        loras_to_apply = []
-        remove_all_loras = False
+    # Handle multiple LoRA support
+    loras_to_apply = []
+    remove_all_loras = False
 
-        # Check for new multiple LoRA format first
-        if request.loras is not None:
-            if len(request.loras) == 0:
-                # Explicitly requested to use NO LoRA
-                remove_all_loras = True
-            else:
-                for lora_config in request.loras:
-                    if not lora_config.name or not lora_config.name.strip():
-                        raise HTTPException(
-                            status_code=400, detail="LoRA name cannot be empty"
-                        )
-                    if lora_config.weight < 0 or lora_config.weight > 2.0:
-                        raise HTTPException(
-                            status_code=400,
-                            detail="LoRA weight must be between 0 and 2.0",
-                        )
-                    loras_to_apply.append(
-                        {"name": lora_config.name.strip(), "weight": lora_config.weight}
+    # Check for new multiple LoRA format first
+    if request.loras is not None:
+        if len(request.loras) == 0:
+            # Explicitly requested to use NO LoRA
+            remove_all_loras = True
+        else:
+            for lora_config in request.loras:
+                if not lora_config.name or not lora_config.name.strip():
+                    raise HTTPException(
+                        status_code=400, detail="LoRA name cannot be empty"
                     )
-        # Legacy support for single LoRA
-        elif request.lora_name:
-            if not request.lora_name.strip():
-                raise HTTPException(
-                    status_code=400, detail="LoRA name cannot be empty if provided"
+                if lora_config.weight < 0 or lora_config.weight > 2.0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="LoRA weight must be between 0 and 2.0",
+                    )
+                loras_to_apply.append(
+                    {"name": lora_config.name.strip(), "weight": lora_config.weight}
                 )
-            if (
-                request.lora_weight is None
-                or request.lora_weight < 0
-                or request.lora_weight > 2.0
-            ):
-                raise HTTPException(
-                    status_code=400, detail="LoRA weight must be between 0 and 2.0"
-                )
-            loras_to_apply.append(
-                {"name": request.lora_name.strip(), "weight": request.lora_weight}
+    # Legacy support for single LoRA
+    elif request.lora_name:
+        if not request.lora_name.strip():
+            raise HTTPException(
+                status_code=400, detail="LoRA name cannot be empty if provided"
             )
-
-        # Apply default LoRA only when client did not send loras at all (None) and no legacy fields
         if (
-            not loras_to_apply
-            and not remove_all_loras
-            and request.loras is None
-            and not request.lora_name
+            request.lora_weight is None
+            or request.lora_weight < 0
+            or request.lora_weight > 2.0
         ):
-            loras_to_apply = DEFAULT_LORA_LIST
+            raise HTTPException(
+                status_code=400, detail="LoRA weight must be between 0 and 2.0"
+            )
+        loras_to_apply.append(
+            {"name": request.lora_name.strip(), "weight": request.lora_weight}
+        )
 
-        # Clean up input
-        prompt = request.prompt.strip()
+    # Apply default LoRA only when client did not send loras at all (None) and no legacy fields
+    if (
+        not loras_to_apply
+        and not remove_all_loras
+        and request.loras is None
+        and not request.lora_name
+    ):
+        loras_to_apply = DEFAULT_LORA_LIST
 
-        # First, ensure the model is loaded with thread safety and force check
-        with _model_manager_lock:
+    # Clean up input
+    prompt = request.prompt.strip()
+
+    # First, ensure the model is loaded with thread safety and force check
+    with _model_manager_lock:
             # Force a more thorough check - sometimes the state gets inconsistent
             model_actually_loaded = (
                 model_manager.is_loaded()
@@ -216,13 +228,13 @@ async def generate_image(request: GenerateRequest):
                 else:
                     logger.info("Model was loaded by another thread while waiting")
 
-        # Now check if LoRAs are already applied
-        current_lora = model_manager.get_lora_info()
-        lora_applied = None
-        lora_weight_applied = None
+    # Now check if LoRAs are already applied
+    current_lora = model_manager.get_lora_info()
+    lora_applied = None
+    lora_weight_applied = None
 
-        # Check if current LoRAs match what we want to apply
-        def loras_match(current, desired):
+    # Check if current LoRAs match what we want to apply
+    def loras_match(current, desired):
             """Check if current LoRAs match desired LoRAs"""
             if not current or not desired:
                 return False
@@ -258,11 +270,11 @@ async def generate_image(request: GenerateRequest):
                     current.get("name") == desired[0]["name"] 
                     and abs(current.get("weight", 0) - desired[0]["weight"]) < 0.001
                 )
-        
-        # Only apply LoRAs if they don't match current state
-        should_apply_loras = loras_to_apply and not loras_match(current_lora, loras_to_apply)
-        
-        if should_apply_loras:
+    
+    # Only apply LoRAs if they don't match current state
+    should_apply_loras = loras_to_apply and not loras_match(current_lora, loras_to_apply)
+    
+    if should_apply_loras:
             # Apply multiple LoRAs simultaneously
             logger.info(f"Applying {len(loras_to_apply)} LoRAs to loaded model")
             try:
@@ -325,54 +337,98 @@ async def generate_image(request: GenerateRequest):
                         status_code=500,
                         detail=f"Failed to apply LoRAs: {str(lora_error)}",
                     )
-        elif loras_to_apply and not should_apply_loras:
-            # LoRAs already match what we want - no need to reapply
-            logger.info(f"LoRAs already applied and match desired state, skipping re-application")
-            if current_lora:
-                lora_applied = current_lora.get("name")
-                lora_weight_applied = current_lora.get("weight")
-        elif remove_all_loras:
-            # Explicit removal requested
-            if model_manager.get_lora_info():
-                logger.info("Removing all LoRAs as requested by client (empty list)")
-                model_manager.remove_lora()
-                current_lora = None
-                lora_applied = None
-                lora_weight_applied = None
-        else:
-            # No-op
-            if current_lora:
-                lora_applied = current_lora.get("name")
-                lora_weight_applied = current_lora.get("weight")
+    elif loras_to_apply and not should_apply_loras:
+        # LoRAs already match what we want - no need to reapply
+        logger.info(f"LoRAs already applied and match desired state, skipping re-application")
+        if current_lora:
+            lora_applied = current_lora.get("name")
+            lora_weight_applied = current_lora.get("weight")
+    elif remove_all_loras:
+        # Explicit removal requested
+        if model_manager.get_lora_info():
+            logger.info("Removing all LoRAs as requested by client (empty list)")
+            model_manager.remove_lora()
+            current_lora = None
+            lora_applied = None
+            lora_weight_applied = None
+    else:
+        # No-op
+        if current_lora:
+            lora_applied = current_lora.get("name")
+            lora_weight_applied = current_lora.get("weight")
 
-        result = generate_image_internal(
-            prompt,
-            "FLUX",
-            lora_applied,
-            lora_weight_applied,
-            request.width or 512,
-            request.height or 512,
-            request.seed,
-            request.upscale or False,
-            request.upscale_factor or 2,
-            request.response_format or "binary",
-            request.s3_prefix,
-            request.enable_nsfw_check if request.enable_nsfw_check is not None else True,
-            request.num_inference_steps or 15,
-            request.negative_prompt,
+    result = generate_image_internal(
+        prompt,
+        "FLUX",
+        lora_applied,
+        lora_weight_applied,
+        request.width or 512,
+        request.height or 512,
+        request.seed,
+        request.upscale or False,
+        request.upscale_factor or 2,
+        request.response_format or "binary",
+        request.s3_prefix,
+        request.enable_nsfw_check if request.enable_nsfw_check is not None else True,
+        request.num_inference_steps or 15,
+        request.negative_prompt,
+    )
+
+    # Trigger cleanup after successful image generation
+    try:
+        from utils.cleanup_service import cleanup_after_generation
+
+        cleanup_after_generation()
+    except Exception as cleanup_error:
+        logger.warning(
+            f"Failed to trigger cleanup after generation: {cleanup_error}"
         )
 
-        # Trigger cleanup after successful image generation
+    return result
+
+
+@router.post("/generate")
+async def generate_image(request: GenerateRequest):
+    """Generate image using FLUX model with optional LoRA support - with request queuing"""
+    try:
+        # Use the request queue manager to handle queuing
+        logger.info(f"Received generation request for prompt: {request.prompt[:50]}...")
+        
+        # Check queue status before processing
+        queue_stats = request_queue_manager.get_queue_stats()
+        logger.info(
+            f"Queue status - Active: {queue_stats['active_requests']}, "
+            f"Queued: {queue_stats['queued_requests']}"
+        )
+        
+        # Process the request through the queue
         try:
-            from utils.cleanup_service import cleanup_after_generation
-
-            cleanup_after_generation()
-        except Exception as cleanup_error:
-            logger.warning(
-                f"Failed to trigger cleanup after generation: {cleanup_error}"
+            result = await request_queue_manager.process_request(
+                generate_image_sync,
+                request
             )
-
-        return result
+            return result
+        except asyncio.QueueFull:
+            logger.warning("Request queue is full")
+            raise HTTPException(
+                status_code=503,
+                detail="Service temporarily unavailable. Queue is full. Please try again later.",
+                headers={
+                    "Retry-After": "30",  # Suggest retry after 30 seconds
+                    "X-Queue-Full": "true",
+                    "X-Max-Queue-Size": str(queue_stats['max_queue_size'])
+                }
+            )
+        except asyncio.TimeoutError:
+            logger.error("Request timed out while waiting in queue")
+            raise HTTPException(
+                status_code=504,
+                detail="Request timed out while waiting in queue. Please try again.",
+                headers={"X-Timeout": "true"}
+            )
+            
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error(f"Request processing failed: {e} (Type: {type(e).__name__})")
         raise HTTPException(
@@ -641,6 +697,22 @@ async def get_queue_stats():
         logger.error(f"Failed to get queue stats: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get queue stats: {str(e)}"
+        )
+
+
+@router.get("/request-queue-stats")
+async def get_request_queue_stats():
+    """Get current request queue statistics for the main /generate endpoint"""
+    try:
+        stats = request_queue_manager.get_queue_stats()
+        return {
+            "queue_stats": stats,
+            "status": "healthy" if stats["active_requests"] < MAX_CONCURRENT_REQUESTS or stats["queued_requests"] < MAX_QUEUE_SIZE else "busy"
+        }
+    except Exception as e:
+        logger.error(f"Failed to get request queue stats: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get request queue stats: {str(e)}"
         )
 
 
