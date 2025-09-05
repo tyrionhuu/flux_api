@@ -225,7 +225,7 @@ class FluxAPI {
         if (applyLoraBtn) {
             applyLoraBtn.addEventListener('click', () => {
                 console.log('Apply LoRA button clicked!');
-                this.showApiCommand();
+                this.applyLorasToModel();
             });
         } else {
             console.error('Apply LoRA button not found!');
@@ -538,8 +538,12 @@ class FluxAPI {
     // 渲染已应用的LoRA列表
     renderAppliedLoras() {
         const container = this.getElement('applied-lora-list');
-        if (!container) return;
+        if (!container) {
+            console.error('Applied LoRA list container not found!');
+            return;
+        }
 
+        console.log('Rendering applied LoRAs:', this.appliedLoras);
         container.innerHTML = '';
 
         this.appliedLoras.forEach((lora, index) => {
@@ -591,7 +595,11 @@ class FluxAPI {
         }
 
         const selectedOption = dropdown.options[dropdown.selectedIndex];
+        console.log('Selected option:', selectedOption);
+        console.log('Dataset:', selectedOption.dataset);
+        
         const loraData = JSON.parse(selectedOption.dataset.loraData);
+        console.log('Parsed LoRA data:', loraData);
 
         // 检查是否已经在应用列表中
         const exists = this.appliedLoras.find(item => item.name === loraData.name);
@@ -610,6 +618,7 @@ class FluxAPI {
             timestamp: loraData.timestamp
         });
 
+        console.log('Applied LoRAs after adding:', this.appliedLoras);
         this.renderAppliedLoras();
         this.updateApiCommand();
 
@@ -617,6 +626,21 @@ class FluxAPI {
         dropdown.value = '';
 
         this.showSuccess(`LoRA "${loraData.name}" added to applied list`);
+    }
+
+    // 格式化文件大小
+    formatFileSize(bytes) {
+        if (!bytes) return '';
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // 格式化日期
+    formatDate(timestamp) {
+        if (!timestamp) return '';
+        const date = new Date(timestamp * 1000);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     }
 
     // 从已应用列表移除
@@ -650,6 +674,64 @@ class FluxAPI {
         this.renderAppliedLoras();
         this.updateApiCommand();
         this.showSuccess('All LoRAs cleared');
+    }
+
+    // 应用LoRAs到模型
+    async applyLorasToModel() {
+        if (this.appliedLoras.length === 0) {
+            this.showError('No LoRAs selected to apply');
+            return;
+        }
+
+        const applyBtn = this.getElement('apply-lora-btn');
+        const originalText = applyBtn.innerHTML;
+        
+        try {
+            // 显示加载状态
+            applyBtn.disabled = true;
+            applyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying...';
+            
+            // 首先移除所有现有的LoRAs
+            try {
+                await fetch(`${this.hostBase}/remove-lora`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            } catch (e) {
+                console.warn('Failed to remove existing LoRAs:', e);
+            }
+
+            // 应用每个LoRA
+            for (const lora of this.appliedLoras) {
+                const loraName = lora.storedName || lora.name;
+                const response = await fetch(`${this.hostBase}/apply-lora`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        lora_name: loraName,
+                        weight: lora.weight
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || `Failed to apply LoRA: ${loraName}`);
+                }
+            }
+
+            this.showSuccess(`Successfully applied ${this.appliedLoras.length} LoRA(s) to the model`);
+            
+            // 更新API命令显示
+            this.updateApiCommand();
+            
+        } catch (error) {
+            console.error('Error applying LoRAs:', error);
+            this.showError(`Failed to apply LoRAs: ${error.message}`);
+        } finally {
+            // 恢复按钮状态
+            applyBtn.disabled = false;
+            applyBtn.innerHTML = originalText;
+        }
     }
 
     // 获取LoRA配置（用于API调用）

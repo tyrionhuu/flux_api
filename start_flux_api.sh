@@ -10,7 +10,7 @@ echo "=========================="
 
 # Parse args (-g supports single GPU id or comma-separated list, e.g., "1,2,3")
 GPU_ID=""
-PORT=9000
+PORT=9001
 
 usage() {
     echo "Usage: $0 [-g <gpu_ids>]"
@@ -153,4 +153,5 @@ fi
 export FP4_API_PORT="$PORT"
 echo "🔧 Using FP4_API_PORT=${FP4_API_PORT}"
 
-python start_api_service.py
+# Run the Python service in the conda environment
+source /opt/conda/etc/profile.d/conda.sh && conda activate img2img && python start_api_service.py

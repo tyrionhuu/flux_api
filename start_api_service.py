@@ -173,6 +173,11 @@ def start_service():
     except ValueError:
         target_port = 9001
 
+    # Check if frontend is enabled
+    frontend_enabled = os.environ.get("ENABLE_FRONTEND", "true").lower() in ("true", "1", "yes")
+    if not frontend_enabled:
+        print("🔧 Backend-only mode enabled - frontend will be disabled")
+
     # Clean up port before starting
     if not cleanup_port(target_port):
         print("   ⚠️  Port cleanup incomplete, but continuing...")
@@ -238,6 +243,10 @@ def start_service():
         print(f"📍 API URL: http://localhost:{target_port}")
         print(f"🔍 Health check: http://localhost:{target_port}/health")
         print(f"📚 API docs: http://localhost:{target_port}/docs")
+        if frontend_enabled:
+            print(f"📱 UI: http://localhost:{target_port}/ui")
+        else:
+            print(f"📱 UI: Disabled (backend-only mode)")
         print("\n📋 Service logs:")
         print("-" * 50)
 
@@ -272,8 +281,6 @@ def main():
         print("❌ main.py not found in current directory!")
         print("   Please run this script from the flux_api directory.")
         sys.exit(1)
-
-    # Skip venv checks; assume environment is already activated
 
     # Start the service
     start_service()
