@@ -5,7 +5,7 @@ Configuration settings for the FLUX API
 # Port Configuration (overridable via environment)
 import os
 
-FP4_API_PORT = int(os.environ.get("FP4_API_PORT", "9000"))
+FP4_API_PORT = int(os.environ.get("FP4_API_PORT", "9001"))
 
 # Model Configuration
 NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-kontext-dev"

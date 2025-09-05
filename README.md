@@ -67,12 +67,12 @@ A dual-model AI image generation API service featuring FLUX models with LoRA sup
 ./start_flux_api.sh
 
 # Start frontend (optional)
-cd frontend && python -m http.server 9000
+cd frontend && python -m http.server 9001
 ```
 
 ### 2. Access the Services
 
-- **Frontend**: http://localhost:9000
+- **Frontend**: http://localhost:9001
 - **FP4 API**: http://localhost:8000
 
 ## LoRA Support
@@ -117,7 +117,7 @@ The FP4 model supports applying multiple LoRAs simultaneously:
 Generates an image and returns JSON with file paths and a download URL.
 
 ```bash
-curl -X POST "http://localhost:9000/generate" \
+curl -X POST "http://localhost:9001/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A beautiful landscape with mountains and a lake",
@@ -161,7 +161,7 @@ Notes:
 Same as `/generate` but returns the PNG image bytes directly.
 
 ```bash
-curl -X POST "http://localhost:9000/generate-and-return-image" \
+curl -X POST "http://localhost:9001/generate-and-return-image" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A watercolor cityscape at dusk",
@@ -175,7 +175,7 @@ curl -X POST "http://localhost:9000/generate-and-return-image" \
 Send an image plus form fields; returns JSON with saved filename and URL.
 
 ```bash
-curl -X POST "http://localhost:9000/generate-with-image" \
+curl -X POST "http://localhost:9001/generate-with-image" \
   -F "prompt=Product photo, soft shadows" \
   -F "image=@/path/to/input.jpg" \
   -F "num_inference_steps=20" \
@@ -196,7 +196,7 @@ Response fields:
 Same request as above, but returns PNG bytes directly.
 
 ```bash
-curl -X POST "http://localhost:9000/generate-with-image-and-return" \
+curl -X POST "http://localhost:9001/generate-with-image-and-return" \
   -F "prompt=Portrait photo, soft studio lighting" \
   -F "image=@/path/to/input.png" \
   -F "num_inference_steps=20" \
@@ -246,32 +246,32 @@ Error responses (examples):
 - List available LoRAs (uploaded + default):
 
 ```bash
-curl "http://localhost:9000/loras"
+curl "http://localhost:9001/loras"
 ```
 
 - Apply a LoRA to the loaded model (query params):
 
 ```bash
-curl -X POST "http://localhost:9000/apply-lora?lora_name=username/model-name&weight=1.0"
+curl -X POST "http://localhost:9001/apply-lora?lora_name=username/model-name&weight=1.0"
 ```
 
 - Remove the currently applied LoRA:
 
 ```bash
-curl -X POST "http://localhost:9000/remove-lora"
+curl -X POST "http://localhost:9001/remove-lora"
 ```
 
 - Upload a LoRA file (server stores it under `uploads/lora_files/`):
 
 ```bash
-curl -X POST "http://localhost:9000/upload-lora" \
+curl -X POST "http://localhost:9001/upload-lora" \
   -F "file=@/path/to/your/lora.safetensors"
 ```
 
 - Remove an uploaded LoRA file and its index entry:
 
 ```bash
-curl -X DELETE "http://localhost:9000/remove-lora/uploaded_lora_1700000000.safetensors"
+curl -X DELETE "http://localhost:9001/remove-lora/uploaded_lora_1700000000.safetensors"
 ```
 
 ### Queue APIs
@@ -279,7 +279,7 @@ curl -X DELETE "http://localhost:9000/remove-lora/uploaded_lora_1700000000.safet
 - Submit a generation request to the queue:
 
 ```bash
-curl -X POST "http://localhost:9000/submit-request" \
+curl -X POST "http://localhost:9001/submit-request" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "A cozy cabin in the woods at night"}'
 ```
@@ -287,19 +287,19 @@ curl -X POST "http://localhost:9000/submit-request" \
 - Check request status:
 
 ```bash
-curl "http://localhost:9000/request-status/<request_id>"
+curl "http://localhost:9001/request-status/<request_id>"
 ```
 
 - Cancel a queued request:
 
 ```bash
-curl -X DELETE "http://localhost:9000/cancel-request/<request_id>"
+curl -X DELETE "http://localhost:9001/cancel-request/<request_id>"
 ```
 
 - Get queue stats:
 
 ```bash
-curl "http://localhost:9000/queue-stats"
+curl "http://localhost:9001/queue-stats"
 ```
 
 ### Download Generated Image
@@ -307,7 +307,7 @@ curl "http://localhost:9000/queue-stats"
 Use the `download_url` from `/generate` responses (served by `/download/{filename}`) or the `/generated_images/{filename}` path from image-to-image endpoints.
 
 ```bash
-curl -L "http://localhost:9000/download/<filename>.png" -o result.png
+curl -L "http://localhost:9001/download/<filename>.png" -o result.png
 ```
 
 ## Configuration

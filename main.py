@@ -147,9 +147,13 @@ async def validate_requests(request, call_next):
 # Include API routes
 app.include_router(router, prefix="")
 
-# Mount static files for frontend
-if os.path.exists("frontend/static"):
+# Check if frontend should be enabled (default: True for backward compatibility)
+FRONTEND_ENABLED = os.environ.get("ENABLE_FRONTEND", "true").lower() in ("true", "1", "yes")
+
+# Mount static files for frontend only if frontend is enabled
+if FRONTEND_ENABLED and os.path.exists("frontend/static"):
     app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
+    logger.info("Frontend enabled - static files mounted")
 
 # Mount generated images directory for downloads
 if os.path.exists("generated_images"):
@@ -167,7 +171,20 @@ else:
 
 @app.get("/ui", response_class=HTMLResponse)
 async def serve_frontend():
-    """Serve the ComfyUI-style frontend"""
+    """Serve the ComfyUI-style frontend (only if frontend is enabled)"""
+    if not FRONTEND_ENABLED:
+        return """
+        <html>
+            <head><title>FP4 FLUX API - Backend Only</title></head>
+            <body>
+                <h1>FP4 FLUX API - Backend Only Mode</h1>
+                <p>Frontend is disabled. This API is running in backend-only mode.</p>
+                <p><a href="/docs">Visit API Documentation</a></p>
+                <p><a href="/health">Health Check</a></p>
+            </body>
+        </html>
+        """
+    
     frontend_path = "frontend/templates/index.html"
     if os.path.exists(frontend_path):
         with open(frontend_path, "r") as f:

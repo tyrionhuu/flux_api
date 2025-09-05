@@ -7,29 +7,32 @@ services:
     restart: unless-stopped
     runtime: nvidia
     
-    # GPU configuration - enable all GPUs by default
+    # GPU configuration - use GPU 7
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
-              capabilities: 
-                - gpu
-                - compute
-                - utility
-    gpus: all
+              count: 1
+              capabilities: [gpu, compute, utility]
     
     # Environment variables
     environment:
-      - CUDA_VISIBLE_DEVICES=all
-      - FP4_API_PORT=9000
-      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=7
+      - FP4_API_PORT=${FP4_API_PORT:-9001}
+      - NVIDIA_VISIBLE_DEVICES=7
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN}
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
     
     # Port mapping
     ports:
-      - "9000:9000"
+      - "${FP4_API_PORT:-9001}:${FP4_API_PORT:-9001}"
+    
+    # Override command if needed (optional)
+    # command: ["./start_flux_api.sh"]  # Uncomment to use start_flux_api.sh instead
+    # command: ["/bin/bash"]            # Uncomment to get bash shell
+    # command: ["python3", "main.py"]   # Uncomment to run main.py directly
     
     # Volume mounts for persistent data
     volumes:
@@ -37,12 +40,12 @@ services:
       - ./logs:/app/logs
       - ./uploads:/app/uploads
       - ./cache:/app/cache
-      - ~/.cache/huggingface:/root/.cache/huggingface
+      - /data/tianyu/.cache/huggingface:/root/.cache/huggingface
       - ~/.cache/torch:/root/.cache/torch
     
     # Health check
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
       interval: 30s
       timeout: 10s
       retries: 3

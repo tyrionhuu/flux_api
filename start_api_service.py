@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 
-def cleanup_port(port: int = 9000):
+def cleanup_port(port: int = 9001):
     """Clean up processes using the specified port"""
     print(f"🧹 Checking port {port} for existing processes...")
 
@@ -133,7 +133,7 @@ def cleanup_port(port: int = 9000):
     return False
 
 
-def check_port_available(port: int = 9000) -> bool:
+def check_port_available(port: int = 9001) -> bool:
     """Check if a port is available by attempting to bind to it"""
 
     try:
@@ -146,7 +146,7 @@ def check_port_available(port: int = 9000) -> bool:
         return False
 
 
-def wait_for_port_free(port: int = 9000, max_wait: int = 30) -> bool:
+def wait_for_port_free(port: int = 9001, max_wait: int = 30) -> bool:
     """Wait for a port to become free"""
     print(f"⏳ Waiting for port {port} to become free...")
 
@@ -167,11 +167,16 @@ def start_service():
     print("\n🚀 Starting FLUX API Service...")
     print("=" * 50)
 
-    # Determine target port from environment (fallback to 9000)
+    # Determine target port from environment (fallback to 9001)
     try:
-        target_port = int(os.environ.get("FP4_API_PORT", "9000"))
+        target_port = int(os.environ.get("FP4_API_PORT", "9001"))
     except ValueError:
-        target_port = 9000
+        target_port = 9001
+
+    # Check if frontend is enabled
+    frontend_enabled = os.environ.get("ENABLE_FRONTEND", "true").lower() in ("true", "1", "yes")
+    if not frontend_enabled:
+        print("🔧 Backend-only mode enabled - frontend will be disabled")
 
     # Clean up port before starting
     if not cleanup_port(target_port):
@@ -206,7 +211,7 @@ def start_service():
 
     # Wait for port to be truly available
     if not wait_for_port_free(target_port, max_wait=30):
-        print("   ❌ Port 9000 is not available, cannot start service")
+        print("   ❌ Port 9001 is not available, cannot start service")
         return False
 
     # Resolve Python executable: prefer flux_env if present, else current python
@@ -238,6 +243,10 @@ def start_service():
         print(f"📍 API URL: http://localhost:{target_port}")
         print(f"🔍 Health check: http://localhost:{target_port}/health")
         print(f"📚 API docs: http://localhost:{target_port}/docs")
+        if frontend_enabled:
+            print(f"📱 UI: http://localhost:{target_port}/ui")
+        else:
+            print(f"📱 UI: Disabled (backend-only mode)")
         print("\n📋 Service logs:")
         print("-" * 50)
 
