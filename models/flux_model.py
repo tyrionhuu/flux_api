@@ -670,7 +670,7 @@ class FluxModelManager:
 
             logger.info(f"   - Setting LoRA strength to {weight}")
             transformer.set_lora_strength(weight)
-            logger.info("   - LoRA applied successfully")
+            logger.info(f"   - LoRA '{lora_source}' applied successfully with weight {weight}")
             return True
         except Exception as e:
             logger.error(f"   - Failed to apply LoRA: {e}")
@@ -690,7 +690,9 @@ class FluxModelManager:
                 logger.info("No LoRAs to apply")
                 return True
 
-            logger.info(f"Applying {len(lora_configs)} LoRAs to FLUX pipeline...")
+            # Log details of LoRAs being applied
+            lora_details = [f"'{lora['name']}' (weight: {lora['weight']})" for lora in lora_configs]
+            logger.info(f"Applying {len(lora_configs)} LoRAs to FLUX pipeline: {', '.join(lora_details)}")
 
             if len(lora_configs) == 1:
                 # Single LoRA - apply directly
@@ -725,8 +727,10 @@ class FluxModelManager:
                             self._temp_lora_paths = []
                         self._temp_lora_paths.append(merged_lora_path)
 
+                        # Log which LoRAs were merged
+                        merged_lora_names = [lora["name"] for lora in lora_configs]
                         logger.info(
-                            f"   - Merged LoRA applied successfully (weight: {combined_weight})"
+                            f"   - Merged LoRA applied successfully: {', '.join(merged_lora_names)} (combined weight: {combined_weight})"
                         )
                         return True
                     else:

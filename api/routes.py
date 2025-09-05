@@ -368,6 +368,13 @@ def _apply_loras(loras_to_apply, remove_all_loras):
                 status_code=500,
                 detail="Failed to apply LoRAs. Please check if the LoRAs exist and are compatible.",
             )
+        else:
+            # Log successful LoRA application
+            applied_loras = model_manager.get_lora_info()
+            if applied_loras:
+                logger.info(f"Successfully applied LoRAs: {applied_loras}")
+            else:
+                logger.info("LoRAs applied successfully (no current LoRA info available)")
 
         current_lora = model_manager.get_lora_info()
         if current_lora:
