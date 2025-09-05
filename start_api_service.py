@@ -282,8 +282,6 @@ def main():
         print("   Please run this script from the flux_api directory.")
         sys.exit(1)
 
-    # Skip venv checks; assume environment is already activated
-
     # Start the service
     start_service()
 
