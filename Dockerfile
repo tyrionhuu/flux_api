@@ -2,47 +2,87 @@
 FROM nvidia/cuda:12.8.0-runtime-ubuntu24.04
 
 # Set environment variables
-ENV HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN}
+ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
-# Install Python 3.12 and essential system packages
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    software-properties-common \
-    curl \
+    build-essential \
+    cmake \
     git \
-    lsof \
-    && add-apt-repository ppa:deadsnakes/ppa \
-    && apt-get update && apt-get install -y \
-    python3.12 \
-    python3.12-dev \
-    python3.12-distutils \
+    wget \
+    curl \
+    bzip2 \
+    ca-certificates \
+    libglib2.0-0 \
+    libxext6 \
+    libgl1 \
+    libsm6 \
+    libxrender1 \
+    mercurial \
+    subversion \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pip for Python 3.12
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
+# Install Miniconda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+    /bin/bash ~/miniconda.sh -b -p /opt/conda && \
+    rm ~/miniconda.sh && \
+    /opt/conda/bin/conda clean --all --yes && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate base" >> ~/.bashrc
 
-# Set Python 3.12 as default
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+# Add conda to PATH
+ENV PATH=/opt/conda/bin:$PATH
 
 # Set working directory
 WORKDIR /app
 
+# Copy environment file first for better caching
+COPY environment.yml .
+
+# Accept conda Terms of Service and configure channels
+RUN conda config --set always_yes true && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
+    conda config --add channels conda-forge && \
+    conda config --add channels pytorch && \
+    conda config --add channels nvidia && \
+    conda config --set channel_priority strict
+
+# Create conda environment from environment.yml
+RUN conda env create -f environment.yml
+
 # Install PyTorch with CUDA support from PyTorch index (stable version)
-RUN pip3 install --no-cache-dir --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
-RUN pip3 install --no-cache-dir https://github.com/nunchaku-tech/nunchaku/releases/download/v0.3.2/nunchaku-0.3.2+torch2.8-cp312-cp312-linux_x86_64.whl
+RUN conda run -n img2img pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
+RUN conda run -n img2img pip install https://github.com/nunchaku-tech/nunchaku/releases/download/v0.3.2/nunchaku-0.3.2+torch2.8-cp312-cp312-linux_x86_64.whl
+
+# Make RUN commands use the new environment
+SHELL ["conda", "run", "-n", "img2img", "/bin/bash", "-c"]
+
+# Activate the environment
+RUN echo "conda activate img2img" >> ~/.bashrc
+ENV CONDA_DEFAULT_ENV=img2img
+ENV PATH=/opt/conda/envs/img2img/bin:$PATH
 
 # Copy application code
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p logs generated_images uploads/lora_files cache/merged_loras cache/nunchaku_loras uploads/images
+RUN mkdir -p logs generated_images uploads/lora_files cache/merged_loras cache/nunchaku_loras
 
 # Set proper permissions
-RUN chmod +x start_flux_api.sh
+RUN chmod +x start_flux_api.sh docker-start.sh
 
 # Expose the API port
-EXPOSE 9001 9002 9000 9100
+EXPOSE 9000 9001 9100
 
-# Default command - run the application directly
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9100"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
+    CMD conda run -n img2img curl -f http://localhost:${FP4_API_PORT:-9001}/health || exit 1
+
+# Default command - use docker-start.sh for container execution
+CMD ["/bin/bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate img2img && ./docker-start.sh"]

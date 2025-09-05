@@ -153,4 +153,5 @@ fi
 export FP4_API_PORT="$PORT"
 echo "🔧 Using FP4_API_PORT=${FP4_API_PORT}"
 
-python start_api_service.py
+# Run the Python service in the conda environment
+source /opt/conda/etc/profile.d/conda.sh && conda activate img2img && python start_api_service.py

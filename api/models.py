@@ -14,6 +14,13 @@ class LoRAConfig(BaseModel):
     weight: float = Field(1.0, ge=0.0, le=2.0, description="LoRA weight (0.0 to 2.0)")
 
 
+class ApplyLoRARequest(BaseModel):
+    """Request model for applying a single LoRA to the model"""
+
+    lora_name: str = Field(..., description="LoRA name to apply")
+    weight: float = Field(1.0, ge=0.0, le=2.0, description="LoRA weight (0.0 to 2.0)")
+
+
 class GenerateRequest(BaseModel):
     """Request model for image generation with optional LoRA parameters"""
 

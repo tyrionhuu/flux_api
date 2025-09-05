@@ -1,5 +1,8 @@
 name: img2img
 channels:
+  - conda-forge
+  - pytorch
+  - nvidia
   - defaults
 dependencies:
   - python=3.12

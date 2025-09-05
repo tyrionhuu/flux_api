@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, Response
 from PIL import Image
 from rembg import remove
 
-from api.models import GenerateRequest
+from api.models import ApplyLoRARequest, GenerateRequest
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_LORA_NAME,
                              DEFAULT_LORA_WEIGHT, INFERENCE_STEPS)
 from models.flux_model import FluxModelManager
@@ -1184,27 +1184,27 @@ def get_model_status():
 
 
 @router.post("/apply-lora")
-async def apply_lora(lora_name: str, weight: float = 1.0):
+async def apply_lora(request: ApplyLoRARequest):
     """Apply a LoRA to the current model - lora_name should be a Hugging Face repo ID (e.g., aleksa-codes/flux-ghibsky-illustration)"""
     if not model_manager.is_loaded():
-        logger.error(f"Cannot apply LoRA {lora_name}: Model not loaded")
+        logger.error(f"Cannot apply LoRA {request.lora_name}: Model not loaded")
         raise HTTPException(status_code=500, detail="Model not loaded")
 
     try:
-        if model_manager.apply_lora(lora_name, weight):
-            logger.info(f"LoRA {lora_name} applied successfully with weight {weight}")
+        if model_manager.apply_lora(request.lora_name, request.weight):
+            logger.info(f"LoRA {request.lora_name} applied successfully with weight {request.weight}")
             return {
-                "message": f"LoRA {lora_name} applied successfully with weight {weight}",
-                "lora_name": lora_name,
-                "weight": weight,
+                "message": f"LoRA {request.lora_name} applied successfully with weight {request.weight}",
+                "lora_name": request.lora_name,
+                "weight": request.weight,
                 "status": "applied",
             }
         else:
             logger.error(
-                f"Failed to apply LoRA {lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+                f"Failed to apply LoRA {request.lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
             )
             raise HTTPException(
-                status_code=500, detail=f"Failed to apply LoRA {lora_name}"
+                status_code=500, detail=f"Failed to apply LoRA {request.lora_name}"
             )
     except Exception as e:
         raise handle_api_error("LoRA application", e)

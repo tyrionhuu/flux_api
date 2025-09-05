@@ -15,6 +15,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+# Configure Hugging Face token for model access
+if "HUGGINGFACE_HUB_TOKEN" in os.environ:
+    os.environ["HF_TOKEN"] = os.environ["HUGGINGFACE_HUB_TOKEN"]
+    # Also set it for huggingface_hub library
+    try:
+        from huggingface_hub import login
+        login(token=os.environ["HUGGINGFACE_HUB_TOKEN"])
+        print(f"✅ Hugging Face token configured successfully")
+    except ImportError:
+        print("⚠️  huggingface_hub not available, token may not work for model downloads")
+    except Exception as e:
+        print(f"⚠️  Failed to configure Hugging Face token: {e}")
+else:
+    print("⚠️  HUGGINGFACE_HUB_TOKEN not set, model downloads may fail")
+
 from api.routes import get_model_manager, router
 from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
                              FP4_API_PORT)
