@@ -32,7 +32,7 @@
                     </div>
                     
                     <!-- LoRA Configuration Section -->
-                    <div class="parameter-group">
+                    <div class="parameter-group lora-config-group">
                         <label>
                             LoRA Configuration
                         </label>
@@ -48,13 +48,13 @@
                                 </button>
                             </div>
                             <div class="lora-actions">
-                                <button id="add-custom-lora" class="btn btn-secondary">
+                                <button id="add-custom-lora" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-plus"></i> Add Custom LoRA
                                 </button>
-                                <button id="upload-lora" class="btn btn-secondary">
+                                <button id="upload-lora" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-upload"></i> Upload LoRA
                                 </button>
-                                <button id="refresh-loras" class="btn btn-secondary">
+                                <button id="refresh-loras" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-sync"></i> Refresh
                                 </button>
                             </div>
@@ -76,9 +76,11 @@
                             </div>
                         </div>
                         
-                        <button id="apply-lora-btn" class="btn btn-primary">
-                            <i class="fas fa-magic"></i> Apply Selected LoRAs
-                        </button>
+                        <div class="lora-apply-section">
+                            <button id="apply-lora-btn" class="btn btn-primary">
+                                <i class="fas fa-magic"></i> Apply Selected LoRAs
+                            </button>
+                        </div>
                         
                         <!-- Hidden file input for LoRA upload -->
                         <input type="file" id="lora-file-input" accept=".safetensors,.bin,.pt,.pth" style="display: none;">
