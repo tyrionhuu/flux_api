@@ -15,7 +15,7 @@ from config.cleanup_settings import (CLEANUP_INTERVAL_SECONDS,
 
 from .cleanup_directories import DirectoryCleanup
 
-logger = loguru.logger
+logger = loguru.logger.bind(name="utils.cleanup_service")
 
 
 class CleanupService:

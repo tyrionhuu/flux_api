@@ -51,16 +51,19 @@ logger.info(f"Script directory: {script_dir}")
 logger.info(f"Generated images absolute path: {generated_images_abs}")
 
 # Configure logging (base setup; uvicorn log_config below ensures file logging too)
-logger.add("logs/flux_api.log", level="INFO")
-
-# Configure specific loggers for better error visibility
-logger.add("logs/api_routes.log", level="INFO")
-logger.add("logs/models_flux_model.log", level="INFO")
-logger.add("logs/utils_cleanup_service.log", level="INFO")
-
-# Configure console output via Loguru (simple, compatible)
+# Remove any existing handlers first
 logger.remove()
+
+# Add console output
 logger.add(sys.stdout, level="INFO", format="{time} - {name} - {level} - {message}")
+
+# Add main log file for all logs
+logger.add("logs/flux_api.log", level="INFO", format="{time} - {name} - {level} - {message}")
+
+# Configure specific loggers for better error visibility (optional separate files)
+logger.add("logs/api_routes.log", level="INFO", format="{time} - {name} - {level} - {message}", filter=lambda record: "api.routes" in record["name"])
+logger.add("logs/models_flux_model.log", level="INFO", format="{time} - {name} - {level} - {message}", filter=lambda record: "models.flux_model" in record["name"])
+logger.add("logs/utils_cleanup_service.log", level="INFO", format="{time} - {name} - {level} - {message}", filter=lambda record: "utils.cleanup_service" in record["name"])
 
 
 @asynccontextmanager

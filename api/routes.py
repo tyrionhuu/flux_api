@@ -31,7 +31,7 @@ from utils.infer_utils import kontext_preprocess
 from utils.queue_manager import QueueManager
 from utils.system_utils import get_system_memory
 
-logger = loguru.logger
+logger = loguru.logger.bind(name="api.routes")
 
 
 def handle_api_error(

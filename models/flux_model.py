@@ -24,7 +24,7 @@ from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_LORA_NAME,
 from utils.gpu_manager import GPUManager
 
 # Configure logging
-logger = loguru.logger
+logger = loguru.logger.bind(name="models.flux_model")
 
 
 class FluxModelManager:
