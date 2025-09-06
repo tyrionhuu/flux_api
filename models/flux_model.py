@@ -218,6 +218,11 @@ class FluxModelManager:
                 logger.warning("Pipeline not loaded, cannot apply default LoRA")
                 return False
 
+            # Check if there's a default LoRA to apply
+            if DEFAULT_LORA_NAME is None:
+                logger.info("No default LoRA configured, skipping default LoRA application")
+                return True
+
             logger.info(
                 f"Applying default LoRA: {DEFAULT_LORA_NAME} with weight {DEFAULT_LORA_WEIGHT}"
             )

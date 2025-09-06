@@ -222,7 +222,7 @@ Parameters (multipart/form-data):
 - `bg_strength` (float 0..1, optional): Controls background removal aggressiveness when `remove_background=true`.
 - `loras_json` (JSON array, optional): Multiple LoRAs, e.g., `[{"name":"user/model","weight":1.0}]`. Use empty array `[]` to remove all LoRAs.
 - `lora_name` (string, optional) and `lora_weight` (float 0..2, optional): Single LoRA shorthand.
-- `use_default_lora` (bool, optional): Apply server default LoRA.
+- `use_default_lora` (bool, optional): Apply server default LoRA (currently disabled - no default LoRA configured).
 
 Behavior and constraints:
 - The endpoint validates that the uploaded file is an image (MIME type + extension) and ≤ 10MB; otherwise it returns HTTP 400.

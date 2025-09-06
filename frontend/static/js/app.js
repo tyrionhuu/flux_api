@@ -13,7 +13,7 @@ class FluxAPI {
     init() {
         this.setupEventListeners();
         this.loadAvailableLoras();
-        this.addDefaultLora();
+        // Removed automatic default LoRA addition
         this.updateApiCommand();
 
         setTimeout(() => {
@@ -445,13 +445,7 @@ class FluxAPI {
         // 清空现有列表，避免重复
         this.availableLoras = [];
 
-        // 添加默认LoRA
-        this.availableLoras.push({
-            name: '21j3h123/realEarthKontext/blob/main/lora_emoji.safetensors',
-            weight: 1.0,
-            type: 'default',
-            displayName: '21j3h123/realEarthKontext/lora_emoji.safetensors (Default)'
-        });
+        // No default LoRA added - users must explicitly select LoRAs
 
         // 从服务器加载上传的LoRA
         try {
@@ -652,21 +646,7 @@ class FluxAPI {
         this.showSuccess(`LoRA "${removed.name}" removed from applied list`);
     }
 
-    // 添加默认LoRA
-    addDefaultLora() {
-        const defaultLora = this.availableLoras.find(l => l.type === 'default');
-        if (defaultLora) {
-            this.appliedLoras.push({
-                name: defaultLora.name,
-                weight: defaultLora.weight,
-                type: defaultLora.type,
-                storedName: defaultLora.storedName,
-                size: defaultLora.size,
-                timestamp: defaultLora.timestamp
-            });
-            this.renderAppliedLoras();
-        }
-    }
+    // addDefaultLora function removed - no default LoRA is applied automatically
 
     // 清空所有已应用的LoRA
     clearAllLoras() {

@@ -28,7 +28,7 @@ class GenerateRequest(BaseModel):
     # Support for multiple LoRAs
     loras: Optional[list[LoRAConfig]] = Field(
         None,
-        description="List of LoRAs to apply. Each LoRA has a name and weight. If not specified, default LoRA will be used.",
+        description="List of LoRAs to apply. Each LoRA has a name and weight. If not specified, no LoRA will be applied.",
     )
     # Legacy support for single LoRA (deprecated but maintained for backward compatibility)
     lora_name: Optional[str] = Field(
@@ -93,7 +93,7 @@ class ImageUploadGenerateRequest(BaseModel):
     # Support for multiple LoRAs
     loras: Optional[list[LoRAConfig]] = Field(
         None,
-        description="List of LoRAs to apply. Each LoRA has a name and weight. If not specified, default LoRA will be used.",
+        description="List of LoRAs to apply. Each LoRA has a name and weight. If not specified, no LoRA will be applied.",
     )
     # Legacy support for single LoRA (deprecated but maintained for backward compatibility)
     lora_name: Optional[str] = Field(

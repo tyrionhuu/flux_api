@@ -313,6 +313,7 @@ def _extract_loras_from_request(request: GenerateRequest):
         and not request.lora_name
         and hasattr(request, "use_default_lora")
         and request.use_default_lora
+        and DEFAULT_LORA_NAME is not None
     ):
         loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
 
@@ -1457,15 +1458,8 @@ async def get_available_loras():
                 logger.error(f"Failed to parse index.json: {e}")
                 uploaded_loras = []
 
-        # Add default LoRA
-        default_loras = [
-            {
-                "name": "21j3h123/realEarthKontext/blob/main/lora_emoji.safetensors",
-                "display_name": "21j3h123/realEarthKontext/lora_emoji.safetensors (Default)",
-                "type": "default",
-                "weight": 1.0,
-            }
-        ]
+        # No default LoRAs - users must explicitly select LoRAs
+        default_loras = []
 
         return {
             "uploaded": uploaded_loras,
