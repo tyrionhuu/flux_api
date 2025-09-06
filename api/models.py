@@ -19,8 +19,12 @@ class ApplyLoRARequest(BaseModel):
 
     lora_name: str = Field(..., description="LoRA name to apply")
     weight: float = Field(1.0, ge=0.0, le=2.0, description="LoRA weight (0.0 to 2.0)")
-    repo_id: Optional[str] = Field(None, description="Hugging Face repository ID (for HF LoRAs)")
-    filename: Optional[str] = Field(None, description="Specific filename in the repository (for HF LoRAs)")
+    repo_id: Optional[str] = Field(
+        None, description="Hugging Face repository ID (for HF LoRAs)"
+    )
+    filename: Optional[str] = Field(
+        None, description="Specific filename in the repository (for HF LoRAs)"
+    )
 
 
 class GenerateRequest(BaseModel):

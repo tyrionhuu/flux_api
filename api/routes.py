@@ -1181,14 +1181,14 @@ async def apply_lora(request: ApplyLoRARequest):
     try:
         # Determine the LoRA source and construct the appropriate identifier
         lora_identifier = request.lora_name
-        
+
         # If it's a Hugging Face LoRA, use the repo_id and filename
         if request.repo_id and request.filename:
             lora_identifier = f"{request.repo_id}/{request.filename}"
             logger.info(f"Applying Hugging Face LoRA: {lora_identifier}")
         else:
             logger.info(f"Applying local LoRA: {lora_identifier}")
-        
+
         if model_manager.apply_lora(lora_identifier, request.weight):
             logger.info(
                 f"LoRA {lora_identifier} applied successfully with weight {request.weight}"
@@ -1493,88 +1493,99 @@ async def cache_huggingface_lora(request: dict):
         repo_id = request.get("repo_id")
         filename = request.get("filename")
         display_name = request.get("display_name", f"{repo_id}/{filename}")
-        
+
         if not repo_id or not filename:
-            raise HTTPException(status_code=400, detail="repo_id and filename are required")
-        
+            raise HTTPException(
+                status_code=400, detail="repo_id and filename are required"
+            )
+
         # Generate a unique stored name for the cached LoRA
         import hashlib
-        import time
         import os
-        
+        import time
+
         # Create a hash-based name to avoid conflicts
         hash_input = f"{repo_id}_{filename}_{int(time.time())}"
-        stored_name = f"hf_{hashlib.md5(hash_input.encode()).hexdigest()[:12]}.safetensors"
-        
+        stored_name = (
+            f"hf_{hashlib.md5(hash_input.encode()).hexdigest()[:12]}.safetensors"
+        )
+
         # Download and cache the LoRA using the existing model manager
         model_manager = get_model_manager()
-        
+
         # Use the existing HF download logic from the model
         try:
-            from huggingface_hub import hf_hub_download
-            import tempfile
             import shutil
-            
+            import tempfile
+
+            from huggingface_hub import hf_hub_download
+
             # Create temp directory for download
             temp_dir = tempfile.mkdtemp(prefix="hf_lora_cache_")
-            
+
             # Download the LoRA file
-            logger.info(f"Downloading HF LoRA: repo_id={repo_id}, filename={filename}, temp_dir={temp_dir}")
+            logger.info(
+                f"Downloading HF LoRA: repo_id={repo_id}, filename={filename}, temp_dir={temp_dir}"
+            )
             downloaded_path = hf_hub_download(
                 repo_id=repo_id,
                 filename=filename,
                 cache_dir=temp_dir,
             )
-            
+
             logger.info(f"Downloaded file path: {downloaded_path}")
-            
+
             # Ensure the downloaded file exists
             if not os.path.exists(downloaded_path):
                 raise FileNotFoundError(f"Downloaded file not found: {downloaded_path}")
-            
+
             logger.info(f"File exists, size: {os.path.getsize(downloaded_path)} bytes")
-            
+
             # Move to uploads directory
             uploads_dir = Path("uploads/lora_files")
             uploads_dir.mkdir(parents=True, exist_ok=True)
-            
+
             final_path = uploads_dir / stored_name
-            
+
             # Copy instead of move to avoid issues
             shutil.copy2(downloaded_path, final_path)
-            
+
             # Verify the file was copied successfully
             if not final_path.exists():
                 raise FileNotFoundError(f"Failed to copy file to: {final_path}")
-            
+
             # Get file size
             file_size = final_path.stat().st_size
-            
+
             # Clean up temp directory
             shutil.rmtree(temp_dir)
-            
+
             # Add to index
             await update_lora_index(
                 stored_name=stored_name,
                 original_name=display_name,
                 timestamp=int(time.time()),
-                size=file_size
+                size=file_size,
             )
-            
-            logger.info(f"Successfully cached Hugging Face LoRA: {repo_id}/{filename} as {stored_name}")
-            
+
+            logger.info(
+                f"Successfully cached Hugging Face LoRA: {repo_id}/{filename} as {stored_name}"
+            )
+
             return {
                 "message": f"LoRA cached successfully",
                 "stored_name": stored_name,
                 "original_name": display_name,
                 "size": file_size,
-                "type": "huggingface"
+                "type": "huggingface",
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to download and cache HF LoRA: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to cache LoRA: {str(e)}")
-            
+            raise HTTPException(
+                status_code=500, detail=f"Failed to cache LoRA: {str(e)}"
+            )
+
     except Exception as e:
         raise handle_api_error("cache Hugging Face LoRA", e)
 
