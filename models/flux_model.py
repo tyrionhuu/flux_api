@@ -997,6 +997,16 @@ class FluxModelManager:
                     logger.error(f"   - Uploaded LoRA file not found: {upload_path}")
                     return None
 
+            # Check if it's a cached Hugging Face LoRA
+            if lora_name.startswith("hf_"):
+                upload_path = f"uploads/lora_files/{lora_name}"
+                if os.path.exists(upload_path):
+                    logger.info(f"   - Found cached HF LoRA file: {upload_path}")
+                    return upload_path
+                else:
+                    logger.error(f"   - Cached HF LoRA file not found: {upload_path}")
+                    return None
+
             # Check if it's a local path
             if os.path.exists(lora_name):
                 return lora_name
