@@ -8,6 +8,7 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, Optional
+
 from loguru import logger
 
 from config.settings import DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS

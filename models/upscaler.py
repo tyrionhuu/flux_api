@@ -8,11 +8,11 @@ import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Optional, Tuple, Union
-from loguru import logger
 
 import cv2
 import numpy as np
 import torch
+from loguru import logger
 from PIL import Image
 
 # Import ESRGAN architecture

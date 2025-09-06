@@ -5,9 +5,10 @@ Run this script to manually clean up directories and maintain size limits.
 """
 
 import argparse
-import loguru
 import sys
 from pathlib import Path
+
+import loguru
 
 # Add the project root to Python path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -17,6 +18,7 @@ from config.cleanup_settings import (GENERATED_IMAGES_SIZE_LIMIT_GB,
 from utils.directory_cleanup import DirectoryCleanup
 
 logger = loguru.logger
+
 
 def main():
     """Main cleanup function."""

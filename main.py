@@ -25,12 +25,12 @@ logger.add(
     rotation="10 MB",
     retention="7 days",
     level="INFO",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}"
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}",
 )
 logger.add(
     lambda msg: print(msg, end=""),
     level="INFO",
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>"
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>",
 )
 
 # Create FastAPI app with lifespan context manager
@@ -52,9 +52,13 @@ async def lifespan(app: FastAPI):
         model_manager = get_model_manager()
 
         if model_manager.load_model(model_type):
-            logger.info(f"Diffusion model ({model_type}) loaded successfully during startup")
+            logger.info(
+                f"Diffusion model ({model_type}) loaded successfully during startup"
+            )
         else:
-            logger.error(f"Failed to load Diffusion model ({model_type}) during startup")
+            logger.error(
+                f"Failed to load Diffusion model ({model_type}) during startup"
+            )
 
         time.sleep(2)
 
@@ -125,7 +129,7 @@ async def serve_frontend():
             </body>
         </html>
         """
-    
+
     frontend_path = "frontend/templates/index.html"
     if os.path.exists(frontend_path):
         with open(frontend_path, "r") as f:

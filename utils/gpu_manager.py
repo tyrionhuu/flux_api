@@ -9,9 +9,9 @@ import threading
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
-from loguru import logger
 
 import torch
+from loguru import logger
 
 
 @dataclass
