@@ -540,6 +540,18 @@ class FluxAPI {
         console.log('Rendering applied LoRAs:', this.appliedLoras);
         container.innerHTML = '';
 
+        // Show placeholder if no LoRAs are applied
+        if (this.appliedLoras.length === 0) {
+            container.innerHTML = `
+                <div class="lora-empty-placeholder">
+                    <i class="fas fa-magic"></i>
+                    <p>No LoRAs selected</p>
+                    <small>Select LoRAs from the dropdown above to add them here</small>
+                </div>
+            `;
+            return;
+        }
+
         this.appliedLoras.forEach((lora, index) => {
             const item = document.createElement('div');
             item.className = 'lora-item applied-lora-item';
