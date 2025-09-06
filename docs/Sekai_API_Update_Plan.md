@@ -18,8 +18,8 @@
 - **功能**: 将经过审核并通过的图片上传到指定的 S3 存储桶。
 - **配置**: 接收客户端提供的 `s3_prefix`（预签名URL）。
 - **流程**: 图片生成后，立即上传到 S3。
-- **文件名处理**: 自动从预签名URL中提取占位符文件名（如 `1.png`），并替换为 `{image_hash}.jpg`，其中 `image_hash` 是生成图片的MD5哈希值。
-- **输出**: 返回更新后的 S3 URL (`s3_url`)，其中包含实际的文件名 `{image_hash}.jpg`。
+- **文件名处理**: 自动从预签名URL中提取占位符文件名（如 `1.png`），并替换为 `output-{image_hash}.jpg`，其中 `image_hash` 是生成图片的MD5哈希值。
+- **输出**: 返回更新后的 S3 URL (`s3_url`)，其中包含实际的文件名 `output-{image_hash}.jpg`。
 
 ## 🛠️ 技术实现细节
 
@@ -36,7 +36,7 @@
 - 给到签名过的 s3地址（http），直接 往地址上面 put即可
 - **文件命名**: 
   - 客户端提供的 URL 包含占位符文件名（如 `1.png`, `2.jpg` 等）
-  - 系统自动将占位符替换为 `{image_hash}.jpg`，其中 `image_hash` 是生成图片的MD5哈希值
+  - 系统自动将占位符替换为 `output-{image_hash}.jpg`，其中 `image_hash` 是生成图片的MD5哈希值
   - 这确保每个图片都有唯一的文件名，避免缓存问题
 - **重试机制**: 实现上传失败时的自动重试机制（指数退避：1s, 2s, 4s）。
 - **监控告警**: 增加上传失败率监控，及时发现并解决问题。
@@ -77,14 +77,14 @@ Response:
 - `num_inference_steps`: (必选) 推理步骤数 (默认为 15)。
 - `response_format`: (必选) 响应格式 (默认为 "s3")。
 - `upscale`: (必选) 是否进行放大 (默认为 "true")。
-- `s3_prefix`: (必选) **完整的** 签名过的 **S3 Http URI，直接往地址put就行 (例如：https://prod-data.sekai.chat/aiu-character/000/1.png?AWSAccessKeyId=AKIAQE43KJDN7ARTLAVM&Signature=%2ByiRa6eTIiuPtE3wGWzFzmS3snA%3D&Expires=1756921542)。注意：URL中的文件名（如 `1.png`）是占位符，系统会自动替换为 `{image_hash}.jpg`。
+- `s3_prefix`: (必选) **完整的** 签名过的 **S3 Http URI，直接往地址put就行 (例如：https://prod-data.sekai.chat/aiu-character/000/1.png?AWSAccessKeyId=AKIAQE43KJDN7ARTLAVM&Signature=%2ByiRa6eTIiuPtE3wGWzFzmS3snA%3D&Expires=1756921542)。注意：URL中的文件名（如 `1.png`）是占位符，系统会自动替换为 `output-{image_hash}.jpg`。
 - `enable_nsfw_check`: (必选) 是否启用 NSFW 检测 (true/false)。
 - **负向提示词？？**
 
 ### 3. 响应说明
 
 - `data`: (JSON 对象) 包含以下字段：
-    - `s3_url`: (字符串) 上传到 S3 的图片 Http URL（文件名已替换为 `{image_hash}.jpg`）。
+    - `s3_url`: (字符串) 上传到 S3 的图片 Http URL（文件名已替换为 `output-{image_hash}.jpg`）。
     - `nsfw_score`: (Float) NSFW 内容 的置信度
     - `image_hash`: (字符串) 生成图片内容的MD5哈希值（与S3 URL中的文件名对应）。
     - `s3_upload_status`: (Integer) HTTP status code from S3 upload (200/204 for success).

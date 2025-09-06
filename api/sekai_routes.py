@@ -4,6 +4,7 @@ API routes for the FLUX API
 
 import asyncio
 import logging
+import os
 import time
 from typing import Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
@@ -13,6 +14,13 @@ from utils.image_utils import extract_image_from_result, save_image_with_unique_
 from utils.system_utils import get_system_memory
 from utils.queue_manager import QueueManager
 from utils.request_queue import RequestQueueManager
+from utils.async_tasks import run_async_task
+from utils.internal_s3_uploader import (
+    upload_json_to_s3,
+    upload_image_to_s3,
+    upload_image_file_to_s3,
+    get_uploaded_file_urls
+)
 from config.sekai_settings import (
     STATIC_IMAGES_DIR,
     LORA_1_NAME,
@@ -59,6 +67,23 @@ def get_model_manager():
 
 
 model_manager = get_model_manager()
+
+# Preload upscaler model at startup (optional but recommended)
+# This ensures the upscaler is ready before first use
+PRELOAD_UPSCALER = os.environ.get("PRELOAD_UPSCALER", "true").lower() == "true"
+
+if PRELOAD_UPSCALER:
+    try:
+        from models.upscaler import get_upscaler
+        logger.info("Preloading upscaler model at startup...")
+        upscaler = get_upscaler()
+        if upscaler.is_ready():
+            logger.info("Upscaler model preloaded successfully and ready for use")
+        else:
+            logger.warning("Upscaler model preloaded but not ready - will retry on first use")
+    except Exception as e:
+        logger.warning(f"Failed to preload upscaler model: {e}")
+        logger.info("Upscaler will be loaded on first use")
 
 # Global queue manager instance (for the old queue endpoints - not used in main /generate)
 queue_manager = QueueManager(max_concurrent=2, max_queue_size=100)
@@ -357,6 +382,7 @@ def generate_image_sync(request: GenerateRequest):
             lora_applied = current_lora.get("name")
             lora_weight_applied = current_lora.get("weight")
 
+    # Pass both the merged LoRA info and the individual LoRA details
     result = generate_image_internal(
         prompt,
         "FLUX",
@@ -372,6 +398,7 @@ def generate_image_sync(request: GenerateRequest):
         request.enable_nsfw_check if request.enable_nsfw_check is not None else True,
         request.num_inference_steps or 15,
         request.negative_prompt,
+        loras_list=loras_to_apply if loras_to_apply else None,  # Pass individual LoRA details
     )
 
     # Trigger cleanup after successful image generation
@@ -570,6 +597,28 @@ def get_lora_status():
     }
 
 
+@router.get("/upscaler-status")
+def get_upscaler_status():
+    """Get the current upscaler status"""
+    try:
+        from models.upscaler import get_upscaler
+        upscaler = get_upscaler()
+        return {
+            "status": "ready" if upscaler.is_ready() else "not_ready",
+            "model_info": upscaler.get_model_info(),
+            "singleton": True,
+            "note": "Upscaler is loaded once and kept in memory for all requests"
+        }
+    except Exception as e:
+        logger.error(f"Failed to get upscaler status: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "singleton": True,
+            "note": "Upscaler singleton pattern is enabled but model may not be available"
+        }
+
+
 # Queue management endpoints
 @router.post("/submit-request")
 async def submit_generation_request(request: GenerateRequest):
@@ -731,6 +780,7 @@ def generate_image_internal(
     enable_nsfw_check: bool = True,
     num_inference_steps: int = 15,
     negative_prompt: Optional[str] = None,
+    loras_list: Optional[list] = None,  # New parameter for individual LoRA details
 ):
     """Internal function to generate images - used by both endpoints"""
     # Append "Use GHIBLISTYLE" to the start of the user prompt
@@ -820,7 +870,140 @@ def generate_image_internal(
             upscaled_image_path = None
             logger.info(f"Falling back to original image: {image_filename}")
         
-        # NSFW Detection (only for scoring, not blocking)
+        # Calculate image hash for consistent naming
+        import hashlib
+        import io
+        from PIL import Image as PILImage
+        img_buffer = io.BytesIO()
+        if image.mode in ('RGBA', 'LA', 'P'):
+            rgb_image = PILImage.new('RGB', image.size, (255, 255, 255))
+            rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+            image_to_hash = rgb_image
+        else:
+            image_to_hash = image
+        image_to_hash.save(img_buffer, format='JPEG', quality=JPEG_QUALITY)
+        image_hash = hashlib.md5(img_buffer.getvalue()).hexdigest()
+        
+        # Build the response JSON first (before uploading to S3)
+        # This will be used both for the API response and S3 upload
+        output_json = None
+        
+        # Build response based on format
+        if response_format == "s3":
+            # This will be built later after S3 upload
+            pass
+        elif response_format == "binary":
+            # For binary responses, create metadata JSON for S3 upload
+            filename = os.path.basename(image_filename)
+            output_json = {
+                "message": f"Generated {model_type_name} image for prompt: {enhanced_prompt}",
+                "response_format": "binary",
+                "filename": filename,
+                "generation_time": f"{generation_time:.2f}s",
+                "lora_applied": model_manager.get_lora_info().get("name") if model_manager.get_lora_info() else None,
+                "lora_weight": model_manager.get_lora_info().get("weight") if model_manager.get_lora_info() else None,
+                "width": final_width,
+                "height": final_height,
+                "seed": seed,
+                "num_inference_steps": num_inference_steps,
+                "negative_prompt": negative_prompt,
+                "upscale": upscale,
+                "upscale_factor": upscale_factor if upscale else None,
+                "nsfw_score": 0.0,  # Will be updated after NSFW check
+                "image_hash": image_hash
+            }
+        else:
+            # Regular JSON response format
+            filename = os.path.basename(image_filename)
+            download_url = f"/download/{filename}"
+            actual_lora_info = model_manager.get_lora_info()
+            
+            output_json = {
+                "message": f"Generated {model_type_name} image for prompt: {enhanced_prompt}",
+                "image_url": image_filename,
+                "download_url": download_url,
+                "filename": filename,
+                "generation_time": f"{generation_time:.2f}s",
+                "lora_applied": actual_lora_info.get("name") if actual_lora_info else None,
+                "lora_weight": actual_lora_info.get("weight") if actual_lora_info else None,
+                "width": final_width,
+                "height": final_height,
+                "seed": seed,
+                "num_inference_steps": num_inference_steps,
+                "negative_prompt": negative_prompt,
+                "upscale": upscale,
+                "upscale_factor": upscale_factor if upscale else None,
+                "nsfw_score": 0.0,  # Will be updated after NSFW check
+                "image_hash": image_hash
+            }
+        
+        # Async upload to internal S3 bucket (fire and forget)
+        # This happens regardless of response_format
+        def upload_to_internal_s3(output_json_to_upload):
+            """Background task to upload input, output image, and output JSON to S3"""
+            import os  # Import inside function for thread safety
+            try:
+                # Prepare input request data
+                input_data = {
+                    "prompt": prompt,
+                    "enhanced_prompt": enhanced_prompt,
+                    "model_type": model_type_name,
+                    "width": width,
+                    "height": height,
+                    "seed": seed,
+                    "num_inference_steps": num_inference_steps,
+                    "negative_prompt": negative_prompt,
+                    "lora_applied": lora_applied,  # Keep for backward compatibility
+                    "lora_weight": lora_weight,     # Keep for backward compatibility (summed weight)
+                    "loras_details": loras_list,    # NEW: Individual LoRA names and weights
+                    "upscale": upscale,
+                    "upscale_factor": upscale_factor,
+                    "response_format": response_format,
+                    "s3_prefix": s3_prefix,
+                    "enable_nsfw_check": enable_nsfw_check,
+                    "timestamp": time.time(),
+                    "generation_time": generation_time
+                }
+                
+                # Upload input JSON
+                input_filename = f"input-{image_hash}.json"
+                success, error = upload_json_to_s3(input_data, input_filename)
+                if success:
+                    logger.info(f"Internal S3: Successfully uploaded {input_filename}")
+                else:
+                    logger.error(f"Internal S3: Failed to upload {input_filename}: {error}")
+                
+                # Upload output image
+                output_image_filename = f"output-{image_hash}.jpg"
+                # Try to use the saved file first (more efficient)
+                if image_filename and os.path.exists(image_filename):
+                    success, error = upload_image_file_to_s3(image_filename, output_image_filename)
+                else:
+                    # Fall back to PIL image
+                    success, error = upload_image_to_s3(image, output_image_filename, JPEG_QUALITY)
+                    
+                if success:
+                    logger.info(f"Internal S3: Successfully uploaded {output_image_filename}")
+                else:
+                    logger.error(f"Internal S3: Failed to upload {output_image_filename}: {error}")
+                
+                # Upload output JSON (the API response)
+                if output_json_to_upload:
+                    output_json_filename = f"output-{image_hash}.json"
+                    success, error = upload_json_to_s3(output_json_to_upload, output_json_filename)
+                    if success:
+                        logger.info(f"Internal S3: Successfully uploaded {output_json_filename}")
+                    else:
+                        logger.error(f"Internal S3: Failed to upload {output_json_filename}: {error}")
+                    
+                # Log the S3 URLs for reference
+                urls = get_uploaded_file_urls(image_hash)
+                logger.info(f"Internal S3 URLs - Input: {urls['input_url']}, Output Image: {urls['output_url']}, Output JSON: {urls.get('output_json_url', 'N/A')}")
+                
+            except Exception as e:
+                logger.error(f"Internal S3 upload error: {str(e)}")
+        
+        # NSFW Detection (do this before S3 upload to include in output JSON)
         nsfw_score = 0.0
         if enable_nsfw_check:
             try:
@@ -835,6 +1018,15 @@ def generate_image_internal(
                 nsfw_score = 1.0
                 logger.warning(f"NSFW detection failed, setting score to 1.0 and continuing")
         
+        # Update NSFW score in output_json if it was created
+        if output_json:
+            output_json["nsfw_score"] = nsfw_score
+        
+        # Trigger async upload for non-S3 formats
+        if response_format != "s3" and output_json:
+            run_async_task(lambda: upload_to_internal_s3(output_json))
+            logger.info(f"Triggered async internal S3 upload for hash: {image_hash}")
+        
         # S3 Upload for response_format="s3"
         if response_format == "s3":
             if not s3_prefix:
@@ -847,20 +1039,7 @@ def generate_image_internal(
                 from utils.s3_uploader import upload_to_s3
                 logger.info(f"Uploading to S3 with presigned URL...")
                 
-                # Calculate image hash first
-                import hashlib
-                import io
-                from PIL import Image as PILImage
-                img_buffer = io.BytesIO()
-                if image.mode in ('RGBA', 'LA', 'P'):
-                    rgb_image = PILImage.new('RGB', image.size, (255, 255, 255))
-                    rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
-                    image_to_hash = rgb_image
-                else:
-                    image_to_hash = image
-                image_to_hash.save(img_buffer, format='JPEG', quality=JPEG_QUALITY)
-                image_hash = hashlib.md5(img_buffer.getvalue()).hexdigest()
-                
+                # Use the already calculated image hash from above
                 # Upload with the image hash to replace placeholder filename
                 success, error, s3_url, http_status = upload_to_s3(
                     image,
@@ -878,20 +1057,35 @@ def generate_image_internal(
                 
                 logger.info(f"S3 upload successful, HTTP status: {http_status}")
                 
-                # Return S3 format response
-                response_json = {
+                # Build output JSON for S3 format
+                output_json = {
                     "data": {
                         "s3_url": s3_url,
                         "nsfw_score": nsfw_score,
                         "image_hash": image_hash,
                         "s3_upload_status": http_status
-                    }
+                    },
+                    "response_format": "s3",
+                    "generation_time": f"{generation_time:.2f}s",
+                    "lora_applied": model_manager.get_lora_info().get("name") if model_manager.get_lora_info() else None,
+                    "lora_weight": model_manager.get_lora_info().get("weight") if model_manager.get_lora_info() else None,
+                    "width": final_width,
+                    "height": final_height,
+                    "seed": seed,
+                    "num_inference_steps": num_inference_steps,
+                    "negative_prompt": negative_prompt,
+                    "upscale": upscale,
+                    "upscale_factor": upscale_factor if upscale else None
                 }
                 
-                # Log the final response JSON
-                logger.info(f"API Response: {response_json}")
+                # Trigger async upload with output JSON
+                run_async_task(lambda: upload_to_internal_s3(output_json))
+                logger.info(f"Triggered async internal S3 upload for hash: {image_hash}")
                 
-                return response_json
+                # Log the final response JSON
+                logger.info(f"API Response: {output_json}")
+                
+                return output_json
                 
             except HTTPException:
                 raise  # Re-raise HTTP exceptions
@@ -920,6 +1114,8 @@ def generate_image_internal(
             from fastapi.responses import FileResponse
             # Determine media type based on configuration
             media_type = "image/jpeg" if SAVE_AS_JPEG else "image/png"
+            # Log the output JSON even though we're returning binary
+            logger.info(f"API Response (metadata for binary): {output_json}")
             return FileResponse(
                 image_filename,
                 media_type=media_type,
@@ -927,23 +1123,10 @@ def generate_image_internal(
                 headers={"Content-Disposition": f"inline; filename={filename}"}
             )
 
-        response_json = {
-            "message": f"Generated {model_type_name} image for prompt: {enhanced_prompt}",
-            "image_url": image_filename,
-            "download_url": download_url,
-            "filename": filename,
-            "generation_time": f"{generation_time:.2f}s",
-            "lora_applied": actual_lora_info.get("name") if actual_lora_info else None,
-            "lora_weight": actual_lora_info.get("weight") if actual_lora_info else None,
-            "width": final_width,
-            "height": final_height,
-            "seed": seed,
-        }
-        
         # Log the final response JSON
-        logger.info(f"API Response: {response_json}")
+        logger.info(f"API Response: {output_json}")
         
-        return response_json
+        return output_json
 
     except Exception as e:
         logger.error(

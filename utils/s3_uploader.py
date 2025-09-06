@@ -189,7 +189,7 @@ def upload_to_s3(
     # Replace the placeholder filename with {image_hash}.jpg
     # Pattern matches: /any_name.(png|jpg|jpeg) before the query string
     pattern = r'/[^/?]+\.(png|jpg|jpeg)(?=\?|$)'
-    replacement = f'/{image_hash}.jpg'
+    replacement = f'/output-{image_hash}.jpg'
     
     # Replace the filename in the URL
     updated_url = re.sub(pattern, replacement, presigned_url, count=1, flags=re.IGNORECASE)
@@ -197,7 +197,7 @@ def upload_to_s3(
     if updated_url == presigned_url:
         logger.warning(f"Could not find filename pattern in URL, using original: {presigned_url[:100]}...")
     else:
-        logger.info(f"Updated URL filename from placeholder to {image_hash}.jpg")
+        logger.info(f"Updated URL filename from placeholder to output-{image_hash}.jpg")
     
     uploader = get_uploader()
     success, error, status_code = uploader.upload_image(image, updated_url, jpeg_quality)

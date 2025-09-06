@@ -401,18 +401,28 @@ def quick_upscale(
 ) -> bool:
     """
     Quick upscaling function for single images
+    
+    Note: This function uses the singleton upscaler instance by default.
+    If a custom model_path is provided, it will create a new instance.
 
     Args:
         input_path: Path to input image
         output_path: Path to save upscaled image
         scale_factor: Upscaling factor (2 or 4)
-        model_path: Path to Remacri model weights
+        model_path: Path to Remacri model weights (if None, uses singleton)
 
     Returns:
         True if successful, False otherwise
     """
     try:
-        upscaler = FLUXUpscaler(model_path)
+        if model_path is None:
+            # Use the singleton instance for better performance
+            upscaler = get_upscaler()
+        else:
+            # Create a new instance with custom model path
+            logger.info(f"Creating new FLUXUpscaler instance with custom model: {model_path}")
+            upscaler = FLUXUpscaler(model_path)
+            
         if not upscaler.is_ready():
             logger.error("Upscaler not ready")
             return False
@@ -437,6 +447,29 @@ if __name__ == "__main__":
     else:
         print("❌ Upscaler not ready")
         print("Make sure ESRGAN is installed and model weights are available")
+
+
+# Global singleton upscaler instance
+import threading
+
+_upscaler_instance = None
+_upscaler_lock = threading.Lock()
+
+
+def get_upscaler():
+    """Get or create the singleton upscaler instance"""
+    global _upscaler_instance
+    if _upscaler_instance is None:
+        with _upscaler_lock:
+            # Double-check pattern for thread safety
+            if _upscaler_instance is None:
+                logger.info("Creating singleton FLUXUpscaler instance...")
+                _upscaler_instance = FLUXUpscaler()
+                if _upscaler_instance.is_ready():
+                    logger.info("Singleton FLUXUpscaler instance created and ready")
+                else:
+                    logger.warning("Singleton FLUXUpscaler instance created but not ready")
+    return _upscaler_instance
 
 
 # API Integration Functions
@@ -478,7 +511,8 @@ def apply_upscaling(
 
     try:
         logger.info(f"Starting upscaling with factor {upscale_factor}x...")
-        upscaler = FLUXUpscaler()
+        # Use the singleton upscaler instance instead of creating a new one
+        upscaler = get_upscaler()
 
         # Check if upscaler is ready and log detailed status
         if not upscaler.is_ready():

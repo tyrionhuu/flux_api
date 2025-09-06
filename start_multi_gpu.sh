@@ -209,6 +209,7 @@ start_service() {
             export FP4_API_PORT=$port
             export NUM_GPU_INSTANCES=$NUM_GPUS
             export FLUX_RETURN_BASE64=true
+            export PRELOAD_UPSCALER=true
             export OMP_NUM_THREADS=$threads_per_gpu
             export MKL_NUM_THREADS=$threads_per_gpu
             export NUMEXPR_NUM_THREADS=$threads_per_gpu
