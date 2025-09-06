@@ -15,13 +15,13 @@ import loguru
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
-from utils.birefnet_remover import remove_background_birefnet
 
 from api.models import ApplyLoRARequest, GenerateRequest
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_LORA_NAME,
                              DEFAULT_LORA_WEIGHT, INFERENCE_STEPS)
 from models.flux_model import FluxModelManager
 from models.upscaler import apply_upscaling
+from utils.birefnet_remover import remove_background_birefnet
 from utils.cleanup_service import (cleanup_after_generation,
                                    cleanup_after_upload)
 from utils.image_utils import (extract_image_from_result,
@@ -51,10 +51,10 @@ def _get_bg_removal_strength(strength: Optional[float]) -> Optional[float]:
     """
     Get background removal strength parameter
     BiRefNet current version doesn't support strength adjustment, but keeps API compatibility
-    
+
     Args:
         strength: Background removal strength (0.0-1.0)
-        
+
     Returns:
         Processed strength value, currently returns original value
     """
@@ -375,7 +375,9 @@ def _apply_loras(loras_to_apply, remove_all_loras):
             if applied_loras:
                 logger.info(f"Successfully applied LoRAs: {applied_loras}")
             else:
-                logger.info("LoRAs applied successfully (no current LoRA info available)")
+                logger.info(
+                    "LoRAs applied successfully (no current LoRA info available)"
+                )
 
         current_lora = model_manager.get_lora_info()
         if current_lora:
@@ -1178,7 +1180,9 @@ async def apply_lora(request: ApplyLoRARequest):
 
     try:
         if model_manager.apply_lora(request.lora_name, request.weight):
-            logger.info(f"LoRA {request.lora_name} applied successfully with weight {request.weight}")
+            logger.info(
+                f"LoRA {request.lora_name} applied successfully with weight {request.weight}"
+            )
             return {
                 "message": f"LoRA {request.lora_name} applied successfully with weight {request.weight}",
                 "lora_name": request.lora_name,
@@ -1580,11 +1584,11 @@ def _apply_background_removal_to_saved(
 ) -> str:
     """
     Apply BiRefNet background removal to saved image
-    
+
     Args:
         download_url: Image download URL
         bg_strength: Background removal strength (0.0-1.0), currently unused
-        
+
     Returns:
         Processed image download URL
     """
@@ -1592,16 +1596,16 @@ def _apply_background_removal_to_saved(
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         filename = download_url.split("/")[-1]
         abs_path = Path(base_dir) / "generated_images" / filename
-        
+
         # Open image and convert to RGB format (BiRefNet requires RGB input)
         with Image.open(abs_path).convert("RGB") as im:
             # Use BiRefNet for background removal
             output_im = remove_background_birefnet(im, bg_strength)
-        
+
         # Save processed image
         new_rel = save_image_with_unique_name(output_im)  # saves into generated_images
         return f"/generated_images/{Path(new_rel).name}"
-        
+
     except Exception as e:
         logger.error(f"BiRefNet background removal processing failed: {e}")
         return download_url

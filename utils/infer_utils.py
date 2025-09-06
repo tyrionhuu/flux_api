@@ -42,15 +42,13 @@ def nearest_kontext_size(w: int, h: int, use_extended: bool = True) -> tuple[int
     else:
         resolution_list = PREFERRED_KONTEXT_RESOLUTIONS
         logger.info(f"Using original resolutions (no 2/3) for {w}x{h} image")
-    
+
     # Calculate target aspect ratio
     target_ar = w / h if h else 1.0
     logger.info(f"Target aspect ratio: {target_ar:.3f}")
-    
+
     # Prefer candidates that do not exceed the current image size (avoid upscaling when possible)
-    candidates = [
-        (tw, th) for (tw, th) in resolution_list if tw <= w and th <= h
-    ]
+    candidates = [(tw, th) for (tw, th) in resolution_list if tw <= w and th <= h]
 
     def aspect_ratio_diff(wh):
         tw, th = wh
@@ -61,13 +59,17 @@ def nearest_kontext_size(w: int, h: int, use_extended: bool = True) -> tuple[int
         # Pick the closest by aspect ratio difference
         best_candidate = min(candidates, key=aspect_ratio_diff)
         best_ar = best_candidate[0] / best_candidate[1] if best_candidate[1] else 1.0
-        logger.info(f"Selected candidate {best_candidate} with AR {best_ar:.3f} (diff: {aspect_ratio_diff(best_candidate):.3f})")
+        logger.info(
+            f"Selected candidate {best_candidate} with AR {best_ar:.3f} (diff: {aspect_ratio_diff(best_candidate):.3f})"
+        )
         return best_candidate
 
     # If none fit, fall back to the closest aspect ratio overall (allows upscaling)
     best_overall = min(resolution_list, key=aspect_ratio_diff)
     best_ar = best_overall[0] / best_overall[1] if best_overall[1] else 1.0
-    logger.info(f"Selected overall best {best_overall} with AR {best_ar:.3f} (diff: {aspect_ratio_diff(best_overall):.3f})")
+    logger.info(
+        f"Selected overall best {best_overall} with AR {best_ar:.3f} (diff: {aspect_ratio_diff(best_overall):.3f})"
+    )
     return best_overall
 
 
@@ -93,15 +95,22 @@ def kontext_preprocess(
 ) -> tuple[Image.Image, int, int]:
     # If downscale is enabled and input image exceeds 512x512 in either dimension, downscale by 2/3 first
     src_w, src_h = image_pil.width, image_pil.height
-    logger.info(f"kontext_preprocess called with downscale={downscale}, image size={src_w}x{src_h}")
+    logger.info(
+        f"kontext_preprocess called with downscale={downscale}, image size={src_w}x{src_h}"
+    )
     if downscale and (src_w > 512 or src_h > 512):
-        logger.info(f"Downscaling image from {src_w}x{src_h} to {int(src_w * 2 // 3)}x{int(src_h * 2 // 3)}")
+        logger.info(
+            f"Downscaling image from {src_w}x{src_h} to {int(src_w * 2 // 3)}x{int(src_h * 2 // 3)}"
+        )
         down_w, down_h = max(1, int(src_w * 2 // 3)), max(1, int(src_h * 2 // 3))
         image_pil = image_pil.resize((down_w, down_h), Image.Resampling.LANCZOS)
     elif not downscale:
-        logger.info(f"Downscaling disabled, keeping original image size {src_w}x{src_h}")
+        logger.info(
+            f"Downscaling disabled, keeping original image size {src_w}x{src_h}"
+        )
 
-    tgt_w, tgt_h = nearest_kontext_size(image_pil.width, image_pil.height, use_extended=downscale)
+    tgt_w, tgt_h = nearest_kontext_size(
+        image_pil.width, image_pil.height, use_extended=downscale
+    )
     processed = letterbox_to(image_pil, (tgt_w, tgt_h), bg=(255, 255, 255))
     return processed, tgt_w, tgt_h
-
