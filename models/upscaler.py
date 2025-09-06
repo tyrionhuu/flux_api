@@ -240,16 +240,23 @@ class FLUXUpscaler:
         return img_tensor.to(self.device)
 
     def _postprocess_image(self, output: torch.Tensor) -> np.ndarray:
-        """Postprocess ESRGAN model output"""
-        # Remove batch dimension and clamp to [0, 1]
-        output_np = output.data.squeeze().float().cpu().clamp_(0, 1).numpy()
-
-        # Transpose back to (H, W, C) and convert BGR to RGB
-        output_np = np.transpose(output_np[[2, 1, 0], :, :], (1, 2, 0))
-
-        # Convert to [0, 255] range
-        output_np = (output_np * 255.0).round().astype(np.uint8)
-
+        """Postprocess ESRGAN model output - Optimized version"""
+        # Perform all computations on GPU to minimize CPU-GPU transfers
+        with torch.no_grad():
+            # Complete in one step: remove batch dimension, clamp, and convert data type
+            output = output.squeeze(0).clamp_(0, 1)
+            
+            # Complete BGR to RGB conversion and dimension rearrangement on GPU
+            # Use permute instead of transpose for better performance
+            output = output.permute(1, 2, 0)  # (C, H, W) -> (H, W, C)
+            output = output[:, :, [2, 1, 0]]  # BGR -> RGB
+            
+            # Complete numerical conversion on GPU
+            output = (output * 255.0).round().to(torch.uint8)
+            
+            # Convert to CPU and numpy in one step
+            output_np = output.cpu().numpy()
+            
         return output_np
 
     def upscale_image(
