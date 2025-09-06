@@ -162,16 +162,43 @@ def wait_for_port_free(port: int = 8000, max_wait: int = 30) -> bool:
     return False
 
 
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully"""
+    print(f"\n\n🛑 Received signal {signum}, shutting down gracefully...")
+    # The process variable will be handled in the main loop
+    sys.exit(0)
+
+
 def start_service():
     """Start the Diffusion API service"""
     print("\n🚀 Starting Diffusion API Service...")
     print("=" * 50)
+
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     # Determine target port from environment (fallback to 8000)
     try:
         target_port = int(os.environ.get("API_PORT", "8000"))
     except ValueError:
         target_port = 8000
+
+    # Check if frontend is enabled
+    frontend_enabled = os.environ.get("ENABLE_FRONTEND", "true").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    if not frontend_enabled:
+        print("🔧 Backend-only mode enabled - frontend will be disabled")
+
+    # Check which model to load
+    model_type = os.environ.get("MODEL_TYPE", "flux").lower()
+    if model_type not in ["flux", "qwen"]:
+        print(f"⚠️  Invalid MODEL_TYPE '{model_type}', defaulting to 'flux'")
+        model_type = "flux"
+    print(f"🔧 Model type: {model_type}")
 
     # Clean up port before starting
     if not cleanup_port(target_port):
@@ -225,6 +252,10 @@ def start_service():
         else:
             print("⚠️  CUDA_VISIBLE_DEVICES not set; default visible GPU will be used")
 
+        # Set environment variables for the service
+        env["ENABLE_FRONTEND"] = str(frontend_enabled).lower()
+        env["MODEL_TYPE"] = model_type
+
         process = subprocess.Popen(
             [python_exec, "main.py"],
             stdout=subprocess.PIPE,
@@ -241,20 +272,30 @@ def start_service():
         print("\n📋 Service logs:")
         print("-" * 50)
 
-        # Stream the output
-        if process.stdout:
-            for line in process.stdout:
-                print(line.rstrip())
+        # Stream the output with proper signal handling
+        try:
+            if process.stdout:
+                for line in process.stdout:
+                    print(line.rstrip())
+        except KeyboardInterrupt:
+            print("\n\n⏹️  Stopping service...")
+            if process:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+            print("✅ Service stopped")
+        except Exception as e:
+            print(f"❌ Error during service execution: {e}")
+            if process:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+            return False
 
-    except KeyboardInterrupt:
-        print("\n\n⏹️  Stopping service...")
-        if process:
-            process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-        print("✅ Service stopped")
     except Exception as e:
         print(f"❌ Failed to start service: {e}")
         return False

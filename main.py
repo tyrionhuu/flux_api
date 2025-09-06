@@ -46,14 +46,15 @@ async def lifespan(app: FastAPI):
         logger.info("FP4 Diffusion API started with cleanup service")
 
         # Auto-load the Diffusion model
-        logger.info("Auto-loading Diffusion model...")
+        model_type = os.environ.get("MODEL_TYPE", "flux").lower()
+        logger.info(f"Auto-loading Diffusion model (type: {model_type})...")
 
         model_manager = get_model_manager()
 
-        if model_manager.load_model():
-            logger.info("Diffusion model loaded successfully during startup")
+        if model_manager.load_model(model_type):
+            logger.info(f"Diffusion model ({model_type}) loaded successfully during startup")
         else:
-            logger.error("Failed to load Diffusion model during startup")
+            logger.error(f"Failed to load Diffusion model ({model_type}) during startup")
 
         time.sleep(2)
 
@@ -97,14 +98,34 @@ app.add_middleware(
 # Include API routes
 app.include_router(router, prefix="")
 
-# Mount static files for frontend
-if os.path.exists("frontend/static"):
+# Mount static files for frontend (only if frontend is enabled)
+frontend_enabled = os.environ.get("ENABLE_FRONTEND", "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
+if frontend_enabled and os.path.exists("frontend/static"):
     app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 
 
 @app.get("/ui", response_class=HTMLResponse)
 async def serve_frontend():
     """Serve the ComfyUI-style frontend"""
+    # Check if frontend is enabled
+    if not frontend_enabled:
+        return """
+        <html>
+            <head><title>FP4 Diffusion API - Backend Only</title></head>
+            <body>
+                <h1>FP4 Diffusion API - Backend Only Mode</h1>
+                <p>Frontend is disabled. This service is running in backend-only mode.</p>
+                <p><a href="/docs">Visit API Documentation</a></p>
+                <p><a href="/health">Health Check</a></p>
+            </body>
+        </html>
+        """
+    
     frontend_path = "frontend/templates/index.html"
     if os.path.exists(frontend_path):
         with open(frontend_path, "r") as f:

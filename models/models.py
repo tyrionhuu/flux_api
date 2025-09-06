@@ -13,11 +13,11 @@ from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from nunchaku import NunchakuFluxTransformer2dModel
 from nunchaku.models.transformers.transformer_qwenimage import \
     NunchakuQwenImageTransformer2DModel
-from nunchaku.pipeline.pipeline_qwenimage import NunchakuQwenImagePipeline
 from nunchaku.utils import get_precision
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
 from loguru import logger
+from diffusers.pipelines.qwenimage.pipeline_qwenimage import QwenImagePipeline
 
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_INFERENCE_STEPS,
                              MODEL_TYPE, NUNCHAKU_FLUX_MODEL_ID,
@@ -29,7 +29,7 @@ class DiffusionModelManager:
     """Manages Diffusion model loading and quantization"""
 
     def __init__(self):
-        self.pipe: Optional[FluxPipeline | NunchakuQwenImagePipeline] = None
+        self.pipe: Optional[FluxPipeline | QwenImagePipeline] = None
         self.model_loaded = False
         self.gpu_manager = GPUManager()
         self.current_model_type = MODEL_TYPE
@@ -185,7 +185,7 @@ class DiffusionModelManager:
                 if device_map == "balanced":
                     # Multi-GPU balanced mode
                     logger.info("Loading pipeline with balanced device map")
-                    self.pipe = NunchakuQwenImagePipeline.from_pretrained(
+                    self.pipe = QwenImagePipeline.from_pretrained(
                         "Qwen/Qwen-Image",
                         transformer=transformer,
                         torch_dtype=torch.bfloat16,
@@ -193,7 +193,7 @@ class DiffusionModelManager:
                     )
                 else:
                     # Single GPU mode
-                    self.pipe = NunchakuQwenImagePipeline.from_pretrained(
+                    self.pipe = QwenImagePipeline.from_pretrained(
                         "Qwen/Qwen-Image",
                         transformer=transformer,
                         torch_dtype=torch.bfloat16,
@@ -389,7 +389,7 @@ class DiffusionModelManager:
         """Check if the model is loaded and pipeline is available"""
         return self.model_loaded and self.pipe is not None
 
-    def get_pipeline(self) -> Optional[FluxPipeline | NunchakuQwenImagePipeline]:
+    def get_pipeline(self) -> Optional[FluxPipeline | QwenImagePipeline]:
         """Get the loaded Diffusion pipeline with Nunchaku transformer"""
         return self.pipe
 

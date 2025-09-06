@@ -50,7 +50,7 @@ pip install https://github.com/nunchaku-tech/nunchaku/releases/download/v1.0.0de
 ./start_api.sh -p 8002
 
 # Start frontend (optional)
-cd frontend && python -m http.server 9000
+cd frontend && python -m http.server 8200
 ```
 
 ### 3. Access the Service

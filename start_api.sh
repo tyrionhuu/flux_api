@@ -11,19 +11,30 @@ echo "=========================="
 # Parse args (-g supports single GPU id or comma-separated list, e.g., "1,2,3")
 GPU_ID=""
 PORT=8000
+FRONTEND_ENABLED="true"
+MODEL_TYPE="flux"
 
 usage() {
-    echo "Usage: $0 [-g <gpu_ids>]"
-    echo "  -g <gpu_ids>   GPU index or comma-separated list (e.g., 1 or 1,2,3). If omitted, all GPUs remain visible."
+    echo "Usage: $0 [-g <gpu_ids>] [-p <port>] [-f <frontend_enabled>] [-m <model_type>]"
+    echo "  -g <gpu_ids>         GPU index or comma-separated list (e.g., 1 or 1,2,3). If omitted, all GPUs remain visible."
+    echo "  -p <port>            Port number for the API service (default: 8000)"
+    echo "  -f <frontend_enabled> Enable/disable frontend (true/false, default: true)"
+    echo "  -m <model_type>      Model type to load (flux/qwen, default: flux)"
 }
 
-while getopts ":g:p:h" opt; do
+while getopts ":g:p:f:m:h" opt; do
   case "$opt" in
     g)
       GPU_ID="$OPTARG"
       ;;
     p)
       PORT="$OPTARG"
+      ;;
+    f)
+      FRONTEND_ENABLED="$OPTARG"
+      ;;
+    m)
+      MODEL_TYPE="$OPTARG"
       ;;
     h)
       usage
@@ -151,6 +162,12 @@ fi
 
 # Export selected port for the Python service
 export API_PORT="$PORT"
-echo "🔧 Using API_PORT=${API_PORT}"
+export ENABLE_FRONTEND="$FRONTEND_ENABLED"
+export MODEL_TYPE="$MODEL_TYPE"
+
+echo "🔧 Configuration:"
+echo "   API_PORT=${API_PORT}"
+echo "   ENABLE_FRONTEND=${ENABLE_FRONTEND}"
+echo "   MODEL_TYPE=${MODEL_TYPE}"
 
 python start_service.py

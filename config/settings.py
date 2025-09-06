@@ -30,5 +30,8 @@ GENERATED_IMAGES_DIR = "generated_images"
 MIN_LORA_WEIGHT = 0.0
 MAX_LORA_WEIGHT = 2.0
 
-MODEL_TYPE = "flux"
-# MODEL_TYPE = "qwen"
+# Model type configuration (can be overridden via environment variable)
+MODEL_TYPE = os.environ.get("MODEL_TYPE", "flux").lower()
+if MODEL_TYPE not in ["flux", "qwen"]:
+    print(f"Warning: Invalid MODEL_TYPE '{MODEL_TYPE}', defaulting to 'flux'")
+    MODEL_TYPE = "flux"
