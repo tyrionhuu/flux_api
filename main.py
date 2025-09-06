@@ -21,10 +21,13 @@ if "HUGGINGFACE_HUB_TOKEN" in os.environ:
     # Also set it for huggingface_hub library
     try:
         from huggingface_hub import login
+
         login(token=os.environ["HUGGINGFACE_HUB_TOKEN"])
         print(f"✅ Hugging Face token configured successfully")
     except ImportError:
-        print("⚠️  huggingface_hub not available, token may not work for model downloads")
+        print(
+            "⚠️  huggingface_hub not available, token may not work for model downloads"
+        )
     except Exception as e:
         print(f"⚠️  Failed to configure Hugging Face token: {e}")
 else:
@@ -166,7 +169,11 @@ async def validate_requests(request, call_next):
 app.include_router(router, prefix="")
 
 # Check if frontend should be enabled (default: True for backward compatibility)
-FRONTEND_ENABLED = os.environ.get("ENABLE_FRONTEND", "true").lower() in ("true", "1", "yes")
+FRONTEND_ENABLED = os.environ.get("ENABLE_FRONTEND", "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 # Mount static files for frontend only if frontend is enabled
 if FRONTEND_ENABLED and os.path.exists("frontend/static"):
@@ -202,7 +209,7 @@ async def serve_frontend():
             </body>
         </html>
         """
-    
+
     frontend_path = "frontend/templates/index.html"
     if os.path.exists(frontend_path):
         with open(frontend_path, "r") as f:

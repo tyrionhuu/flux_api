@@ -218,6 +218,13 @@ class FluxModelManager:
                 logger.warning("Pipeline not loaded, cannot apply default LoRA")
                 return False
 
+            # Check if there's a default LoRA to apply
+            if DEFAULT_LORA_NAME is None:
+                logger.info(
+                    "No default LoRA configured, skipping default LoRA application"
+                )
+                return True
+
             logger.info(
                 f"Applying default LoRA: {DEFAULT_LORA_NAME} with weight {DEFAULT_LORA_WEIGHT}"
             )
@@ -670,7 +677,9 @@ class FluxModelManager:
 
             logger.info(f"   - Setting LoRA strength to {weight}")
             transformer.set_lora_strength(weight)
-            logger.info(f"   - LoRA '{lora_source}' applied successfully with weight {weight}")
+            logger.info(
+                f"   - LoRA '{lora_source}' applied successfully with weight {weight}"
+            )
             return True
         except Exception as e:
             logger.error(f"   - Failed to apply LoRA: {e}")
@@ -691,8 +700,12 @@ class FluxModelManager:
                 return True
 
             # Log details of LoRAs being applied
-            lora_details = [f"'{lora['name']}' (weight: {lora['weight']})" for lora in lora_configs]
-            logger.info(f"Applying {len(lora_configs)} LoRAs to FLUX pipeline: {', '.join(lora_details)}")
+            lora_details = [
+                f"'{lora['name']}' (weight: {lora['weight']})" for lora in lora_configs
+            ]
+            logger.info(
+                f"Applying {len(lora_configs)} LoRAs to FLUX pipeline: {', '.join(lora_details)}"
+            )
 
             if len(lora_configs) == 1:
                 # Single LoRA - apply directly
@@ -982,6 +995,16 @@ class FluxModelManager:
                     return upload_path
                 else:
                     logger.error(f"   - Uploaded LoRA file not found: {upload_path}")
+                    return None
+
+            # Check if it's a cached Hugging Face LoRA
+            if lora_name.startswith("hf_"):
+                upload_path = f"uploads/lora_files/{lora_name}"
+                if os.path.exists(upload_path):
+                    logger.info(f"   - Found cached HF LoRA file: {upload_path}")
+                    return upload_path
+                else:
+                    logger.error(f"   - Cached HF LoRA file not found: {upload_path}")
                     return None
 
             # Check if it's a local path

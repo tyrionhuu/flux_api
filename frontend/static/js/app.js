@@ -13,7 +13,7 @@ class FluxAPI {
     init() {
         this.setupEventListeners();
         this.loadAvailableLoras();
-        this.addDefaultLora();
+        // Removed automatic default LoRA addition
         this.updateApiCommand();
 
         setTimeout(() => {
@@ -216,6 +216,7 @@ class FluxAPI {
             refreshBtn.addEventListener('click', () => {
                 console.log('Refreshing LoRA list...');
                 this.loadAvailableLoras();
+                this.showSuccess('LoRA list refreshed');
             });
         }
 
@@ -291,51 +292,6 @@ class FluxAPI {
         // Image upload functionality
         this.setupImageUpload();
 
-        // LoRA info tooltip
-        const loraInfoIcon = this.getElement('lora-info-icon');
-        const loraInfoTooltip = this.getElement('lora-info-tooltip');
-        console.log('LoRA info icon found:', loraInfoIcon);
-        console.log('LoRA info tooltip found:', loraInfoTooltip);
-        console.log('LoRA info icon HTML:', loraInfoIcon ? loraInfoIcon.outerHTML : 'NOT FOUND');
-        console.log('LoRA info tooltip HTML:', loraInfoTooltip ? loraInfoTooltip.outerHTML : 'NOT FOUND');
-
-        if (loraInfoIcon && loraInfoTooltip) {
-            console.log('Setting up LoRA info tooltip event listeners');
-
-            // Test if the icon is clickable
-            loraInfoIcon.style.cursor = 'pointer';
-            console.log('Icon cursor style set to pointer');
-
-            loraInfoIcon.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('Info icon clicked!');
-                console.log('Tooltip before toggle:', loraInfoTooltip.className);
-                loraInfoTooltip.classList.toggle('show');
-                console.log('Tooltip after toggle:', loraInfoTooltip.className);
-                console.log('Tooltip computed styles:', window.getComputedStyle(loraInfoTooltip));
-            });
-
-            // Close tooltip when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!loraInfoIcon.contains(e.target) && !loraInfoTooltip.contains(e.target)) {
-                    loraInfoTooltip.classList.remove('show');
-                }
-            });
-
-            // Close tooltip when pressing Escape key
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    loraInfoTooltip.classList.remove('show');
-                }
-            });
-        } else {
-            console.error('LoRA info elements not found!');
-            console.error('Available elements with similar IDs:');
-            document.querySelectorAll('[id*="lora"]').forEach(el => {
-                console.log('Found element:', el.id, el);
-            });
-        }
 
         // Modal controls
         const closeModalBtn = this.getElement('close-modal');
@@ -445,19 +401,15 @@ class FluxAPI {
         // 清空现有列表，避免重复
         this.availableLoras = [];
 
-        // 添加默认LoRA
-        this.availableLoras.push({
-            name: '21j3h123/realEarthKontext/blob/main/lora_emoji.safetensors',
-            weight: 1.0,
-            type: 'default',
-            displayName: '21j3h123/realEarthKontext/lora_emoji.safetensors (Default)'
-        });
+        // No default LoRA added - users must explicitly select LoRAs
 
-        // 从服务器加载上传的LoRA
+        // 从服务器加载上传的LoRA和Hugging Face LoRA
         try {
             const resp = await fetch(`${this.hostBase}/loras`);
             if (resp.ok) {
                 const data = await resp.json();
+                
+                // Add uploaded LoRAs
                 if (data.uploaded && Array.isArray(data.uploaded)) {
                     data.uploaded.forEach(item => {
                         this.availableLoras.push({
@@ -471,10 +423,45 @@ class FluxAPI {
                         });
                     });
                 }
+                
+                // Add Hugging Face LoRAs
+                if (data.huggingface && Array.isArray(data.huggingface)) {
+                    data.huggingface.forEach(item => {
+                        this.availableLoras.push({
+                            name: item.name,
+                            weight: 1.0,
+                            type: 'huggingface',
+                            repoId: item.repo_id,
+                            filename: item.filename,
+                            displayName: `${item.display_name} (Hugging Face)`,
+                            size: item.size,
+                            timestamp: item.timestamp
+                        });
+                    });
+                }
             }
         } catch (e) {
             console.warn('Failed to load server LoRAs:', e);
         }
+
+        // Add currently applied LoRAs to available list (so they can be selected again)
+        this.appliedLoras.forEach(appliedLora => {
+            // Check if this LoRA is already in the available list
+            const exists = this.availableLoras.find(lora => lora.name === appliedLora.name);
+            if (!exists) {
+                this.availableLoras.push({
+                    name: appliedLora.name,
+                    weight: appliedLora.weight,
+                    type: appliedLora.type,
+                    storedName: appliedLora.storedName,
+                    repoId: appliedLora.repoId,
+                    filename: appliedLora.filename,
+                    displayName: appliedLora.displayName || `${appliedLora.name} (Applied)`,
+                    size: appliedLora.size,
+                    timestamp: appliedLora.timestamp
+                });
+            }
+        });
 
         // 清理重复项
         this.removeDuplicateLoras();
@@ -546,6 +533,18 @@ class FluxAPI {
         console.log('Rendering applied LoRAs:', this.appliedLoras);
         container.innerHTML = '';
 
+        // Show placeholder if no LoRAs are applied
+        if (this.appliedLoras.length === 0) {
+            container.innerHTML = `
+                <div class="lora-empty-placeholder">
+                    <i class="fas fa-magic"></i>
+                    <p>No LoRAs selected</p>
+                    <small>Select LoRAs from the dropdown above to add them here</small>
+                </div>
+            `;
+            return;
+        }
+
         this.appliedLoras.forEach((lora, index) => {
             const item = document.createElement('div');
             item.className = 'lora-item applied-lora-item';
@@ -614,6 +613,8 @@ class FluxAPI {
             weight: loraData.weight,
             type: loraData.type,
             storedName: loraData.storedName,
+            repoId: loraData.repoId,
+            filename: loraData.filename,
             size: loraData.size,
             timestamp: loraData.timestamp
         });
@@ -652,21 +653,7 @@ class FluxAPI {
         this.showSuccess(`LoRA "${removed.name}" removed from applied list`);
     }
 
-    // 添加默认LoRA
-    addDefaultLora() {
-        const defaultLora = this.availableLoras.find(l => l.type === 'default');
-        if (defaultLora) {
-            this.appliedLoras.push({
-                name: defaultLora.name,
-                weight: defaultLora.weight,
-                type: defaultLora.type,
-                storedName: defaultLora.storedName,
-                size: defaultLora.size,
-                timestamp: defaultLora.timestamp
-            });
-            this.renderAppliedLoras();
-        }
-    }
+    // addDefaultLora function removed - no default LoRA is applied automatically
 
     // 清空所有已应用的LoRA
     clearAllLoras() {
@@ -704,13 +691,21 @@ class FluxAPI {
             // 应用每个LoRA
             for (const lora of this.appliedLoras) {
                 const loraName = lora.storedName || lora.name;
+                const requestBody = {
+                    lora_name: loraName,
+                    weight: lora.weight
+                };
+                
+                // Add Hugging Face specific data if it's a HF LoRA
+                if (lora.type === 'huggingface') {
+                    requestBody.repo_id = lora.repoId;
+                    requestBody.filename = lora.filename;
+                }
+                
                 const response = await fetch(`${this.hostBase}/apply-lora`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        lora_name: loraName,
-                        weight: lora.weight
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!response.ok) {
@@ -720,6 +715,27 @@ class FluxAPI {
             }
 
             this.showSuccess(`Successfully applied ${this.appliedLoras.length} LoRA(s) to the model`);
+            
+            // Add applied LoRAs to available list if not already there
+            this.appliedLoras.forEach(appliedLora => {
+                const exists = this.availableLoras.find(lora => lora.name === appliedLora.name);
+                if (!exists) {
+                    this.availableLoras.push({
+                        name: appliedLora.name,
+                        weight: appliedLora.weight,
+                        type: appliedLora.type,
+                        storedName: appliedLora.storedName,
+                        repoId: appliedLora.repoId,
+                        filename: appliedLora.filename,
+                        displayName: appliedLora.displayName || `${appliedLora.name} (Applied)`,
+                        size: appliedLora.size,
+                        timestamp: appliedLora.timestamp
+                    });
+                }
+            });
+            
+            // Update dropdown with new LoRAs
+            this.populateLoraDropdown();
             
             // 更新API命令显示
             this.updateApiCommand();
@@ -739,12 +755,15 @@ class FluxAPI {
         return this.appliedLoras.map(lora => ({
             name: lora.storedName || lora.name,
             weight: lora.weight,
-            isUploaded: lora.type === 'uploaded'
+            isUploaded: lora.type === 'uploaded',
+            isHuggingFace: lora.type === 'huggingface',
+            repoId: lora.repoId,
+            filename: lora.filename
         }));
     }
 
     // 添加自定义LoRA
-    addCustomLora() {
+    async addCustomLora() {
         const customName = prompt('Enter LoRA name (Hugging Face repo ID or local path):');
         if (!customName || !customName.trim()) return;
 
@@ -755,16 +774,86 @@ class FluxAPI {
             return;
         }
 
-        // 添加到应用列表
-        this.appliedLoras.push({
-            name: customName.trim(),
-            weight: 1.0,
-            type: 'custom'
-        });
+        // Check if it's a Hugging Face LoRA (contains / and doesn't start with / or C:)
+        const isHuggingFace = customName.includes('/') && !customName.startsWith('/') && !customName.match(/^[A-Za-z]:/);
+        
+        if (isHuggingFace) {
+            // Try to cache the Hugging Face LoRA first
+            try {
+                // Show downloading progress indicator
+                this.showDownloadProgress('Downloading Hugging Face LoRA...');
+                
+                // Parse repo_id and filename from the input
+                let repo_id, filename;
+                
+                // Handle different input formats
+                if (customName.includes('/blob/main/')) {
+                    // Format: username/repo/blob/main/filename.safetensors
+                    const parts = customName.trim().split('/');
+                    repo_id = parts.slice(0, 2).join('/'); // username/repo
+                    filename = parts[parts.length - 1]; // filename.safetensors
+                } else if (customName.includes('/')) {
+                    // Format: username/repo/filename.safetensors
+                    const parts = customName.trim().split('/');
+                    repo_id = parts.slice(0, -1).join('/');
+                    filename = parts[parts.length - 1];
+                } else {
+                    throw new Error('Invalid Hugging Face LoRA format');
+                }
+                
+                const response = await fetch(`${this.hostBase}/cache-hf-lora`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        repo_id: repo_id,
+                        filename: filename,
+                        display_name: customName.trim()
+                    })
+                });
 
-        this.renderAppliedLoras();
-        this.updateApiCommand();
-        this.showSuccess(`Custom LoRA "${customName.trim()}" added`);
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to cache LoRA');
+                }
+
+                const result = await response.json();
+                
+                // Add to applied list with cached info
+                this.appliedLoras.push({
+                    name: customName.trim(),
+                    weight: 1.0,
+                    type: 'huggingface',
+                    storedName: result.stored_name,
+                    displayName: `${result.original_name} (Cached)`,
+                    size: result.size,
+                    timestamp: Math.floor(Date.now() / 1000)
+                });
+
+                this.renderAppliedLoras();
+                this.updateApiCommand();
+                this.hideDownloadProgress();
+                this.showSuccess(`Hugging Face LoRA "${customName.trim()}" cached and added`);
+                
+                // Refresh the available LoRAs list to include the cached one
+                this.loadAvailableLoras();
+                
+            } catch (error) {
+                console.error('Error caching HF LoRA:', error);
+                this.hideDownloadProgress();
+                this.showError(`Failed to cache LoRA: ${error.message}`);
+            }
+        } else {
+            // Local LoRA - add directly
+            this.appliedLoras.push({
+                name: customName.trim(),
+                weight: 1.0,
+                type: 'custom'
+            });
+
+            this.renderAppliedLoras();
+            this.updateApiCommand();
+            this.showSuccess(`Custom LoRA "${customName.trim()}" added`);
+        }
     }
 
     async generateImage() {
@@ -1517,6 +1606,79 @@ class FluxAPI {
         // Store container reference for progress updates
         this.uploadProgressContainer = progressContainer;
         this.uploadProgressFill = progressContainer.querySelector('.upload-progress-fill');
+    }
+
+    showDownloadProgress(message) {
+        // Create download progress indicator
+        const progressContainer = document.createElement('div');
+        progressContainer.id = 'download-progress';
+        progressContainer.className = 'download-progress';
+        progressContainer.innerHTML = `
+            <div class="download-progress-content">
+                <div class="download-progress-text">
+                    <div class="download-filename">${message}</div>
+                    <div class="download-status">Please wait...</div>
+                </div>
+                <div class="download-progress-bar">
+                    <div class="download-progress-fill"></div>
+                </div>
+            </div>
+        `;
+
+        // Add to page
+        document.body.appendChild(progressContainer);
+
+        // Add slide-in animation
+        setTimeout(() => {
+            progressContainer.classList.add('download-progress-show');
+        }, 100);
+
+        // Store container reference
+        this.downloadProgressContainer = progressContainer;
+        this.downloadProgressFill = progressContainer.querySelector('.download-progress-fill');
+        
+        // Start animated progress bar
+        this.animateDownloadProgress();
+    }
+
+    animateDownloadProgress() {
+        if (!this.downloadProgressFill) return;
+        
+        let progress = 0;
+        const animate = () => {
+            if (this.downloadProgressContainer && this.downloadProgressFill) {
+                progress += Math.random() * 10;
+                if (progress > 90) progress = 90; // Don't go to 100% until actually done
+                this.downloadProgressFill.style.width = progress + '%';
+                this.downloadProgressTimeout = setTimeout(animate, 200);
+            }
+        };
+        animate();
+    }
+
+    hideDownloadProgress() {
+        const progressContainer = this.getElement('download-progress');
+        if (progressContainer) {
+            // Clear animation timeout
+            if (this.downloadProgressTimeout) {
+                clearTimeout(this.downloadProgressTimeout);
+                this.downloadProgressTimeout = null;
+            }
+            
+            // Show completion briefly
+            progressContainer.classList.add('download-progress-complete');
+            
+            // Remove after animation
+            setTimeout(() => {
+                if (progressContainer.parentElement) {
+                    progressContainer.remove();
+                }
+            }, 500);
+        }
+
+        // Clear references
+        this.downloadProgressContainer = null;
+        this.downloadProgressFill = null;
     }
 
     updateUploadProgress(percent) {

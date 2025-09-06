@@ -32,25 +32,10 @@
                     </div>
                     
                     <!-- LoRA Configuration Section -->
-                    <div class="parameter-group">
+                    <div class="parameter-group lora-config-group">
                         <label>
                             LoRA Configuration
-                            <span class="info-icon" id="lora-info-icon" title="Click for more information">ℹ</span>
-                            <div class="info-tooltip" id="lora-info-tooltip">
-                                Select LoRAs from the dropdown and add them to your applied list
-                            </div>
                         </label>
-                        
-                        <!-- 已应用的LoRA列表 -->
-                        <div class="lora-container">
-                            <div id="applied-lora-list" class="lora-list applied-lora-list">
-                            </div>
-                            <div class="lora-buttons">
-                                <button id="clear-all-loras" class="btn btn-secondary btn-sm">
-                                    <i class="fas fa-trash"></i> Clear All
-                                </button>
-                            </div>
-                        </div>
                         
                         <!-- LoRA选择器 -->
                         <div class="lora-selector">
@@ -63,21 +48,39 @@
                                 </button>
                             </div>
                             <div class="lora-actions">
-                                <button id="add-custom-lora" class="btn btn-secondary">
+                                <button id="add-custom-lora" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-plus"></i> Add Custom LoRA
                                 </button>
-                                <button id="upload-lora" class="btn btn-secondary">
+                                <button id="upload-lora" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-upload"></i> Upload LoRA
                                 </button>
-                                <button id="refresh-loras" class="btn btn-secondary">
+                                <button id="refresh-loras" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-sync"></i> Refresh
                                 </button>
                             </div>
                         </div>
                         
-                        <button id="apply-lora-btn" class="btn btn-primary">
-                            <i class="fas fa-magic"></i> Apply Selected LoRAs
-                        </button>
+                        <!-- 已应用的LoRA列表 -->
+                        <div class="lora-container">
+                            <div id="applied-lora-list" class="lora-list applied-lora-list">
+                                <div class="lora-empty-placeholder">
+                                    <i class="fas fa-magic"></i>
+                                    <p>No LoRAs selected</p>
+                                    <small>Select LoRAs from the dropdown above to add them here</small>
+                                </div>
+                            </div>
+                            <div class="lora-buttons">
+                                <button id="clear-all-loras" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-trash"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="lora-apply-section">
+                            <button id="apply-lora-btn" class="btn btn-primary">
+                                <i class="fas fa-magic"></i> Apply Selected LoRAs
+                            </button>
+                        </div>
                         
                         <!-- Hidden file input for LoRA upload -->
                         <input type="file" id="lora-file-input" accept=".safetensors,.bin,.pt,.pth" style="display: none;">

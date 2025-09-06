@@ -174,7 +174,11 @@ def start_service():
         target_port = 9001
 
     # Check if frontend is enabled
-    frontend_enabled = os.environ.get("ENABLE_FRONTEND", "true").lower() in ("true", "1", "yes")
+    frontend_enabled = os.environ.get("ENABLE_FRONTEND", "true").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
     if not frontend_enabled:
         print("🔧 Backend-only mode enabled - frontend will be disabled")
 

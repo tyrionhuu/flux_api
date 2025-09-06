@@ -15,13 +15,13 @@ import loguru
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
-from utils.birefnet_remover import remove_background_birefnet
 
 from api.models import ApplyLoRARequest, GenerateRequest
 from config.settings import (DEFAULT_GUIDANCE_SCALE, DEFAULT_LORA_NAME,
                              DEFAULT_LORA_WEIGHT, INFERENCE_STEPS)
 from models.flux_model import FluxModelManager
 from models.upscaler import apply_upscaling
+from utils.birefnet_remover import remove_background_birefnet
 from utils.cleanup_service import (cleanup_after_generation,
                                    cleanup_after_upload)
 from utils.image_utils import (extract_image_from_result,
@@ -51,10 +51,10 @@ def _get_bg_removal_strength(strength: Optional[float]) -> Optional[float]:
     """
     Get background removal strength parameter
     BiRefNet current version doesn't support strength adjustment, but keeps API compatibility
-    
+
     Args:
         strength: Background removal strength (0.0-1.0)
-        
+
     Returns:
         Processed strength value, currently returns original value
     """
@@ -313,6 +313,7 @@ def _extract_loras_from_request(request: GenerateRequest):
         and not request.lora_name
         and hasattr(request, "use_default_lora")
         and request.use_default_lora
+        and DEFAULT_LORA_NAME is not None
     ):
         loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
 
@@ -374,7 +375,9 @@ def _apply_loras(loras_to_apply, remove_all_loras):
             if applied_loras:
                 logger.info(f"Successfully applied LoRAs: {applied_loras}")
             else:
-                logger.info("LoRAs applied successfully (no current LoRA info available)")
+                logger.info(
+                    "LoRAs applied successfully (no current LoRA info available)"
+                )
 
         current_lora = model_manager.get_lora_info()
         if current_lora:
@@ -1170,26 +1173,38 @@ def get_model_status():
 
 @router.post("/apply-lora")
 async def apply_lora(request: ApplyLoRARequest):
-    """Apply a LoRA to the current model - lora_name should be a Hugging Face repo ID (e.g., aleksa-codes/flux-ghibsky-illustration)"""
+    """Apply a LoRA to the current model - supports both local files and Hugging Face repositories"""
     if not model_manager.is_loaded():
         logger.error(f"Cannot apply LoRA {request.lora_name}: Model not loaded")
         raise HTTPException(status_code=500, detail="Model not loaded")
 
     try:
-        if model_manager.apply_lora(request.lora_name, request.weight):
-            logger.info(f"LoRA {request.lora_name} applied successfully with weight {request.weight}")
+        # Determine the LoRA source and construct the appropriate identifier
+        lora_identifier = request.lora_name
+
+        # If it's a Hugging Face LoRA, use the repo_id and filename
+        if request.repo_id and request.filename:
+            lora_identifier = f"{request.repo_id}/{request.filename}"
+            logger.info(f"Applying Hugging Face LoRA: {lora_identifier}")
+        else:
+            logger.info(f"Applying local LoRA: {lora_identifier}")
+
+        if model_manager.apply_lora(lora_identifier, request.weight):
+            logger.info(
+                f"LoRA {lora_identifier} applied successfully with weight {request.weight}"
+            )
             return {
-                "message": f"LoRA {request.lora_name} applied successfully with weight {request.weight}",
-                "lora_name": request.lora_name,
+                "message": f"LoRA {lora_identifier} applied successfully with weight {request.weight}",
+                "lora_name": lora_identifier,
                 "weight": request.weight,
                 "status": "applied",
             }
         else:
             logger.error(
-                f"Failed to apply LoRA {request.lora_name} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
+                f"Failed to apply LoRA {lora_identifier} - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is not None}"
             )
             raise HTTPException(
-                status_code=500, detail=f"Failed to apply LoRA {request.lora_name}"
+                status_code=500, detail=f"Failed to apply LoRA {lora_identifier}"
             )
     except Exception as e:
         raise handle_api_error("LoRA application", e)
@@ -1449,7 +1464,7 @@ async def get_available_loras():
                     ):
                         uploaded_loras = index_data["entries"]
                         logger.info(
-                            f"Loaded {len(uploaded_loras)} LoRAs from index.json"
+                            f"Loaded {len(uploaded_loras)} uploaded LoRAs from index.json"
                         )
                     else:
                         logger.warning("Invalid index.json format")
@@ -1457,24 +1472,122 @@ async def get_available_loras():
                 logger.error(f"Failed to parse index.json: {e}")
                 uploaded_loras = []
 
-        # Add default LoRA
-        default_loras = [
-            {
-                "name": "21j3h123/realEarthKontext/blob/main/lora_emoji.safetensors",
-                "display_name": "21j3h123/realEarthKontext/lora_emoji.safetensors (Default)",
-                "type": "default",
-                "weight": 1.0,
-            }
-        ]
+        # No default LoRAs - users must explicitly select LoRAs
+        default_loras = []
 
         return {
             "uploaded": uploaded_loras,
+            "huggingface": [],
             "default": default_loras,
             "total_count": len(uploaded_loras) + len(default_loras),
         }
 
     except Exception as e:
         raise handle_api_error("get available LoRAs", e)
+
+
+@router.post("/cache-hf-lora")
+async def cache_huggingface_lora(request: dict):
+    """Cache a Hugging Face LoRA and add it to the index"""
+    try:
+        repo_id = request.get("repo_id")
+        filename = request.get("filename")
+        display_name = request.get("display_name", f"{repo_id}/{filename}")
+
+        if not repo_id or not filename:
+            raise HTTPException(
+                status_code=400, detail="repo_id and filename are required"
+            )
+
+        # Generate a unique stored name for the cached LoRA
+        import hashlib
+        import os
+        import time
+
+        # Create a hash-based name to avoid conflicts
+        hash_input = f"{repo_id}_{filename}_{int(time.time())}"
+        stored_name = (
+            f"hf_{hashlib.md5(hash_input.encode()).hexdigest()[:12]}.safetensors"
+        )
+
+        # Download and cache the LoRA using the existing model manager
+        model_manager = get_model_manager()
+
+        # Use the existing HF download logic from the model
+        try:
+            import shutil
+            import tempfile
+
+            from huggingface_hub import hf_hub_download
+
+            # Create temp directory for download
+            temp_dir = tempfile.mkdtemp(prefix="hf_lora_cache_")
+
+            # Download the LoRA file
+            logger.info(
+                f"Downloading HF LoRA: repo_id={repo_id}, filename={filename}, temp_dir={temp_dir}"
+            )
+            downloaded_path = hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                cache_dir=temp_dir,
+            )
+
+            logger.info(f"Downloaded file path: {downloaded_path}")
+
+            # Ensure the downloaded file exists
+            if not os.path.exists(downloaded_path):
+                raise FileNotFoundError(f"Downloaded file not found: {downloaded_path}")
+
+            logger.info(f"File exists, size: {os.path.getsize(downloaded_path)} bytes")
+
+            # Move to uploads directory
+            uploads_dir = Path("uploads/lora_files")
+            uploads_dir.mkdir(parents=True, exist_ok=True)
+
+            final_path = uploads_dir / stored_name
+
+            # Copy instead of move to avoid issues
+            shutil.copy2(downloaded_path, final_path)
+
+            # Verify the file was copied successfully
+            if not final_path.exists():
+                raise FileNotFoundError(f"Failed to copy file to: {final_path}")
+
+            # Get file size
+            file_size = final_path.stat().st_size
+
+            # Clean up temp directory
+            shutil.rmtree(temp_dir)
+
+            # Add to index
+            await update_lora_index(
+                stored_name=stored_name,
+                original_name=display_name,
+                timestamp=int(time.time()),
+                size=file_size,
+            )
+
+            logger.info(
+                f"Successfully cached Hugging Face LoRA: {repo_id}/{filename} as {stored_name}"
+            )
+
+            return {
+                "message": f"LoRA cached successfully",
+                "stored_name": stored_name,
+                "original_name": display_name,
+                "size": file_size,
+                "type": "huggingface",
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to download and cache HF LoRA: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to cache LoRA: {str(e)}"
+            )
+
+    except Exception as e:
+        raise handle_api_error("cache Hugging Face LoRA", e)
 
 
 @router.post("/upload-lora")
@@ -1586,11 +1699,11 @@ def _apply_background_removal_to_saved(
 ) -> str:
     """
     Apply BiRefNet background removal to saved image
-    
+
     Args:
         download_url: Image download URL
         bg_strength: Background removal strength (0.0-1.0), currently unused
-        
+
     Returns:
         Processed image download URL
     """
@@ -1598,16 +1711,16 @@ def _apply_background_removal_to_saved(
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         filename = download_url.split("/")[-1]
         abs_path = Path(base_dir) / "generated_images" / filename
-        
+
         # Open image and convert to RGB format (BiRefNet requires RGB input)
         with Image.open(abs_path).convert("RGB") as im:
             # Use BiRefNet for background removal
             output_im = remove_background_birefnet(im, bg_strength)
-        
+
         # Save processed image
         new_rel = save_image_with_unique_name(output_im)  # saves into generated_images
         return f"/generated_images/{Path(new_rel).name}"
-        
+
     except Exception as e:
         logger.error(f"BiRefNet background removal processing failed: {e}")
         return download_url
