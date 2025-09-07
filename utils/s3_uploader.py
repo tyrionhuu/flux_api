@@ -153,57 +153,29 @@ def upload_to_s3(
     image: Image.Image,
     presigned_url: str,
     jpeg_quality: int = 65,
-    image_hash: Optional[str] = None
+    image_hash: Optional[str] = None,
 ) -> Tuple[bool, Optional[str], str, Optional[int]]:
     """
-    Simple API for S3 upload.
-    Replaces placeholder filename in URL with actual image_hash.jpg
-    
+    Simple API for S3 upload using the provided pre-signed URL as-is.
+
     Args:
         image: PIL Image to upload
-        presigned_url: Pre-signed S3 URL with placeholder filename
+        presigned_url: Pre-signed S3 URL for PUT (includes the exact desired filename)
         jpeg_quality: JPEG compression quality
-        image_hash: Optional pre-computed image hash (MD5)
-    
+        image_hash: Unused; kept for backward compatibility
+
     Returns:
         Tuple[bool, Optional[str], str, Optional[int]]: (success, error_message, final_url, http_status)
-        On success, returns (True, None, updated_url_with_hash, status_code)
+        On success, returns (True, None, presigned_url, status_code)
         On failure, returns (False, error_message, None, status_code)
     """
-    import re
-    import hashlib
-    
-    # Calculate image hash if not provided
-    if not image_hash:
-        img_buffer = io.BytesIO()
-        # Convert to RGB if needed
-        if image.mode in ('RGBA', 'LA', 'P'):
-            rgb_image = Image.new('RGB', image.size, (255, 255, 255))
-            rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
-            image_to_hash = rgb_image
-        else:
-            image_to_hash = image
-        image_to_hash.save(img_buffer, format='JPEG', quality=jpeg_quality)
-        image_hash = hashlib.md5(img_buffer.getvalue()).hexdigest()
-    
-    # Replace the placeholder filename with {image_hash}.jpg
-    # Pattern matches: /any_name.(png|jpg|jpeg) before the query string
-    pattern = r'/[^/?]+\.(png|jpg|jpeg)(?=\?|$)'
-    replacement = f'/output-{image_hash}.jpg'
-    
-    # Replace the filename in the URL
-    updated_url = re.sub(pattern, replacement, presigned_url, count=1, flags=re.IGNORECASE)
-    
-    if updated_url == presigned_url:
-        logger.warning(f"Could not find filename pattern in URL, using original: {presigned_url[:100]}...")
-    else:
-        logger.info(f"Updated URL filename from placeholder to output-{image_hash}.jpg")
-    
+    # Use the provided URL without modifying the filename
+    final_url = presigned_url
+
     uploader = get_uploader()
-    success, error, status_code = uploader.upload_image(image, updated_url, jpeg_quality)
-    
+    success, error, status_code = uploader.upload_image(image, final_url, jpeg_quality)
+
     if success:
-        # Return the updated URL with the actual filename
-        return True, None, updated_url, status_code
+        return True, None, final_url, status_code
     else:
         return False, error, None, status_code

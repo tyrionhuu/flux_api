@@ -5,6 +5,13 @@
 
 set -e
 
+# Determine sudo usage (containers often run as root without sudo)
+if command -v sudo >/dev/null 2>&1; then
+  SUDO="sudo"
+else
+  SUDO=""
+fi
+
 echo "🚀 Multi-GPU FLUX API Deployment"
 echo "=========================================="
 
@@ -351,26 +358,26 @@ start_nginx() {
     
     # Stop the systemd nginx service if it's running
     echo "   Checking for systemd nginx service..."
-    if systemctl is-active nginx > /dev/null 2>&1; then
+    if command -v systemctl > /dev/null 2>&1 && systemctl is-active nginx > /dev/null 2>&1; then
         echo "   Stopping systemd nginx service..."
-        sudo systemctl stop nginx
+        $SUDO systemctl stop nginx
         sleep 2
     fi
     
     # Also stop any other nginx instances
     if pgrep -x nginx > /dev/null; then
         echo "   Stopping remaining nginx instances..."
-        sudo nginx -s quit 2>/dev/null || true
+        $SUDO nginx -s quit 2>/dev/null || true
         sleep 2
         # Force kill if still running
         if pgrep -x nginx > /dev/null; then
-            sudo pkill -9 nginx 2>/dev/null || true
+            $SUDO pkill -9 nginx 2>/dev/null || true
             sleep 1
         fi
     fi
     
     # Test nginx config
-    if ! sudo nginx -t -c "$PWD/$NGINX_CONFIG" 2>/dev/null; then
+    if ! $SUDO nginx -t -c "$PWD/$NGINX_CONFIG" 2>/dev/null; then
         echo "⚠️  Nginx config test failed. Please check $NGINX_CONFIG"
         echo "   Services are running on ports ${BASE_PORT}-$((BASE_PORT + NUM_GPUS - 1))"
         return 1
@@ -378,21 +385,21 @@ start_nginx() {
     
     # Start nginx with our config
     echo "   Starting nginx with config: $NGINX_CONFIG"
-    if sudo nginx -c "$PWD/$NGINX_CONFIG"; then
+    if $SUDO nginx -c "$PWD/$NGINX_CONFIG"; then
         # Verify nginx started successfully and is listening on port 8080
         sleep 2
-        if sudo lsof -i :8080 > /dev/null 2>&1; then
+        if lsof -i :8080 > /dev/null 2>&1; then
             echo "✅ Nginx started successfully on port 8080"
             return 0
         else
             echo "⚠️  Nginx started but not listening on port 8080"
             echo "   Checking nginx status..."
-            sudo nginx -t -c "$PWD/$NGINX_CONFIG"
+            $SUDO nginx -t -c "$PWD/$NGINX_CONFIG"
             return 1
         fi
     else
         echo "❌ Failed to start nginx. Error output above."
-        echo "   Try manually: sudo nginx -c $PWD/$NGINX_CONFIG"
+        echo "   Try manually: nginx -c $PWD/$NGINX_CONFIG"
         return 1
     fi
 }
@@ -427,9 +434,11 @@ main() {
     if [ "${1:-}" = "stop" ]; then
         stop_all_services
         # Stop nginx (both custom and systemd)
-        sudo nginx -s stop 2>/dev/null || true
-        sudo systemctl stop nginx 2>/dev/null || true
-        sudo pkill -9 nginx 2>/dev/null || true
+        $SUDO nginx -s stop 2>/dev/null || true
+        if command -v systemctl > /dev/null 2>&1; then
+            $SUDO systemctl stop nginx 2>/dev/null || true
+        fi
+        $SUDO pkill -9 nginx 2>/dev/null || true
         exit 0
     fi
     
@@ -448,14 +457,26 @@ main() {
         start_service $i
     done
     
-    # Wait for services to be ready
-    wait_for_services
+    # Wait for services to be ready (do not exit container if not all are ready yet)
+    if ! wait_for_services; then
+        echo "⚠️  Proceeding even though not all services reported ready yet. Check logs."
+    fi
     
-    # Start nginx
-    start_nginx
+    # Start nginx (best effort)
+    if ! start_nginx; then
+        echo "⚠️  Nginx did not start; backends should still be reachable on ports ${BASE_PORT}-$((BASE_PORT + NUM_GPUS - 1))."
+    fi
     
     # Show final status
     show_status
+
+    # Keep container/process alive and handle clean shutdown
+    echo "📎 Attaching to services (Ctrl+C to stop)..."
+    trap 'echo "\n🛑 Signal received, stopping services..."; stop_all_services; if command -v nginx >/dev/null 2>&1; then $SUDO nginx -s stop 2>/dev/null || true; fi; exit 0' TERM INT
+
+    # Sleep indefinitely to keep container running; trap handles shutdown
+    tail -f /dev/null &
+    wait $!
 }
 
 # Run main function

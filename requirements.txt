@@ -97,7 +97,9 @@ python-dotenv==1.1.1
 python-multipart==0.0.20
 python-slugify==8.0.4
 python-socks==2.7.2
-pytorch-triton==3.4.0+gitf7888497
+# pytorch-triton build-specific pin is not available on public indexes; let torch/triton resolve
+# or install the generic release that matches torch. The separate 'triton==3.4.0' below suffices.
+# pytorch-triton==3.4.0+gitf7888497
 PyYAML==6.0.2
 questionary==2.1.0
 referencing==0.36.2

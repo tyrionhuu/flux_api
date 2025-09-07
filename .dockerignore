@@ -51,12 +51,15 @@ test_*.py
 *_test.py
 tests/
 
-# Shell scripts (not needed in container)
+# Shell scripts
+# Keep the multi-GPU launcher inside the image
 *.sh
+!start_multi_gpu.sh
 
-# Config files for local development
+# Config files
 nginx.conf
-configs/
+!configs/
+!configs/*.conf
 
 # Output files
 output.png

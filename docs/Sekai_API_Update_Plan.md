@@ -18,8 +18,8 @@
 - **功能**: 将经过审核并通过的图片上传到指定的 S3 存储桶。
 - **配置**: 接收客户端提供的 `s3_prefix`（预签名URL）。
 - **流程**: 图片生成后，立即上传到 S3。
-- **文件名处理**: 自动从预签名URL中提取占位符文件名（如 `1.png`），并替换为 `output-{image_hash}.jpg`，其中 `image_hash` 是生成图片的MD5哈希值。
-- **输出**: 返回更新后的 S3 URL (`s3_url`)，其中包含实际的文件名 `output-{image_hash}.jpg`。
+- **文件名处理**: 严格使用预签名 URL 中的文件名（如 `1.png`、`2.jpg`），不做任何替换或改写。
+- **输出**: 返回上传使用的 S3 URL (`s3_url`)，与输入提供的 URL 一致（包含查询参数）。
 
 ## 🛠️ 技术实现细节
 
@@ -33,11 +33,8 @@
 ### 2. S3 上传模块
 
 - **~~S3 客户端**: 使用 AWS SDK (如 `boto3`) 进行 S3 上传。~~
-- 给到签名过的 s3地址（http），直接 往地址上面 put即可
-- **文件命名**: 
-  - 客户端提供的 URL 包含占位符文件名（如 `1.png`, `2.jpg` 等）
-  - 系统自动将占位符替换为 `output-{image_hash}.jpg`，其中 `image_hash` 是生成图片的MD5哈希值
-  - 这确保每个图片都有唯一的文件名，避免缓存问题
+- 给到签名过的 S3 地址（HTTP），直接对该地址执行 PUT 即可。
+- **文件命名**: 客户端提供的 URL 中的文件名（如 `1.png`、`2.jpg`）将被原样使用，系统不再进行任何替换或基于 `image_hash` 的改名。
 - **重试机制**: 实现上传失败时的自动重试机制（指数退避：1s, 2s, 4s）。
 - **监控告警**: 增加上传失败率监控，及时发现并解决问题。
 
@@ -61,7 +58,7 @@ POST /generate
 Response:
 {
   "data": {
-    "s3_url": "https://prod-data.sekai.chat/aiu-character/000/d41d8cd98f00b204e9800998ecf8427e.jpg?AWSAccessKeyId=AKIAQE43KJDN7ARTLAVM&Signature=%2ByiRa6eTIiuPtE3wGWzFzmS3snA%3D&Expires=1756921542",
+    "s3_url": "https://prod-data.sekai.chat/aiu-character/000/1.png?AWSAccessKeyId=AKIAQE43KJDN7ARTLAVM&Signature=%2ByiRa6eTIiuPtE3wGWzFzmS3snA%3D&Expires=1756921542",
     "nsfw_score": 0.05,
     "image_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "s3_upload_status": 200
@@ -77,17 +74,17 @@ Response:
 - `num_inference_steps`: (必选) 推理步骤数 (默认为 15)。
 - `response_format`: (必选) 响应格式 (默认为 "s3")。
 - `upscale`: (必选) 是否进行放大 (默认为 "true")。
-- `s3_prefix`: (必选) **完整的** 签名过的 **S3 Http URI，直接往地址put就行 (例如：https://prod-data.sekai.chat/aiu-character/000/1.png?AWSAccessKeyId=AKIAQE43KJDN7ARTLAVM&Signature=%2ByiRa6eTIiuPtE3wGWzFzmS3snA%3D&Expires=1756921542)。注意：URL中的文件名（如 `1.png`）是占位符，系统会自动替换为 `output-{image_hash}.jpg`。
+- `s3_prefix`: (必选) **完整的** 签名过的 **S3 Http URI，直接往地址 PUT 即可**（例如：https://prod-data.sekai.chat/aiu-character/000/1.png?AWSAccessKeyId=AKIAQE43KJDN7ARTLAVM&Signature=%2ByiRa6eTIiuPtE3wGWzFzmS3snA%3D&Expires=1756921542）。注意：URL 中的文件名（如 `1.png`）将被原样使用，系统不会替换文件名。
 - `enable_nsfw_check`: (必选) 是否启用 NSFW 检测 (true/false)。
 - **负向提示词？？**
 
 ### 3. 响应说明
 
 - `data`: (JSON 对象) 包含以下字段：
-    - `s3_url`: (字符串) 上传到 S3 的图片 Http URL（文件名已替换为 `output-{image_hash}.jpg`）。
-    - `nsfw_score`: (Float) NSFW 内容 的置信度
-    - `image_hash`: (字符串) 生成图片内容的MD5哈希值（与S3 URL中的文件名对应）。
-    - `s3_upload_status`: (Integer) HTTP status code from S3 upload (200/204 for success).
+    - `s3_url`: (字符串) 上传时使用的 S3 Http URL（与请求中提供的 URL 相同，包含查询参数；文件名保持不变）。
+    - `nsfw_score`: (Float) NSFW 内容的置信度。
+    - `image_hash`: (字符串) 生成图片内容的 MD5 哈希值（用于溯源与内部记录，不再影响对外文件名）。
+    - `s3_upload_status`: (Integer) S3 上传返回的 HTTP 状态码（200/204 表示成功）。
 
 ## 🧪 测试要求
 

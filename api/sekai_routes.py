@@ -1048,7 +1048,7 @@ def generate_image_internal(
                 logger.info(f"Uploading to S3 with presigned URL...")
                 
                 # Use the already calculated image hash from above
-                # Upload with the image hash to replace placeholder filename
+                # Upload using the presigned URL as provided (no filename rewrite)
                 success, error, s3_url, http_status = upload_to_s3(
                     image,
                     s3_prefix,
@@ -1065,25 +1065,14 @@ def generate_image_internal(
                 
                 logger.info(f"S3 upload successful, HTTP status: {http_status}")
                 
-                # Build output JSON for S3 format
+                # Build minimal output JSON for S3 format (only expose necessary fields)
                 output_json = {
                     "data": {
                         "s3_url": s3_url,
                         "nsfw_score": nsfw_score,
                         "image_hash": image_hash,
-                        "s3_upload_status": http_status
-                    },
-                    "response_format": "s3",
-                    "generation_time": f"{generation_time:.2f}s",
-                    "lora_applied": model_manager.get_lora_info().get("name") if model_manager.get_lora_info() else None,
-                    "lora_weight": model_manager.get_lora_info().get("weight") if model_manager.get_lora_info() else None,
-                    "width": final_width,
-                    "height": final_height,
-                    "seed": seed,
-                    "num_inference_steps": num_inference_steps,
-                    "negative_prompt": negative_prompt,
-                    "upscale": upscale,
-                    "upscale_factor": upscale_factor if upscale else None
+                        "s3_upload_status": http_status,
+                    }
                 }
                 
                 # Trigger async upload with output JSON
