@@ -46,7 +46,7 @@ GENERATED_IMAGES_DIR = "/data/pingzhi/generated_images"
 STATIC_IMAGES_DIR = "static"
 
 # LoRA Configuration
-LORA_DIR = "/home/pingzhi/checkpoints"
+LORA_DIR = "/data/pingzhi/checkpoints"
 LORA_1_NAME = f"{LORA_DIR}/lora_1_weight_1.safetensors"
 LORA_1_WEIGHT = 1.0
 LORA_2_NAME = f"{LORA_DIR}/lora_2_weight_0_7.safetensors"

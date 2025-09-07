@@ -54,7 +54,7 @@ tail -f logs/multi_gpu/gpu_*.log
 
 ### Sekai API Current Implementation
 - Binary image output (JPEG format, 65% quality)
-- Default LoRAs at /home/pingzhi/checkpoints/
+- Default LoRAs at /data/pingzhi/checkpoints/
 - Multi-GPU deployment across 8 GPUs
 - Load balancing via nginx on port 8080
 
@@ -80,7 +80,7 @@ Use run_pressure_test.sh for load testing - sends requests at controlled RPS to 
 
 ### Important File Paths
 - Generated images: /data/pingzhi/generated_images/
-- LoRA checkpoints: /home/pingzhi/checkpoints/
+- LoRA checkpoints: /data/pingzhi/checkpoints/
 - Uploaded LoRAs: uploads/lora_files/
 
 ### Current Branch

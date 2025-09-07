@@ -1,0 +1,38 @@
+# Pre-commit hooks for formatting and linting
+# Uses local hooks for tools already in requirements (black, ruff)
+# and common hygiene hooks from pre-commit-hooks.
+
+exclude: |
+  (?x)^
+  (
+    generated_images/|
+    uploads/|
+    logs/|
+    tmp.*|\.venv/|venv/|__pycache__/|\.mypy_cache/|\.ruff_cache/
+  )
+
+repos:
+  - repo: local
+    hooks:
+      - id: black
+        name: black
+        entry: black
+        language: system
+        types: [python]
+        args: ["--line-length=88"]
+
+      - id: ruff
+        name: ruff
+        entry: ruff
+        language: system
+        types: [python]
+        args: ["check", "--fix"]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-added-large-files
+        args: ["--maxkb=10240"]  # 10MB
+

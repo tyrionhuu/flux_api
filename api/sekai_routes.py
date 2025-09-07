@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import time
+import traceback
 from typing import Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
@@ -245,11 +246,20 @@ def generate_image_sync(request: GenerateRequest):
                     model_manager.is_loaded()
                     and model_manager.get_pipeline() is not None
                 ):
-                    if not model_manager.load_model():
+                    try:
+                        if not model_manager.load_model():
+                            logger.error("Model loading failed - load_model() returned False")
+                            raise HTTPException(
+                                status_code=500, detail="Failed to load FLUX model"
+                            )
+                        logger.info("Model loaded successfully")
+                    except HTTPException:
+                        raise  # Re-raise HTTP exceptions
+                    except Exception as e:
+                        logger.error(f"Model loading fucked up: {e}\n{traceback.format_exc()}")
                         raise HTTPException(
                             status_code=500, detail="Failed to load FLUX model"
                         )
-                    logger.info("Model loaded successfully")
                 else:
                     logger.info("Model was loaded by another thread while waiting")
 
@@ -350,7 +360,7 @@ def generate_image_sync(request: GenerateRequest):
                     )
             except Exception as lora_error:
                 logger.error(
-                    f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})"
+                    f"LoRA application shit the bed: {lora_error}\n{traceback.format_exc()}"
                 )
                 if "not found" in str(lora_error).lower() or "404" in str(lora_error):
                     raise HTTPException(
@@ -457,7 +467,7 @@ async def generate_image(request: GenerateRequest):
     except HTTPException:
         raise  # Re-raise HTTP exceptions
     except Exception as e:
-        logger.error(f"Request processing failed: {e} (Type: {type(e).__name__})")
+        logger.error(f"Request processing blew up: {e}\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=500, detail=f"Request processing failed: {str(e)}"
         )
@@ -489,7 +499,7 @@ def load_model():
                 )
                 raise HTTPException(status_code=500, detail="Failed to load FLUX model")
     except Exception as e:
-        logger.error(f"Exception during model loading: {e} (Type: {type(e).__name__})")
+        logger.error(f"Model loading died: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
 
 
@@ -559,9 +569,7 @@ async def apply_lora(lora_name: str, weight: float = 1.0):
                 status_code=500, detail=f"Failed to apply LoRA {lora_name}"
             )
     except Exception as e:
-        logger.error(
-            f"Exception during LoRA application: {e} (Type: {type(e).__name__})"
-        )
+        logger.error(f"LoRA apply broke ({lora_name}, weight={weight}): {e}\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=500, detail=f"LoRA application failed: {str(e)}"
         )
@@ -584,7 +592,7 @@ async def remove_lora():
             )
             raise HTTPException(status_code=500, detail="Failed to remove LoRA")
     except Exception as e:
-        logger.error(f"Exception during LoRA removal: {e} (Type: {type(e).__name__})")
+        logger.error(f"LoRA removal failed: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"LoRA removal failed: {str(e)}")
 
 
@@ -783,8 +791,8 @@ def generate_image_internal(
     loras_list: Optional[list] = None,  # New parameter for individual LoRA details
 ):
     """Internal function to generate images - used by both endpoints"""
-    # Append "Use GHIBLISTYLE" to the start of the user prompt
-    enhanced_prompt = f"Use GHIBLISTYLE, {prompt}"
+    # Use the original prompt without modifications
+    enhanced_prompt = prompt
     logger.info(f"Starting image generation for prompt: {enhanced_prompt}")
 
     # Model should already be loaded at this point
@@ -1129,9 +1137,7 @@ def generate_image_internal(
         return output_json
 
     except Exception as e:
-        logger.error(
-            f"Error generating {model_type_name} image: {e} (Type: {type(e).__name__})"
-        )
+        logger.error(f"Image generation crapped out: {e}\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail=f"{model_type_name} image generation failed: {str(e)}",

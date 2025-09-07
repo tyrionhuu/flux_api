@@ -4,6 +4,8 @@ Main FastAPI application for the FP4 FLUX API (Port 8002)
 
 import logging
 import os
+import sys
+import traceback
 import torch
 
 # Set PyTorch thread limits BEFORE any other imports or operations
@@ -154,5 +156,20 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=FP4_API_PORT)
+    
+    # Install global exception handler for uncaught exceptions
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            # Allow keyboard interrupt to work normally
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        
+        logger.error(f"Uncaught exception: {exc_value}\n{''.join(traceback.format_tb(exc_traceback))}")
+    
+    sys.excepthook = handle_exception
+    
+    try:
+        uvicorn.run(app, host="0.0.0.0", port=FP4_API_PORT)
+    except Exception as e:
+        logger.error(f"Uvicorn startup exploded: {e}\n{traceback.format_exc()}")
+        sys.exit(1)

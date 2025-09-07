@@ -7,14 +7,15 @@ import torch
 import os
 import tempfile
 import shutil
+import traceback
 from typing import Optional, Any, Union
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from safetensors.torch import load_file as safe_load_file, save_file as safe_save_file
-from config.fp4_settings import (
+from config.sekai_settings import (
     NUNCHAKU_MODEL_ID,
     MODEL_TYPE_QUANTIZED_GPU,
-    DEFAULT_LORA_NAME,
-    DEFAULT_LORA_WEIGHT,
+    LORA_1_NAME as DEFAULT_LORA_NAME,
+    LORA_1_WEIGHT as DEFAULT_LORA_WEIGHT,
 )
 from utils.gpu_manager import GPUManager
 
@@ -150,9 +151,7 @@ class FluxModelManager:
                 logger.info("Nunchaku model loaded successfully with LoRA support!")
 
             except Exception as nunchaku_error:
-                logger.error(
-                    f"Error loading Nunchaku model: {nunchaku_error} (Type: {type(nunchaku_error).__name__})"
-                )
+                logger.error(f"Nunchaku model shit itself: {nunchaku_error}\n{traceback.format_exc()}")
                 raise RuntimeError(
                     f"Failed to load Nunchaku model: {nunchaku_error}. Nunchaku is required for this model."
                 )
@@ -166,13 +165,13 @@ class FluxModelManager:
             # Perform CUDA Graph warm-up for better performance
             self._warmup_cuda_graph()
 
-            # Apply default LoRA
-            self._apply_default_lora()
+            # Skip automatic LoRA application - handled per request in sekai_routes.py
+            # self._apply_default_lora()
 
             return True
 
         except Exception as e:
-            logger.error(f"Error loading FLUX model: {e} (Type: {type(e).__name__})")
+            logger.error(f"FLUX model loading fucked up: {e}\n{traceback.format_exc()}")
             return False
 
     def _warmup_cuda_graph(self):
@@ -198,9 +197,7 @@ class FluxModelManager:
                     "Skipping CUDA Graph warm-up - pipeline not loaded or CUDA not available"
                 )
         except Exception as e:
-            logger.warning(
-                f"CUDA Graph warm-up failed: {e} - continuing without warm-up"
-            )
+            logger.warning(f"CUDA Graph warm-up choked: {e}")
 
     def _apply_default_lora(self):
         """Apply the default LoRA after model loading"""
@@ -232,9 +229,7 @@ class FluxModelManager:
                     transformer.update_lora_params(DEFAULT_LORA_NAME)
                     logger.info(f"   - Default LoRA parameters loaded successfully")
                 except Exception as load_error:
-                    logger.warning(
-                        f"   - Failed to load default LoRA parameters: {load_error}"
-                    )
+                    logger.warning(f"Default LoRA load failed: {load_error}\n{traceback.format_exc()}")
                     return False
 
                 # Set LoRA strength
@@ -245,9 +240,7 @@ class FluxModelManager:
                     transformer.set_lora_strength(DEFAULT_LORA_WEIGHT)
                     logger.info(f"   - Default LoRA strength set successfully")
                 except Exception as strength_error:
-                    logger.warning(
-                        f"   - Failed to set default LoRA strength: {strength_error}"
-                    )
+                    logger.warning(f"Default LoRA strength setting failed: {strength_error}")
                     return False
 
                 self.current_lora = DEFAULT_LORA_NAME
@@ -263,9 +256,7 @@ class FluxModelManager:
                 return False
 
         except Exception as e:
-            logger.warning(
-                f"Failed to apply default LoRA: {e} - continuing without default LoRA"
-            )
+            logger.warning(f"Default LoRA application crapped out: {e}")
             return False
 
     # Removed _integrate_quantized_weights - now using Nunchaku pipeline directly
@@ -299,9 +290,7 @@ class FluxModelManager:
                 torch.cuda.set_device(0)
                 logger.info("Generating on cuda:0 (single GPU)")
             except Exception as gpu_error:
-                logger.error(
-                    f"GPU error during device selection: {gpu_error} (Type: {type(gpu_error).__name__})"
-                )
+                logger.error(f"GPU device selection blew up: {gpu_error}\n{traceback.format_exc()}")
                 raise RuntimeError(
                     f"GPU error: {gpu_error}. GPU required for image generation."
                 )
@@ -373,7 +362,7 @@ class FluxModelManager:
                     raise memory_error
 
         except Exception as e:
-            logger.error(f"Error in image generation: {e} (Type: {type(e).__name__})")
+            logger.error(f"Image generation died: {e}\n{traceback.format_exc()}")
             raise RuntimeError(f"Failed to generate image: {e}")
 
     def get_model_status(self) -> dict:
@@ -520,13 +509,11 @@ class FluxModelManager:
                 return True
 
             except Exception as load_error:
-                logger.error(
-                    f"   - Failed to load LoRA file for compatibility check: {str(load_error)}"
-                )
+                logger.error(f"LoRA compatibility check failed to load file: {load_error}\n{traceback.format_exc()}")
                 return False
 
         except Exception as e:
-            logger.error(f"   - LoRA compatibility check failed: {str(e)}")
+            logger.error(f"LoRA compatibility check shit the bed: {e}\n{traceback.format_exc()}")
             return False
 
     def _apply_lora_to_transformer(self, lora_source: str, weight: float) -> bool:
@@ -556,7 +543,7 @@ class FluxModelManager:
             logger.info("   - LoRA applied successfully")
             return True
         except Exception as e:
-            logger.error(f"   - Failed to apply LoRA: {e}")
+            logger.error(f"LoRA application to transformer failed: {e}\n{traceback.format_exc()}")
             return False
 
     def apply_lora(self, lora_name: str, lora_weight: float = 1.0) -> bool:
@@ -643,9 +630,7 @@ class FluxModelManager:
                         return False
 
         except Exception as e:
-            logger.error(
-                f"Error applying multiple LoRAs: {e} (Type: {type(e).__name__})"
-            )
+            logger.error(f"Multiple LoRA application blew up: {e}\n{traceback.format_exc()}")
             return False
 
     def _apply_single_lora(self, lora_name: str, weight: float) -> bool:
@@ -686,7 +671,7 @@ class FluxModelManager:
             logger.info(f"LoRA(s) removed successfully")
             return True
         except Exception as e:
-            logger.error(f"Error removing LoRA: {e}")
+            logger.error(f"LoRA removal failed: {e}\n{traceback.format_exc()}")
             return False
 
     def get_lora_info(self) -> Optional[dict]:
@@ -769,7 +754,7 @@ class FluxModelManager:
                         lora_weights_list.append(weight)
                         logger.info(f"   - LoRA {i+1} loaded successfully")
                     except Exception as load_error:
-                        logger.error(f"   - Failed to load LoRA {i+1}: {load_error}")
+                        logger.error(f"LoRA {i+1} loading failed: {load_error}\n{traceback.format_exc()}")
                         return None
 
                 # Merge the LoRA weights
@@ -813,14 +798,14 @@ class FluxModelManager:
                 return merged_lora_path
 
             except Exception as merge_error:
-                logger.error(f"Error during LoRA merging: {merge_error}")
+                logger.error(f"LoRA merging blew up: {merge_error}\n{traceback.format_exc()}")
                 # Clean up temp directory
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
                 return None
 
         except Exception as e:
-            logger.error(f"Error in LoRA merging: {e}")
+            logger.error(f"LoRA merge wrapper failed: {e}\n{traceback.format_exc()}")
             return None
 
     def _get_lora_path(self, lora_name: str) -> Optional[str]:
@@ -876,9 +861,7 @@ class FluxModelManager:
                             )
                             logger.info(f"   - Downloaded: {filename}")
                         except Exception as specific_error:
-                            logger.warning(
-                                f"   - Failed to download {filename}, falling back to auto-detection"
-                            )
+                            logger.warning(f"LoRA download of {filename} failed: {specific_error}")
                             filename = None
 
                     # If no specific filename or it failed, auto-detect the file
@@ -933,9 +916,7 @@ class FluxModelManager:
                             logger.info(f"   - Downloaded: {lora_filename}")
 
                         except Exception as list_error:
-                            logger.warning(
-                                f"   - Could not list repo files, using fallback"
-                            )
+                            logger.warning(f"LoRA repo listing failed: {list_error}")
                             # Final fallback to common filename
                             try:
                                 downloaded_path = hf_hub_download(
@@ -947,9 +928,7 @@ class FluxModelManager:
                                     f"   - Downloaded: lora.safetensors (fallback)"
                                 )
                             except Exception as fallback_error:
-                                logger.error(
-                                    f"   - All download attempts failed: {fallback_error}"
-                                )
+                                logger.error(f"All LoRA download attempts failed: {fallback_error}\n{traceback.format_exc()}")
                                 raise fallback_error
 
                     # Verify the downloaded file
@@ -973,12 +952,10 @@ class FluxModelManager:
                     return lora_path
 
                 except ImportError:
-                    logger.error(
-                        f"   - huggingface_hub not available. Install with: pip install huggingface_hub"
-                    )
+                    logger.error("huggingface_hub not installed, can't download LoRA")
                     return None
                 except Exception as download_error:
-                    logger.error(f"   - Failed to download LoRA: {download_error}")
+                    logger.error(f"LoRA download fucked up: {download_error}\n{traceback.format_exc()}")
                     # Clean up temp directory on failure
                     if os.path.exists(temp_dir):
                         shutil.rmtree(temp_dir)
@@ -987,7 +964,7 @@ class FluxModelManager:
             return None
 
         except Exception as e:
-            logger.error(f"Error resolving LoRA path: {e}")
+            logger.error(f"LoRA path resolution died: {e}\n{traceback.format_exc()}")
             return None
 
     def _cleanup_temp_loras(self):
@@ -1002,4 +979,4 @@ class FluxModelManager:
                             logger.info(f"Cleaned up temporary LoRA: {temp_dir}")
                 self._temp_lora_paths = []
         except Exception as e:
-            logger.warning(f"Error cleaning up temporary LoRAs: {e}")
+            logger.warning(f"Temp LoRA cleanup failed: {e}")
