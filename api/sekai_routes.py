@@ -1013,6 +1013,7 @@ def generate_image_internal(
         
         # NSFW Detection (do this before S3 upload to include in output JSON)
         nsfw_score = 0.0
+        nsfw_error_message = None
         if enable_nsfw_check:
             try:
                 from utils.nsfw_detector import check_image_nsfw
@@ -1024,11 +1025,16 @@ def generate_image_internal(
                 logger.error(f"NSFW detection error: {nsfw_error}")
                 # On error, set score to 1.0 but continue processing
                 nsfw_score = 1.0
-                logger.warning(f"NSFW detection failed, setting score to 1.0 and continuing")
+                nsfw_error_message = "NSFW detection encountered an error; score set to 1.0"
+                logger.warning(
+                    "NSFW detection failed, setting score to 1.0 and continuing"
+                )
         
         # Update NSFW score in output_json if it was created
         if output_json:
             output_json["nsfw_score"] = nsfw_score
+            if nsfw_error_message:
+                output_json["nsfw_error"] = nsfw_error_message
         
         # Trigger async upload for non-S3 formats
         if response_format != "s3" and output_json:
@@ -1074,6 +1080,8 @@ def generate_image_internal(
                         "s3_upload_status": http_status,
                     }
                 }
+                if nsfw_error_message:
+                    output_json["data"]["nsfw_error"] = nsfw_error_message
                 
                 # Trigger async upload with output JSON
                 run_async_task(lambda: upload_to_internal_s3(output_json))
