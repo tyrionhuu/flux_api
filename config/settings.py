@@ -2,7 +2,6 @@
 Configuration settings for the FLUX API
 """
 
-
 # Model Configuration
 NUNCHAKU_MODEL_ID = "nunchaku-tech/nunchaku-flux.1-kontext-dev"
 DEFAULT_GUIDANCE_SCALE = 3.5

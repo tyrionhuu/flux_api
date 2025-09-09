@@ -16,9 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-
 from api.routes import get_model_manager, router
-from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION)
+from config.settings import API_DESCRIPTION, API_TITLE, API_VERSION
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
 
 # Hugging Face token setup
@@ -26,6 +25,7 @@ if "HUGGINGFACE_HUB_TOKEN" in os.environ:
     os.environ["HF_TOKEN"] = os.environ["HUGGINGFACE_HUB_TOKEN"]
     try:
         from huggingface_hub import login
+
         login(token=os.environ["HUGGINGFACE_HUB_TOKEN"])
         print("✅ Hugging Face token configured successfully")
     except Exception as e:
@@ -183,6 +183,7 @@ app.include_router(router, prefix="")
 # Frontend enabled flag - will be set by command line arguments
 FRONTEND_ENABLED = True  # Default value, will be overridden in main()
 
+
 def setup_frontend(frontend_enabled: bool):
     """Setup frontend mounting based on the enabled flag"""
     # Mount static files for frontend only if frontend is enabled
@@ -204,6 +205,7 @@ def setup_frontend(frontend_enabled: bool):
         files = os.listdir("generated_images")
     else:
         logger.warning("generated_images directory not found - downloads may not work")
+
 
 # Setup frontend with default value (will be overridden in main)
 setup_frontend(FRONTEND_ENABLED)
@@ -269,28 +271,25 @@ if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="FLUX API Service")
     parser.add_argument(
-        "--port",
-        type=int,
-        default=9200,
-        help="API port number (default: 9200)"
+        "--port", type=int, default=9200, help="API port number (default: 9200)"
     )
     parser.add_argument(
         "--no-frontend",
         action="store_true",
         default=False,
-        help="Disable frontend (backend-only mode)"
+        help="Disable frontend (backend-only mode)",
     )
     args = parser.parse_args()
-    
+
     # Set frontend enabled based on arguments
     FRONTEND_ENABLED = not args.no_frontend
-    
+
     # Setup frontend with parsed arguments
     setup_frontend(FRONTEND_ENABLED)
-    
+
     # Store port in app state for access by routes
     app.state.port = args.port
-    
+
     # Ensure uvicorn also writes to our file
     LOG_CONFIG = {
         "version": 1,

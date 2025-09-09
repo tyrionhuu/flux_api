@@ -184,7 +184,7 @@ def read_root(request: Request):
         ],
         "model_loaded": model_manager.is_loaded(),
         "model_type": model_manager.model_type,
-        "server_port": getattr(request.app.state, 'port', 9200),
+        "server_port": getattr(request.app.state, "port", 9200),
         "timestamp": time.time(),
     }
 

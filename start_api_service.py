@@ -163,11 +163,13 @@ def wait_for_port_free(port: int = 9001, max_wait: int = 30) -> bool:
     return False
 
 
-def start_service(cleanup_enabled: bool = False, api_port: int = 9200, enable_frontend: bool = True):
+def start_service(
+    cleanup_enabled: bool = False, api_port: int = 9200, enable_frontend: bool = True
+):
     """Start the FLUX API service"""
     print("\n🚀 Starting FLUX API Service...")
     print("=" * 50)
-    
+
     if cleanup_enabled:
         print("🧹 Cleanup mode enabled - will attempt to clean up existing processes")
     else:
@@ -236,15 +238,15 @@ def start_service(cleanup_enabled: bool = False, api_port: int = 9200, enable_fr
         print("Starting API server...")
         # Manual GPU selection: respect existing CUDA_VISIBLE_DEVICES
         env = os.environ.copy()
-        
+
         # Debug: Check if HUGGINGFACE_HUB_TOKEN is available
         if env.get("HUGGINGFACE_HUB_TOKEN"):
             print(f"✅ HUGGINGFACE_HUB_TOKEN found in environment")
         else:
             print("⚠️  HUGGINGFACE_HUB_TOKEN not found in environment")
-        
+
         # Port will be passed as command line argument instead of environment variable
-        
+
         if env.get("CUDA_VISIBLE_DEVICES"):
             print(
                 f"Using CUDA_VISIBLE_DEVICES={env['CUDA_VISIBLE_DEVICES']} for FP4 service"
@@ -256,7 +258,7 @@ def start_service(cleanup_enabled: bool = False, api_port: int = 9200, enable_fr
         cmd = [python_exec, "main.py", "--port", str(target_port)]
         if not enable_frontend:
             cmd.append("--no-frontend")
-        
+
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -305,23 +307,20 @@ def main():
         "--cleanup",
         action="store_true",
         default=False,
-        help="Enable cleanup of existing processes on the target port (default: False)"
+        help="Enable cleanup of existing processes on the target port (default: False)",
     )
     parser.add_argument(
-        "--port",
-        type=int,
-        default=9200,
-        help="API port number (default: 9200)"
+        "--port", type=int, default=9200, help="API port number (default: 9200)"
     )
     parser.add_argument(
         "--no-frontend",
         action="store_true",
         default=False,
-        help="Disable frontend (backend-only mode)"
+        help="Disable frontend (backend-only mode)",
     )
-    
+
     args = parser.parse_args()
-    
+
     print("FLUX API Service Starter")
     print("=" * 30)
     print(f"Cleanup mode: {'enabled' if args.cleanup else 'disabled'}")
@@ -338,7 +337,7 @@ def main():
     start_service(
         cleanup_enabled=args.cleanup,
         api_port=args.port,
-        enable_frontend=not args.no_frontend
+        enable_frontend=not args.no_frontend,
     )
 
 
