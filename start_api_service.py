@@ -4,6 +4,7 @@ FLUX API Service Starter
 This script starts the FLUX API service directly using the flux_env virtual environment.
 """
 
+import argparse
 import os
 import signal
 import socket
@@ -162,29 +163,37 @@ def wait_for_port_free(port: int = 9001, max_wait: int = 30) -> bool:
     return False
 
 
-def start_service():
+def start_service(cleanup_enabled: bool = False, api_port: int = 9200, enable_frontend: bool = True):
     """Start the FLUX API service"""
     print("\n🚀 Starting FLUX API Service...")
     print("=" * 50)
+    
+    if cleanup_enabled:
+        print("🧹 Cleanup mode enabled - will attempt to clean up existing processes")
+    else:
+        print("🔧 Cleanup mode disabled - will only check for port conflicts")
 
-    # Determine target port from environment (fallback to 9001)
-    try:
-        target_port = int(os.environ.get("FP4_API_PORT", "9001"))
-    except ValueError:
-        target_port = 9001
+    # Use provided port
+    target_port = api_port
+    print(f"🌐 API Port: {target_port}")
 
     # Check if frontend is enabled
-    frontend_enabled = os.environ.get("ENABLE_FRONTEND", "true").lower() in (
-        "true",
-        "1",
-        "yes",
-    )
-    if not frontend_enabled:
+    if not enable_frontend:
         print("🔧 Backend-only mode enabled - frontend will be disabled")
+    else:
+        print("📱 Frontend enabled")
 
-    # Clean up port before starting
-    if not cleanup_port(target_port):
-        print("   ⚠️  Port cleanup incomplete, but continuing...")
+    # Clean up port before starting (only if cleanup is enabled)
+    if cleanup_enabled:
+        if not cleanup_port(target_port):
+            print("   ⚠️  Port cleanup incomplete, but continuing...")
+    else:
+        print(f"🔍 Checking port {target_port} availability (cleanup disabled)...")
+        if not check_port_available(target_port):
+            print(f"   ❌ Port {target_port} is not available")
+            return False
+        else:
+            print(f"   ✅ Port {target_port} is available")
 
     # Final port verification
     print("🔍 Final port verification...")
@@ -215,7 +224,7 @@ def start_service():
 
     # Wait for port to be truly available
     if not wait_for_port_free(target_port, max_wait=30):
-        print("   ❌ Port 9001 is not available, cannot start service")
+        print(f"   ❌ Port {target_port} is not available, cannot start service")
         return False
 
     # Resolve Python executable: prefer flux_env if present, else current python
@@ -224,18 +233,27 @@ def start_service():
 
     # Start the service
     try:
-        print("📡 Starting API server...")
+        print("Starting API server...")
         # Manual GPU selection: respect existing CUDA_VISIBLE_DEVICES
         env = os.environ.copy()
+        
+        # Set the API port
+        env["FP4_API_PORT"] = str(target_port)
+        
         if env.get("CUDA_VISIBLE_DEVICES"):
             print(
-                f"🔧 Using CUDA_VISIBLE_DEVICES={env['CUDA_VISIBLE_DEVICES']} for FP4 service"
+                f"Using CUDA_VISIBLE_DEVICES={env['CUDA_VISIBLE_DEVICES']} for FP4 service"
             )
         else:
-            print("⚠️  CUDA_VISIBLE_DEVICES not set; default visible GPU will be used")
+            print("CUDA_VISIBLE_DEVICES not set; default visible GPU will be used")
 
+        # Build command with arguments
+        cmd = [python_exec, "main.py"]
+        if not enable_frontend:
+            cmd.append("--no-frontend")
+        
         process = subprocess.Popen(
-            [python_exec, "main.py"],
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -243,14 +261,14 @@ def start_service():
             env=env,
         )
 
-        print(f"✅ Service started with PID: {process.pid}")
-        print(f"📍 API URL: http://localhost:{target_port}")
-        print(f"🔍 Health check: http://localhost:{target_port}/health")
-        print(f"📚 API docs: http://localhost:{target_port}/docs")
-        if frontend_enabled:
-            print(f"📱 UI: http://localhost:{target_port}/ui")
+        print(f"Service started with PID: {process.pid}")
+        print(f"API URL: http://localhost:{target_port}")
+        print(f"Health check: http://localhost:{target_port}/health")
+        print(f"API docs: http://localhost:{target_port}/docs")
+        if enable_frontend:
+            print(f"UI: http://localhost:{target_port}/ui")
         else:
-            print(f"📱 UI: Disabled (backend-only mode)")
+            print(f"UI: Disabled (backend-only mode)")
         print("\n📋 Service logs:")
         print("-" * 50)
 
@@ -267,9 +285,9 @@ def start_service():
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
-        print("✅ Service stopped")
+        print("Service stopped")
     except Exception as e:
-        print(f"❌ Failed to start service: {e}")
+        print(f"Failed to start service: {e}")
         return False
 
     return True
@@ -277,8 +295,33 @@ def start_service():
 
 def main():
     """Main function"""
-    print("🐍 FLUX API Service Starter")
+    parser = argparse.ArgumentParser(description="FLUX API Service Starter")
+    parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        default=False,
+        help="Enable cleanup of existing processes on the target port (default: False)"
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=9200,
+        help="API port number (default: 9200)"
+    )
+    parser.add_argument(
+        "--no-frontend",
+        action="store_true",
+        default=False,
+        help="Disable frontend (backend-only mode)"
+    )
+    
+    args = parser.parse_args()
+    
+    print("FLUX API Service Starter")
     print("=" * 30)
+    print(f"Cleanup mode: {'enabled' if args.cleanup else 'disabled'}")
+    print(f"API Port: {args.port}")
+    print(f"📱 Frontend: {'disabled' if args.no_frontend else 'enabled'}")
 
     # Check if we're in the right directory
     if not Path("main.py").exists():
@@ -287,7 +330,11 @@ def main():
         sys.exit(1)
 
     # Start the service
-    start_service()
+    start_service(
+        cleanup_enabled=args.cleanup,
+        api_port=args.port,
+        enable_frontend=not args.no_frontend
+    )
 
 
 if __name__ == "__main__":

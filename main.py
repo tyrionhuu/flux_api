@@ -2,6 +2,7 @@
 Main FastAPI application for the FP4 FLUX API (Port 8002)
 """
 
+import argparse
 import os
 import sys
 import time
@@ -15,23 +16,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-# Configure Hugging Face token for model access
-if "HUGGINGFACE_HUB_TOKEN" in os.environ:
-    os.environ["HF_TOKEN"] = os.environ["HUGGINGFACE_HUB_TOKEN"]
-    # Also set it for huggingface_hub library
-    try:
-        from huggingface_hub import login
-
-        login(token=os.environ["HUGGINGFACE_HUB_TOKEN"])
-        print(f"✅ Hugging Face token configured successfully")
-    except ImportError:
-        print(
-            "⚠️  huggingface_hub not available, token may not work for model downloads"
-        )
-    except Exception as e:
-        print(f"⚠️  Failed to configure Hugging Face token: {e}")
-else:
-    print("⚠️  HUGGINGFACE_HUB_TOKEN not set, model downloads may fail")
 
 from api.routes import get_model_manager, router
 from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
@@ -185,30 +169,33 @@ async def validate_requests(request, call_next):
 # Include API routes
 app.include_router(router, prefix="")
 
-# Check if frontend should be enabled (default: True for backward compatibility)
-FRONTEND_ENABLED = os.environ.get("ENABLE_FRONTEND", "true").lower() in (
-    "true",
-    "1",
-    "yes",
-)
+# Frontend enabled flag - will be set by command line arguments
+FRONTEND_ENABLED = True  # Default value, will be overridden in main()
 
-# Mount static files for frontend only if frontend is enabled
-if FRONTEND_ENABLED and os.path.exists("frontend/static"):
-    app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
-    logger.info("Frontend enabled - static files mounted")
+def setup_frontend(frontend_enabled: bool):
+    """Setup frontend mounting based on the enabled flag"""
+    # Mount static files for frontend only if frontend is enabled
+    if frontend_enabled and os.path.exists("frontend/static"):
+        app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
+        logger.info("Frontend enabled - static files mounted")
+    elif not frontend_enabled:
+        logger.info("Frontend disabled - backend-only mode")
 
-# Mount generated images directory for downloads
-if os.path.exists("generated_images"):
-    app.mount(
-        "/generated_images",
-        StaticFiles(directory="generated_images"),
-        name="generated_images",
-    )
-    logger.info("Mounted generated_images directory for static file serving")
+    # Mount generated images directory for downloads
+    if os.path.exists("generated_images"):
+        app.mount(
+            "/generated_images",
+            StaticFiles(directory="generated_images"),
+            name="generated_images",
+        )
+        logger.info("Mounted generated_images directory for static file serving")
 
-    files = os.listdir("generated_images")
-else:
-    logger.warning("generated_images directory not found - downloads may not work")
+        files = os.listdir("generated_images")
+    else:
+        logger.warning("generated_images directory not found - downloads may not work")
+
+# Setup frontend with default value (will be overridden in main)
+setup_frontend(FRONTEND_ENABLED)
 
 
 @app.get("/ui", response_class=HTMLResponse)
@@ -268,6 +255,22 @@ def health_check():
 
 
 if __name__ == "__main__":
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="FLUX API Service")
+    parser.add_argument(
+        "--no-frontend",
+        action="store_true",
+        default=False,
+        help="Disable frontend (backend-only mode)"
+    )
+    args = parser.parse_args()
+    
+    # Set frontend enabled based on arguments
+    FRONTEND_ENABLED = not args.no_frontend
+    
+    # Setup frontend with parsed arguments
+    setup_frontend(FRONTEND_ENABLED)
+    
     # Ensure uvicorn also writes to our file
     LOG_CONFIG = {
         "version": 1,

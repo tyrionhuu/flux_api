@@ -75,14 +75,14 @@ COPY . .
 RUN mkdir -p logs generated_images uploads/lora_files cache/merged_loras cache/nunchaku_loras
 
 # Set proper permissions
-RUN chmod +x start_flux_api.sh docker-start.sh
+RUN chmod +x start_api_service.py
 
 # Expose the API port
-EXPOSE 9000 9001 9100
+EXPOSE 9200
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
     CMD conda run -n img2img curl -f http://localhost:${FP4_API_PORT:-9001}/health || exit 1
 
-# Default command - use docker-start.sh for container execution
-CMD ["/bin/bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate img2img && ./docker-start.sh"]
+# Default command - run Python service directly
+CMD ["/bin/bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate img2img && /opt/conda/envs/img2img/bin/python start_api_service.py --port 9200 --cleanup"]
