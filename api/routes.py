@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 import loguru
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
 
@@ -167,7 +167,7 @@ async def remove_lora_from_index(stored_name: str):
 
 
 @router.get("/")
-def read_root():
+def read_root(request: Request):
     """Root endpoint for testing"""
     return {
         "message": "FLUX API is running!",
@@ -184,7 +184,7 @@ def read_root():
         ],
         "model_loaded": model_manager.is_loaded(),
         "model_type": model_manager.model_type,
-        "server_port": os.environ.get("FP4_API_PORT", "8000"),
+        "server_port": getattr(request.app.state, 'port', 9200),
         "timestamp": time.time(),
     }
 

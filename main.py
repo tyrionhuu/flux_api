@@ -18,9 +18,20 @@ from fastapi.staticfiles import StaticFiles
 
 
 from api.routes import get_model_manager, router
-from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION,
-                             FP4_API_PORT)
+from config.settings import (API_DESCRIPTION, API_TITLE, API_VERSION)
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
+
+# Hugging Face token setup
+if "HUGGINGFACE_HUB_TOKEN" in os.environ:
+    os.environ["HF_TOKEN"] = os.environ["HUGGINGFACE_HUB_TOKEN"]
+    try:
+        from huggingface_hub import login
+        login(token=os.environ["HUGGINGFACE_HUB_TOKEN"])
+        print("✅ Hugging Face token configured successfully")
+    except Exception as e:
+        print(f"⚠️  Failed to configure Hugging Face token: {e}")
+else:
+    print("⚠️  HUGGINGFACE_HUB_TOKEN not set, model downloads may fail")
 
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
@@ -258,6 +269,12 @@ if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="FLUX API Service")
     parser.add_argument(
+        "--port",
+        type=int,
+        default=9200,
+        help="API port number (default: 9200)"
+    )
+    parser.add_argument(
         "--no-frontend",
         action="store_true",
         default=False,
@@ -270,6 +287,9 @@ if __name__ == "__main__":
     
     # Setup frontend with parsed arguments
     setup_frontend(FRONTEND_ENABLED)
+    
+    # Store port in app state for access by routes
+    app.state.port = args.port
     
     # Ensure uvicorn also writes to our file
     LOG_CONFIG = {
@@ -334,4 +354,4 @@ if __name__ == "__main__":
         },
     }
 
-    uvicorn.run(app, host="0.0.0.0", port=FP4_API_PORT, log_config=LOG_CONFIG)
+    uvicorn.run(app, host="0.0.0.0", port=args.port, log_config=LOG_CONFIG)

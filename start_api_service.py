@@ -237,8 +237,13 @@ def start_service(cleanup_enabled: bool = False, api_port: int = 9200, enable_fr
         # Manual GPU selection: respect existing CUDA_VISIBLE_DEVICES
         env = os.environ.copy()
         
-        # Set the API port
-        env["FP4_API_PORT"] = str(target_port)
+        # Debug: Check if HUGGINGFACE_HUB_TOKEN is available
+        if env.get("HUGGINGFACE_HUB_TOKEN"):
+            print(f"✅ HUGGINGFACE_HUB_TOKEN found in environment")
+        else:
+            print("⚠️  HUGGINGFACE_HUB_TOKEN not found in environment")
+        
+        # Port will be passed as command line argument instead of environment variable
         
         if env.get("CUDA_VISIBLE_DEVICES"):
             print(
@@ -248,7 +253,7 @@ def start_service(cleanup_enabled: bool = False, api_port: int = 9200, enable_fr
             print("CUDA_VISIBLE_DEVICES not set; default visible GPU will be used")
 
         # Build command with arguments
-        cmd = [python_exec, "main.py"]
+        cmd = [python_exec, "main.py", "--port", str(target_port)]
         if not enable_frontend:
             cmd.append("--no-frontend")
         

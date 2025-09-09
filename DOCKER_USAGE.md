@@ -187,7 +187,6 @@ docker run -d \
   -p 9200:9200 \
   -e HUGGINGFACE_HUB_TOKEN=your_token_here \
   -e CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
-  -e FP4_API_PORT=9200 \
   -e CUDA_HOME=/usr/local/cuda \
   -e PYTHONUNBUFFERED=1 \
   -e CONDA_DEFAULT_ENV=img2img \
@@ -212,7 +211,6 @@ docker run -d \
 |----------|---------|-------------|
 | `HUGGINGFACE_HUB_TOKEN` | **Required** | Your Hugging Face token for model access |
 | `CUDA_VISIBLE_DEVICES` | all | GPU IDs to use (comma-separated: 0,1,2) |
-| `FP4_API_PORT` | 9001 | API port (overridden by --port argument) |
 | `CUDA_HOME` | /usr/local/cuda | CUDA installation path |
 | `PYTHONUNBUFFERED` | 1 | Python output buffering |
 | `CONDA_DEFAULT_ENV` | img2img | Conda environment name |
