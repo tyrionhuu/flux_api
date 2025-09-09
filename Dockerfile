@@ -84,6 +84,5 @@ EXPOSE 9200
 HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
     CMD conda run -n img2img curl -f http://localhost:9200/health || exit 1
 
-# Default command - run Python service directly
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["--port", "9200", "--cleanup"]
