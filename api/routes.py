@@ -172,7 +172,6 @@ def read_root(request: Request):
     return {
         "message": "FLUX API is running!",
         "endpoints": [
-            "/static-image",
             "/generate",
             "/generate-and-return-image",
             "/generate-with-image",
@@ -180,7 +179,9 @@ def read_root(request: Request):
             "/loras",
             "/apply-lora",
             "/remove-lora",
-            "/lora-status",
+            "/upload-lora",
+            "/load-model",
+            "/model-status",
         ],
         "model_loaded": model_manager.is_loaded(),
         "model_type": model_manager.model_type,
