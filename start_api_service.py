@@ -6,132 +6,11 @@ This script starts the FLUX API service directly using the flux_env virtual envi
 
 import argparse
 import os
-import signal
 import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
-
-
-def cleanup_port(port: int = 9001):
-    """Clean up processes using the specified port"""
-    print(f"🧹 Checking port {port} for existing processes...")
-
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            # Use lsof to find processes using the port
-            result = subprocess.run(
-                ["lsof", "-ti", f":{port}"], capture_output=True, text=True, timeout=10
-            )
-
-            if result.returncode == 0 and result.stdout.strip():
-                pids = result.stdout.strip().split("\n")
-                print(
-                    f"   Found {len(pids)} process(es) using port {port} (attempt {attempt + 1}/{max_retries})"
-                )
-
-                for pid in pids:
-                    if pid.strip():
-                        try:
-                            pid_int = int(pid.strip())
-                            print(f"   🚫 Terminating process {pid_int}...")
-
-                            # Try graceful termination first
-                            os.kill(pid_int, signal.SIGTERM)
-                            time.sleep(2)  # Give more time for graceful shutdown
-
-                            # Check if process is still running
-                            try:
-                                os.kill(pid_int, 0)  # Check if process exists
-                                print(f"   💀 Force killing process {pid_int}...")
-                                os.kill(pid_int, signal.SIGKILL)
-                                time.sleep(1)
-                            except OSError:
-                                print(
-                                    f"   ✅ Process {pid_int} terminated successfully"
-                                )
-
-                        except (ValueError, OSError) as e:
-                            print(f"   ⚠️  Could not terminate process {pid}: {e}")
-
-                # Wait longer for port to be released
-                time.sleep(3)
-
-                # Verify port is free
-                result = subprocess.run(
-                    ["lsof", "-ti", f":{port}"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-
-                if result.returncode == 0 and result.stdout.strip():
-                    if attempt < max_retries - 1:
-                        print(f"   ⚠️  Port {port} still in use, retrying...")
-                        time.sleep(2)
-                        continue
-                    else:
-                        print(
-                            f"   ❌ Port {port} still in use after {max_retries} attempts"
-                        )
-                        return False
-                else:
-                    print(f"   ✅ Port {port} is now free")
-                    return True
-            else:
-                print(f"   ✅ Port {port} is free")
-                return True
-
-        except subprocess.TimeoutExpired:
-            print(f"   ⚠️  Port cleanup timed out (attempt {attempt + 1})")
-            if attempt < max_retries - 1:
-                time.sleep(2)
-                continue
-            else:
-                return False
-        except FileNotFoundError:
-            print(f"   ⚠️  lsof not available, trying alternative method...")
-            # Try alternative method using netstat
-            try:
-                result = subprocess.run(
-                    ["netstat", "-tlnp"], capture_output=True, text=True, timeout=10
-                )
-                if result.returncode == 0:
-                    lines = result.stdout.split("\n")
-                    for line in lines:
-                        if f":{port}" in line and "LISTEN" in line:
-                            print(
-                                f"   🚫 Found process using port {port}, attempting to kill..."
-                            )
-                            # Extract PID from netstat output
-                            parts = line.split()
-                            if len(parts) > 6:
-                                pid_part = parts[6].split("/")[0]
-                                try:
-                                    pid_int = int(pid_part)
-                                    os.kill(pid_int, signal.SIGKILL)
-                                    print(f"   ✅ Killed process {pid_int}")
-                                    time.sleep(2)
-                                except (ValueError, OSError):
-                                    pass
-                    return True
-                else:
-                    print(f"   ⚠️  Alternative cleanup method failed")
-                    return False
-            except Exception:
-                print(f"   ⚠️  Alternative cleanup method not available")
-                return False
-        except Exception as e:
-            print(f"   ⚠️  Port cleanup failed (attempt {attempt + 1}): {e}")
-            if attempt < max_retries - 1:
-                time.sleep(2)
-                continue
-            else:
-                return False
-
-    return False
 
 
 def check_port_available(port: int = 9001) -> bool:
@@ -163,63 +42,24 @@ def wait_for_port_free(port: int = 9001, max_wait: int = 30) -> bool:
     return False
 
 
-def start_service(cleanup_enabled: bool = False, api_port: int = 9200):
+def start_service(api_port: int = 9200):
     """Start the FLUX API service"""
     print("\n🚀 Starting FLUX API Service...")
     print("=" * 50)
-
-    if cleanup_enabled:
-        print("🧹 Cleanup mode enabled - will attempt to clean up existing processes")
-    else:
-        print("🔧 Cleanup mode disabled - will only check for port conflicts")
 
     # Use provided port
     target_port = api_port
     print(f"🌐 API Port: {target_port}")
 
-    # Clean up port before starting (only if cleanup is enabled)
-    if cleanup_enabled:
-        if not cleanup_port(target_port):
-            print("   ⚠️  Port cleanup incomplete, but continuing...")
-    else:
-        print(f"🔍 Checking port {target_port} availability (cleanup disabled)...")
-        if not check_port_available(target_port):
-            print(f"   ❌ Port {target_port} is not available")
-            return False
-        else:
-            print(f"   ✅ Port {target_port} is available")
-
-    # Final port verification
-    print("🔍 Final port verification...")
-    try:
-        result = subprocess.run(
-            ["lsof", "-ti", f":{target_port}"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-
-        if result.returncode == 0 and result.stdout.strip():
-            print(f"   ❌ Port {target_port} still in use by: {result.stdout.strip()}")
-            print("   🚫 Attempting final cleanup...")
-            pids = result.stdout.strip().split("\n")
-            for pid in pids:
-                if pid.strip():
-                    try:
-                        subprocess.run(["kill", "-9", pid.strip()], timeout=5)
-                        print(f"   ✅ Killed process {pid.strip()}")
-                    except Exception:
-                        pass
-            time.sleep(2)
-        else:
-            print(f"   ✅ Port {target_port} is confirmed free")
-    except Exception as e:
-        print(f"   ⚠️  Final verification failed: {e}")
-
-    # Wait for port to be truly available
-    if not wait_for_port_free(target_port, max_wait=30):
-        print(f"   ❌ Port {target_port} is not available, cannot start service")
+    # Check port availability
+    print(f"🔍 Checking port {target_port} availability...")
+    if not check_port_available(target_port):
+        print(f"   ❌ Port {target_port} is not available")
         return False
+    else:
+        print(f"   ✅ Port {target_port} is available")
+
+
 
     # Resolve Python executable: prefer flux_env if present, else current python
     flux_env_python = Path("flux_env/bin/python")
@@ -289,12 +129,7 @@ def start_service(cleanup_enabled: bool = False, api_port: int = 9200):
 def main():
     """Main function"""
     parser = argparse.ArgumentParser(description="FLUX API Service Starter")
-    parser.add_argument(
-        "--cleanup",
-        action="store_true",
-        default=False,
-        help="Enable cleanup of existing processes on the target port (default: False)",
-    )
+
     parser.add_argument(
         "--port", type=int, default=9200, help="API port number (default: 9200)"
     )
@@ -304,7 +139,6 @@ def main():
 
     print("FLUX API Service Starter")
     print("=" * 30)
-    print(f"Cleanup mode: {'enabled' if args.cleanup else 'disabled'}")
     print(f"API Port: {args.port}")
 
     # Check if we're in the right directory
@@ -314,7 +148,7 @@ def main():
         sys.exit(1)
 
     # Start the service
-    start_service(cleanup_enabled=args.cleanup, api_port=args.port)
+    start_service(api_port=args.port)
 
 
 if __name__ == "__main__":
