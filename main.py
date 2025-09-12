@@ -13,7 +13,7 @@ import loguru
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.routes import get_model_manager, router
@@ -180,68 +180,19 @@ async def validate_requests(request, call_next):
 # Include API routes
 app.include_router(router, prefix="")
 
-# Frontend enabled flag - will be set by command line arguments
-FRONTEND_ENABLED = True  # Default value, will be overridden in main()
+# Mount generated images directory for downloads
+if os.path.exists("generated_images"):
+    app.mount(
+        "/generated_images",
+        StaticFiles(directory="generated_images"),
+        name="generated_images",
+    )
+    logger.info("Mounted generated_images directory for static file serving")
+else:
+    logger.warning("generated_images directory not found - downloads may not work")
 
 
-def setup_frontend(frontend_enabled: bool):
-    """Setup frontend mounting based on the enabled flag"""
-    # Mount static files for frontend only if frontend is enabled
-    if frontend_enabled and os.path.exists("frontend/static"):
-        app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
-        logger.info("Frontend enabled - static files mounted")
-    elif not frontend_enabled:
-        logger.info("Frontend disabled - backend-only mode")
 
-    # Mount generated images directory for downloads
-    if os.path.exists("generated_images"):
-        app.mount(
-            "/generated_images",
-            StaticFiles(directory="generated_images"),
-            name="generated_images",
-        )
-        logger.info("Mounted generated_images directory for static file serving")
-
-        files = os.listdir("generated_images")
-    else:
-        logger.warning("generated_images directory not found - downloads may not work")
-
-
-# Setup frontend with default value (will be overridden in main)
-setup_frontend(FRONTEND_ENABLED)
-
-
-@app.get("/ui", response_class=HTMLResponse)
-async def serve_frontend():
-    """Serve the ComfyUI-style frontend (only if frontend is enabled)"""
-    if not FRONTEND_ENABLED:
-        return """
-        <html>
-            <head><title>FP4 FLUX API - Backend Only</title></head>
-            <body>
-                <h1>FP4 FLUX API - Backend Only Mode</h1>
-                <p>Frontend is disabled. This API is running in backend-only mode.</p>
-                <p><a href="/docs">Visit API Documentation</a></p>
-                <p><a href="/health">Health Check</a></p>
-            </body>
-        </html>
-        """
-
-    frontend_path = "frontend/templates/index.html"
-    if os.path.exists(frontend_path):
-        with open(frontend_path, "r") as f:
-            return f.read()
-    else:
-        return """
-        <html>
-            <head><title>FP4 FLUX API</title></head>
-            <body>
-                <h1>FP4 FLUX API - Frontend Not Available</h1>
-                <p>The frontend files are not found. Please check the frontend directory.</p>
-                <p><a href="/docs">Visit API Documentation</a></p>
-            </body>
-        </html>
-        """
 
 
 # Health check endpoint
@@ -273,19 +224,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--port", type=int, default=9200, help="API port number (default: 9200)"
     )
-    parser.add_argument(
-        "--no-frontend",
-        action="store_true",
-        default=False,
-        help="Disable frontend (backend-only mode)",
-    )
     args = parser.parse_args()
-
-    # Set frontend enabled based on arguments
-    FRONTEND_ENABLED = not args.no_frontend
-
-    # Setup frontend with parsed arguments
-    setup_frontend(FRONTEND_ENABLED)
 
     # Store port in app state for access by routes
     app.state.port = args.port

@@ -163,9 +163,7 @@ def wait_for_port_free(port: int = 9001, max_wait: int = 30) -> bool:
     return False
 
 
-def start_service(
-    cleanup_enabled: bool = False, api_port: int = 9200, enable_frontend: bool = True
-):
+def start_service(cleanup_enabled: bool = False, api_port: int = 9200):
     """Start the FLUX API service"""
     print("\n🚀 Starting FLUX API Service...")
     print("=" * 50)
@@ -178,12 +176,6 @@ def start_service(
     # Use provided port
     target_port = api_port
     print(f"🌐 API Port: {target_port}")
-
-    # Check if frontend is enabled
-    if not enable_frontend:
-        print("🔧 Backend-only mode enabled - frontend will be disabled")
-    else:
-        print("📱 Frontend enabled")
 
     # Clean up port before starting (only if cleanup is enabled)
     if cleanup_enabled:
@@ -256,8 +248,6 @@ def start_service(
 
         # Build command with arguments
         cmd = [python_exec, "main.py", "--port", str(target_port)]
-        if not enable_frontend:
-            cmd.append("--no-frontend")
 
         process = subprocess.Popen(
             cmd,
@@ -272,10 +262,6 @@ def start_service(
         print(f"API URL: http://localhost:{target_port}")
         print(f"Health check: http://localhost:{target_port}/health")
         print(f"API docs: http://localhost:{target_port}/docs")
-        if enable_frontend:
-            print(f"UI: http://localhost:{target_port}/ui")
-        else:
-            print(f"UI: Disabled (backend-only mode)")
         print("\n📋 Service logs:")
         print("-" * 50)
 
@@ -312,12 +298,7 @@ def main():
     parser.add_argument(
         "--port", type=int, default=9200, help="API port number (default: 9200)"
     )
-    parser.add_argument(
-        "--no-frontend",
-        action="store_true",
-        default=False,
-        help="Disable frontend (backend-only mode)",
-    )
+
 
     args = parser.parse_args()
 
@@ -325,7 +306,6 @@ def main():
     print("=" * 30)
     print(f"Cleanup mode: {'enabled' if args.cleanup else 'disabled'}")
     print(f"API Port: {args.port}")
-    print(f"📱 Frontend: {'disabled' if args.no_frontend else 'enabled'}")
 
     # Check if we're in the right directory
     if not Path("main.py").exists():
@@ -334,11 +314,7 @@ def main():
         sys.exit(1)
 
     # Start the service
-    start_service(
-        cleanup_enabled=args.cleanup,
-        api_port=args.port,
-        enable_frontend=not args.no_frontend,
-    )
+    start_service(cleanup_enabled=args.cleanup, api_port=args.port)
 
 
 if __name__ == "__main__":

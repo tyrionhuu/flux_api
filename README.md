@@ -7,8 +7,7 @@ A dual-model AI image generation API service featuring FLUX models with LoRA sup
 - **FP4 Model Support**: Quantized FLUX model for efficient inference
 - **GPU Management**: Automatic GPU selection and load balancing
 - **LoRA Support**: Apply custom LoRA weights for style customization
-- **LoRA File Upload**: Upload local LoRA files directly through the web interface
-- **ComfyUI-style Frontend**: Modern, intuitive web interface
+- **LoRA File Upload**: Upload local LoRA files directly through the API
 - **RESTful API**: Easy integration with external applications
 
 ## Model Services
@@ -65,14 +64,10 @@ A dual-model AI image generation API service featuring FLUX models with LoRA sup
 ```bash
 # Start FP4 service
 ./start_flux_api.sh
-
-# Start frontend (optional)
-cd frontend && python -m http.server 9001
 ```
 
 ### 2. Access the Services
 
-- **Frontend**: http://localhost:9001
 - **FP4 API**: http://localhost:8000
 
 ## LoRA Support
@@ -88,12 +83,14 @@ curl -X POST "http://localhost:8000/apply-lora" \
 
 ### Uploading Local LoRA Files
 
-The web interface now supports uploading local LoRA files:
+The API supports uploading local LoRA files:
 
-1. **Click "Upload LoRA"** button in the frontend
-2. **Select your LoRA file** (.safetensors, .bin, .pt, .pth)
-3. **Set the weight** (0.0 - 2.0)
-4. **Apply the LoRA** using the "Apply LoRA" button
+```bash
+# Upload a LoRA file
+curl -X POST "http://localhost:8000/upload-lora" \
+  -F "file=@/path/to/your/lora.safetensors" \
+  -F "weight=1.0"
+```
 
 **Supported Formats**:
 - `.safetensors` (recommended)
@@ -332,7 +329,6 @@ flux_api/
 ├── models/                 # FLUX model implementations
 ├── utils/                  # Utility modules
 ├── config/                 # Configuration files
-├── frontend/               # Web interface
 ├── uploads/                # Uploaded LoRA files
 │   └── lora_files/        # LoRA file storage
 ├── generated_images/       # Generated images
@@ -372,9 +368,8 @@ tail -f logs/flux_api.log
 
 ### Adding New Features
 
-1. **Frontend**: Modify `frontend/static/js/app.js`
-2. **API**: Add routes in `api/routes.py`
-3. **Models**: Extend `models/flux_model.py`
+1. **API**: Add routes in `api/routes.py`
+2. **Models**: Extend `models/flux_model.py`
 
 ### Testing
 

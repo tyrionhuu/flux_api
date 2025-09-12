@@ -34,7 +34,6 @@ docker run -d \
 The Docker container runs with these default arguments:
 - `--port 9200` - API port (can be overridden with custom CMD)
 - `--cleanup` - Enable cleanup of existing processes
-- `--no-frontend` - Disable frontend (backend-only mode) - frontend is enabled by default
 
 ### Port Mapping
 
