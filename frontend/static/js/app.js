@@ -35,6 +35,101 @@ class FluxAPI {
         return document.getElementById(id);
     }
 
+    // Generate a stable key for a LoRA entry (prefer storedName, fallback to name)
+    loraKey(lora) {
+        const key = (lora?.storedName || lora?.name || '').toString().trim().toLowerCase();
+        return key;
+    }
+
+    // Return a new array with LoRAs de-duplicated by key
+    dedupeLoras(list) {
+        const seen = new Set();
+        const out = [];
+        for (const l of list || []) {
+            const k = this.loraKey(l);
+            if (!k) continue;
+            if (seen.has(k)) continue;
+            seen.add(k);
+            out.push(l);
+        }
+        return out;
+    }
+
+    // Check if a LoRA file to upload already exists (by original name + size) on server
+    async checkDuplicateLoraFile(file) {
+        try {
+            const resp = await fetch(`${this.hostBase}/loras`);
+            if (!resp.ok) return false;
+            const data = await resp.json();
+
+            const uploaded = Array.isArray(data.uploaded) ? data.uploaded : [];
+            const match = uploaded.find(entry => {
+                const original = (entry.original_name || entry.stored_name || '').toString().trim();
+                const sizeMatch = typeof entry.size === 'number' ? entry.size === file.size : false;
+                return original === file.name && sizeMatch;
+            });
+
+            if (match) {
+                // Ensure it's in availableLoras
+                const candidate = {
+                    name: match.original_name || match.stored_name,
+                    weight: 1.0,
+                    type: 'uploaded',
+                    storedName: match.stored_name,
+                    displayName: `${match.original_name || match.stored_name} (Uploaded)`,
+                    size: match.size,
+                    timestamp: match.timestamp
+                };
+                const k = this.loraKey(candidate);
+                if (!this.availableLoras.find(x => this.loraKey(x) === k)) {
+                    this.availableLoras.push(candidate);
+                    this.removeDuplicateLoras();
+                    this.populateLoraDropdown();
+                }
+                this.showError(`A LoRA with the same name and size already exists. Skipping upload.`);
+                return true;
+            }
+        } catch (_) {
+            // Non-fatal; if we can't check, proceed with upload
+        }
+        return false;
+    }
+
+    // Check if a Hugging Face LoRA (repo_id + filename) is already cached on the server
+    async checkDuplicateHfLora(repo_id, filename, displayName) {
+        try {
+            const resp = await fetch(`${this.hostBase}/loras`);
+            if (!resp.ok) return null;
+            const data = await resp.json();
+            const uploaded = Array.isArray(data.uploaded) ? data.uploaded : [];
+
+            // Prefer exact display name match (original_name), otherwise fallback to suffix filename match
+            const expectedDisplay = (displayName || `${repo_id}/${filename}`).trim();
+            let match = uploaded.find(e => (e.original_name || e.stored_name || '').trim() === expectedDisplay);
+            if (!match && filename) {
+                // fallback: some entries may have only filename in original_name
+                match = uploaded.find(e => (e.original_name || '').endsWith(`/${filename}`));
+            }
+
+            if (match) {
+                // Build candidate available item
+                const candidate = {
+                    name: match.original_name || match.stored_name,
+                    weight: 1.0,
+                    type: 'uploaded',
+                    storedName: match.stored_name,
+                    displayName: `${match.original_name || match.stored_name} (Cached)`,
+                    size: match.size,
+                    timestamp: match.timestamp
+                };
+                return candidate;
+            }
+        } catch (_) {
+            // ignore
+        }
+        return null;
+    }
+
     getFormValues() {
         return {
             prompt: this.getElement('prompt').value.trim(),
@@ -447,7 +542,7 @@ class FluxAPI {
                 // Add uploaded LoRAs
                 if (data.uploaded && Array.isArray(data.uploaded)) {
                     data.uploaded.forEach(item => {
-                        this.availableLoras.push({
+                        const candidate = {
                             name: item.original_name || item.stored_name,
                             weight: 1.0,
                             type: 'uploaded',
@@ -455,14 +550,19 @@ class FluxAPI {
                             displayName: `${item.original_name || item.stored_name} (Uploaded)`,
                             size: item.size,
                             timestamp: item.timestamp
-                        });
+                        };
+                        // prevent duplicates while loading
+                        const k = this.loraKey(candidate);
+                        if (!this.availableLoras.find(x => this.loraKey(x) === k)) {
+                            this.availableLoras.push(candidate);
+                        }
                     });
                 }
                 
                 // Add Hugging Face LoRAs
                 if (data.huggingface && Array.isArray(data.huggingface)) {
                     data.huggingface.forEach(item => {
-                        this.availableLoras.push({
+                        const candidate = {
                             name: item.name,
                             weight: 1.0,
                             type: 'huggingface',
@@ -471,7 +571,11 @@ class FluxAPI {
                             displayName: `${item.display_name} (Hugging Face)`,
                             size: item.size,
                             timestamp: item.timestamp
-                        });
+                        };
+                        const k = this.loraKey(candidate);
+                        if (!this.availableLoras.find(x => this.loraKey(x) === k)) {
+                            this.availableLoras.push(candidate);
+                        }
                     });
                 }
             }
@@ -479,11 +583,10 @@ class FluxAPI {
             console.warn('Failed to load server LoRAs:', e);
         }
 
-        // Add currently applied LoRAs to available list (so they can be selected again)
+        // Add currently applied LoRAs to available list (so they can be selected again) without duplication
         this.appliedLoras.forEach(appliedLora => {
-            // Check if this LoRA is already in the available list
-            const exists = this.availableLoras.find(lora => lora.name === appliedLora.name);
-            if (!exists) {
+            const k = this.loraKey(appliedLora);
+            if (!this.availableLoras.find(x => this.loraKey(x) === k)) {
                 this.availableLoras.push({
                     name: appliedLora.name,
                     weight: appliedLora.weight,
@@ -507,10 +610,9 @@ class FluxAPI {
     removeDuplicateLoras() {
         const seen = new Set();
         this.availableLoras = this.availableLoras.filter(lora => {
-            const key = lora.storedName || lora.name;
-            if (seen.has(key)) {
-                return false;
-            }
+            const key = this.loraKey(lora);
+            if (!key) return false;
+            if (seen.has(key)) return false;
             seen.add(key);
             return true;
         });
@@ -635,8 +737,8 @@ class FluxAPI {
         const loraData = JSON.parse(selectedOption.dataset.loraData);
         console.log('Parsed LoRA data:', loraData);
 
-        // 检查是否已经在应用列表中
-        const exists = this.appliedLoras.find(item => item.name === loraData.name);
+        // 检查是否已经在应用列表中（按 storedName/name 去重）
+        const exists = this.appliedLoras.find(item => this.loraKey(item) === this.loraKey(loraData));
         if (exists) {
             this.showError('This LoRA is already applied');
             return;
@@ -993,6 +1095,33 @@ class FluxAPI {
                     throw new Error('Invalid Hugging Face LoRA format');
                 }
                 
+                // Pre-check: see if a matching HF LoRA already exists in server index
+                const preExisting = await this.checkDuplicateHfLora(repo_id, filename, customName.trim());
+                if (preExisting) {
+                    const k = this.loraKey(preExisting);
+                    if (!this.availableLoras.find(x => this.loraKey(x) === k)) {
+                        this.availableLoras.push(preExisting);
+                        this.removeDuplicateLoras();
+                        this.populateLoraDropdown();
+                    }
+                    if (!this.appliedLoras.find(x => this.loraKey(x) === k)) {
+                        this.appliedLoras.push({
+                            name: preExisting.name,
+                            weight: 1.0,
+                            type: 'huggingface',
+                            storedName: preExisting.storedName,
+                            displayName: preExisting.displayName,
+                            size: preExisting.size,
+                            timestamp: preExisting.timestamp
+                        });
+                        this.renderAppliedLoras();
+                        this.updateApiCommand();
+                    }
+                    this.hideDownloadProgress();
+                    this.showSuccess(`Hugging Face LoRA already cached; reusing existing entry.`);
+                    return;
+                }
+
                 const response = await fetch(`${this.hostBase}/cache-hf-lora`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1010,16 +1139,19 @@ class FluxAPI {
 
                 const result = await response.json();
                 
-                // Add to applied list with cached info
-                this.appliedLoras.push({
-                    name: customName.trim(),
-                    weight: 1.0,
-                    type: 'huggingface',
-                    storedName: result.stored_name,
-                    displayName: `${result.original_name} (Cached)`,
-                    size: result.size,
-                    timestamp: Math.floor(Date.now() / 1000)
-                });
+                // Add to applied list with cached info (avoid duplicates by key)
+                const kRes = this.loraKey({ storedName: result.stored_name, name: result.original_name });
+                if (!this.appliedLoras.find(x => this.loraKey(x) === kRes)) {
+                    this.appliedLoras.push({
+                        name: customName.trim(),
+                        weight: 1.0,
+                        type: 'huggingface',
+                        storedName: result.stored_name,
+                        displayName: `${result.original_name} (Cached)`,
+                        size: result.size,
+                        timestamp: Math.floor(Date.now() / 1000)
+                    });
+                }
 
                 this.renderAppliedLoras();
                 this.updateApiCommand();
@@ -1960,6 +2092,14 @@ class FluxAPI {
         }
 
         try {
+            // Pre-check duplication against server index (by original name + size)
+            const isDup = await this.checkDuplicateLoraFile(file);
+            if (isDup) {
+                // Reset the file input and abort upload
+                event.target.value = '';
+                return;
+            }
+
             // Show upload progress indicator
             this.showUploadProgress(file.name);
 
