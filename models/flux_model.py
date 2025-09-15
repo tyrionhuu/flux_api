@@ -39,6 +39,11 @@ class FluxModelManager:
         self.current_lora: Optional[Union[str, list]] = None
         self.current_weight: float = 1.0
         self._temp_lora_paths: list = []
+        # LoRA Fusion State Management
+        self.fused_lora_path: Optional[str] = None
+        self.fused_lora_configs: Optional[list] = None
+        self.fused_timestamp: Optional[float] = None
+        self.is_fused_state: bool = False
 
     def load_model(self) -> bool:
         """Load the FLUX model with GPU-only support and quantization"""
@@ -238,9 +243,7 @@ class FluxModelManager:
                 )
                 try:
                     # Convert default LoRA to nunchaku format
-                    logger.info(
-                        "   - Converting default LoRA to nunchaku format..."
-                    )
+                    logger.info("   - Converting default LoRA to nunchaku format...")
                     transformer.update_lora_params(DEFAULT_LORA_NAME)
                     logger.info(f"   - Default LoRA parameters loaded successfully")
                 except Exception as load_error:
@@ -666,7 +669,7 @@ class FluxModelManager:
         return self.apply_multiple_loras([{"name": lora_name, "weight": lora_weight}])
 
     def apply_multiple_loras(self, lora_configs: list) -> bool:
-        """Apply multiple LoRAs simultaneously to the pipeline by combining them"""
+        """Apply multiple LoRAs using fusion workflow when multiple provided"""
         try:
             if not self._is_ready_with_lora():
                 return False
@@ -831,7 +834,6 @@ class FluxModelManager:
                     logger.error(f"   - Could not resolve path for LoRA: {lora_name}")
                     return None
                 resolved_paths.append(lora_path)
-
 
             # Create a temporary directory for the merge operation
             temp_dir = tempfile.mkdtemp(prefix="merged_lora_")
@@ -1091,7 +1093,6 @@ class FluxModelManager:
             logger.error(f"Error resolving LoRA path: {e}")
             return None
 
-
     def _cleanup_temp_loras(self):
         """Clean up any temporary LoRA files"""
         try:
@@ -1105,3 +1106,107 @@ class FluxModelManager:
                 self._temp_lora_paths = []
         except Exception as e:
             logger.warning(f"Error cleaning up temporary LoRAs: {e}")
+
+    # ============================================================================
+    # LoRA Fusion Methods
+    # ============================================================================
+
+    def fuse_loras(self, lora_configs: list) -> bool:
+        """Permanently fuse LoRAs (by merging into a single temporary LoRA and applying at full strength)."""
+        try:
+            logger.info(f"Starting LoRA fusion for {len(lora_configs)} LoRAs...")
+
+            # Unfuse any existing LoRAs first
+            if self.is_fused_state:
+                logger.info("Unfusing existing LoRAs before new fusion...")
+                self.unfuse_loras()
+
+            if len(lora_configs) == 0:
+                logger.error("No LoRA configurations provided for fusion")
+                return False
+
+            # Resolve/merge
+            if len(lora_configs) == 1:
+                # Single LoRA - copy to temp for consistency
+                lora_path = self._get_lora_path(lora_configs[0]["name"])
+                if not lora_path:
+                    return False
+                temp_dir = tempfile.mkdtemp(prefix="fused_lora_")
+                temp_path = os.path.join(temp_dir, os.path.basename(lora_path))
+                shutil.copy2(lora_path, temp_path)
+                fused_path = temp_path
+            else:
+                fused_path = self._merge_loras(lora_configs)
+                if not fused_path:
+                    logger.error("Failed to merge multiple LoRAs")
+                    return False
+
+            # Apply fused LoRA at strength 1.0
+            transformer = self._get_pipe_transformer()
+            if not self._check_lora_compatibility(fused_path):
+                return False
+            transformer.update_lora_params(fused_path)
+            transformer.set_lora_strength(1.0)
+
+            # Store state
+            self.fused_lora_path = fused_path
+            self.fused_lora_configs = lora_configs
+            import time as _time
+
+            self.fused_timestamp = _time.time()
+            self.is_fused_state = True
+            logger.info(f"LoRA fusion completed successfully. Fused path: {fused_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Error during LoRA fusion: {e}")
+            return False
+
+    def unfuse_loras(self) -> bool:
+        """Remove fused LoRAs and reset state (sets strength to 0 and cleans up temp)."""
+        try:
+            if not self.is_fused_state:
+                return True
+
+            if (
+                self.pipe is not None
+                and hasattr(self.pipe, "transformer")
+                and hasattr(self.pipe.transformer, "set_lora_strength")
+            ):
+                self.pipe.transformer.set_lora_strength(0.0)
+
+            # Cleanup temp files/dirs
+            if self.fused_lora_path and os.path.exists(self.fused_lora_path):
+                try:
+                    if os.path.isfile(self.fused_lora_path):
+                        parent_dir = os.path.dirname(self.fused_lora_path)
+                        os.remove(self.fused_lora_path)
+                        if os.path.exists(parent_dir) and not os.listdir(parent_dir):
+                            os.rmdir(parent_dir)
+                    else:
+                        shutil.rmtree(self.fused_lora_path)
+                except Exception as cleanup_error:
+                    logger.warning(
+                        f"Error cleaning up temporary fused LoRA: {cleanup_error}"
+                    )
+
+            self.fused_lora_path = None
+            self.fused_lora_configs = None
+            self.fused_timestamp = None
+            self.is_fused_state = False
+            return True
+        except Exception as e:
+            logger.error(f"Error during LoRA unfusion: {e}")
+            return False
+
+    def is_fused(self) -> bool:
+        return self.is_fused_state
+
+    def get_fused_lora_info(self) -> Optional[dict]:
+        if not self.is_fused_state:
+            return None
+        return {
+            "fused_lora_path": self.fused_lora_path,
+            "fused_lora_configs": self.fused_lora_configs,
+            "fused_timestamp": self.fused_timestamp,
+            "is_fused": self.is_fused_state,
+        }

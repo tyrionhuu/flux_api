@@ -1237,6 +1237,7 @@ async def remove_lora():
 # LoRA Fusion Endpoints
 # ============================================================================
 
+
 @router.post("/apply-lora-permanent")
 async def apply_lora_permanent(request: dict):
     """Apply LoRAs permanently (fusion)"""
@@ -1301,8 +1302,9 @@ async def get_fused_lora_status():
         fused_info = model_manager.get_fused_lora_info()
         return {"is_fused": is_fused, "fused_info": fused_info}
     except Exception as e:
-        logger.error(f"Error getting fused LoRA status: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        # Return a safe default instead of raising 500 so the UI doesn't break on startup
+        logger.warning(f"fused-lora-status error (returning safe default): {e}")
+        return {"is_fused": False, "fused_info": None, "error": str(e)}
 
 
 @router.delete("/unfuse-loras")
