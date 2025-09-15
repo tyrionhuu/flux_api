@@ -181,6 +181,9 @@ def read_root(request: Request):
             "/apply-lora",
             "/remove-lora",
             "/lora-status",
+            "/apply-lora-permanent",
+            "/fused-lora-status",
+            "/unfuse-loras",
         ],
         "model_loaded": model_manager.is_loaded(),
         "model_type": model_manager.model_type,
@@ -1228,6 +1231,94 @@ async def remove_lora():
             raise HTTPException(status_code=500, detail="Failed to remove LoRA")
     except Exception as e:
         raise handle_api_error("LoRA removal", e)
+
+
+# ============================================================================
+# LoRA Fusion Endpoints
+# ============================================================================
+
+@router.post("/apply-lora-permanent")
+async def apply_lora_permanent(request: dict):
+    """Apply LoRAs permanently (fusion)"""
+    try:
+        if "loras" not in request:
+            raise HTTPException(
+                status_code=400, detail="Missing 'loras' field in request"
+            )
+
+        lora_configs = request["loras"]
+        if not isinstance(lora_configs, list):
+            raise HTTPException(status_code=400, detail="'loras' must be a list")
+
+        if len(lora_configs) == 0:
+            raise HTTPException(status_code=400, detail="No LoRAs provided for fusion")
+
+        # Validate LoRA configurations
+        for config in lora_configs:
+            if not isinstance(config, dict):
+                raise HTTPException(
+                    status_code=400, detail="Each LoRA config must be a dictionary"
+                )
+            if "name" not in config or "weight" not in config:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Each LoRA config must have 'name' and 'weight' fields",
+                )
+            if not config["name"] or not config["name"].strip():
+                raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
+            if (
+                not isinstance(config["weight"], (int, float))
+                or config["weight"] < 0
+                or config["weight"] > 2.0
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="LoRA weight must be a number between 0 and 2.0",
+                )
+
+        # Apply fusion
+        if model_manager.fuse_loras(lora_configs):
+            fused_info = model_manager.get_fused_lora_info()
+            return {
+                "message": f"Successfully fused {len(lora_configs)} LoRAs",
+                "fused_info": fused_info,
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to fuse LoRAs")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error applying LoRAs permanently: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/fused-lora-status")
+async def get_fused_lora_status():
+    """Get the current fused LoRA status"""
+    try:
+        is_fused = model_manager.is_fused()
+        fused_info = model_manager.get_fused_lora_info()
+        return {"is_fused": is_fused, "fused_info": fused_info}
+    except Exception as e:
+        logger.error(f"Error getting fused LoRA status: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.delete("/unfuse-loras")
+async def unfuse_loras():
+    """Unfuse LoRAs"""
+    try:
+        if model_manager.unfuse_loras():
+            return {"message": "LoRAs unfused successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to unfuse LoRAs")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unfusing LoRAs: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 # Queue management endpoints

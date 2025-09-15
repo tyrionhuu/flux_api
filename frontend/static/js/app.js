@@ -7,6 +7,12 @@ class FluxAPI {
         this.appliedLoras = []; // 已应用的LoRA列表
         this.availableLoras = []; // 可选择的LoRA列表
         this.uploadedFiles = new Map(); // 存储上传的文件映射
+        
+        // LoRA Fusion State Management
+        this.isFused = false;
+        this.fusedLoras = [];
+        this.fusedTimestamp = null;
+        
         this.init();
     }
 
@@ -15,6 +21,9 @@ class FluxAPI {
         this.loadAvailableLoras();
         // Removed automatic default LoRA addition
         this.updateApiCommand();
+
+        // Check fusion status on startup
+        this.checkFusionStatus();
 
         setTimeout(() => {
             this.updateButtonVisibility();
@@ -93,33 +102,50 @@ class FluxAPI {
 
     async handleFetchResponse(response) {
         if (!response.ok) {
-            let detail = 'Unknown error';
+            let detail = `Server error (${response.status}: ${response.statusText})`;
+            
             try {
-                const error = await response.json();
-                detail = error.detail || JSON.stringify(error);
-            } catch (_) {
-                try {
+                // Check content type before attempting to parse
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const error = await response.json();
+                    detail = error.detail || error.message || JSON.stringify(error);
+                } else {
+                    // Try to get text content for non-JSON responses
                     const bodyText = await response.text();
-                    detail = bodyText?.slice(0, 500) || detail;
-                } catch (textError) {
-                    detail = `HTTP ${response.status}: ${response.statusText}`;
+                    if (bodyText && bodyText.trim()) {
+                        detail = bodyText.slice(0, 500) + (bodyText.length > 500 ? '...' : '');
+                    }
                 }
+            } catch (parseError) {
+                console.warn('Failed to parse error response:', parseError);
+                // Keep the default error message
             }
+            
             throw new Error(`Request failed: ${detail}`);
         }
     
+        // Handle successful responses
         try {
-            return await response.json();
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return await response.json();
+            } else {
+                // For non-JSON responses, return text
+                const responseText = await response.text();
+                console.warn('Non-JSON response received:', responseText.substring(0, 100));
+                return { message: 'Success', data: responseText };
+            }
         } catch (parseError) {
+            console.error('Response parsing error:', parseError);
+            
             try {
                 const responseText = await response.text();
-                console.error('JSON parse error:', parseError);
-                console.error('Response text:', responseText);
-                throw new Error(`Invalid JSON response: ${responseText?.slice(0, 500) || 'empty body'}`);
+                console.error('Response text:', responseText.substring(0, 500));
+                throw new Error(`Invalid response format: ${responseText?.slice(0, 200) || 'empty body'}...`);
             } catch (textError) {
-                console.error('JSON parse error:', parseError);
                 console.error('Failed to read response text:', textError);
-                throw new Error(`Invalid JSON response: Unable to read response body`);
+                throw new Error(`Invalid response: Unable to read response body`);
             }
         }
     }
@@ -226,10 +252,19 @@ class FluxAPI {
         if (applyLoraBtn) {
             applyLoraBtn.addEventListener('click', () => {
                 console.log('Apply LoRA button clicked!');
-                this.applyLorasToModel();
+                this.applyLorasPermanently();
             });
         } else {
             console.error('Apply LoRA button not found!');
+        }
+
+        // Unfuse LoRAs button
+        const unfuseLoraBtn = this.getElement('unfuse-loras-btn');
+        if (unfuseLoraBtn) {
+            unfuseLoraBtn.addEventListener('click', () => {
+                console.log('Unfuse LoRA button clicked!');
+                this.unfuseLoras();
+            });
         }
 
         // Upscaler checkbox
@@ -663,95 +698,169 @@ class FluxAPI {
         this.showSuccess('All LoRAs cleared');
     }
 
-    // 应用LoRAs到模型
-    async applyLorasToModel() {
+    // Apply LoRAs permanently (fusion)
+    async applyLorasPermanently() {
         if (this.appliedLoras.length === 0) {
-            this.showError('No LoRAs selected to apply');
+            this.showError('No LoRAs to apply. Please add LoRAs first.');
             return;
         }
 
-        const applyBtn = this.getElement('apply-lora-btn');
-        const originalText = applyBtn.innerHTML;
-        
         try {
-            // 显示加载状态
-            applyBtn.disabled = true;
-            applyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying...';
+            this.showLoading('Fusing LoRAs...');
             
-            // 首先移除所有现有的LoRAs
-            try {
-                await fetch(`${this.hostBase}/remove-lora`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            } catch (e) {
-                console.warn('Failed to remove existing LoRAs:', e);
-            }
-
-            // 应用每个LoRA
-            for (const lora of this.appliedLoras) {
-                const loraName = lora.storedName || lora.name;
-                const requestBody = {
-                    lora_name: loraName,
-                    weight: lora.weight
-                };
-                
-                // Add Hugging Face specific data if it's a HF LoRA
-                if (lora.type === 'huggingface') {
-                    requestBody.repo_id = lora.repoId;
-                    requestBody.filename = lora.filename;
-                }
-                
-                const response = await fetch(`${this.hostBase}/apply-lora`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || `Failed to apply LoRA: ${loraName}`);
-                }
-            }
-
-            this.showSuccess(`Successfully applied ${this.appliedLoras.length} LoRA(s) to the model`);
-            
-            // Add applied LoRAs to available list if not already there
-            this.appliedLoras.forEach(appliedLora => {
-                const exists = this.availableLoras.find(lora => lora.name === appliedLora.name);
-                if (!exists) {
-                    this.availableLoras.push({
-                        name: appliedLora.name,
-                        weight: appliedLora.weight,
-                        type: appliedLora.type,
-                        storedName: appliedLora.storedName,
-                        repoId: appliedLora.repoId,
-                        filename: appliedLora.filename,
-                        displayName: appliedLora.displayName || `${appliedLora.name} (Applied)`,
-                        size: appliedLora.size,
-                        timestamp: appliedLora.timestamp
-                    });
-                }
+            const response = await fetch(`${this.hostBase}/apply-lora-permanent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    loras: this.appliedLoras.map(lora => ({
+                        name: lora.storedName || lora.name,
+                        weight: lora.weight
+                    }))
+                })
             });
+
+            // Handle different types of errors
+            if (!response.ok) {
+                let errorMessage = `Server error (${response.status}: ${response.statusText})`;
+                
+                try {
+                    // Try to parse error response as JSON
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        errorMessage = errorData.detail || errorData.message || errorMessage;
+                    } else {
+                        // If not JSON, try to get text content
+                        const errorText = await response.text();
+                        if (errorText.trim()) {
+                            errorMessage = errorText.substring(0, 200) + (errorText.length > 200 ? '...' : '');
+                        }
+                    }
+                } catch (parseError) {
+                    console.warn('Failed to parse error response:', parseError);
+                    // Use the default error message
+                }
+                
+                throw new Error(errorMessage);
+            }
+
+            // Parse successful response
+            let result;
+            try {
+                result = await response.json();
+            } catch (parseError) {
+                console.warn('Failed to parse success response as JSON:', parseError);
+                result = { message: 'LoRAs fused successfully (server response parsing failed)' };
+            }
             
-            // Update dropdown with new LoRAs
-            this.populateLoraDropdown();
+            // Update fusion state
+            this.isFused = true;
+            this.fusedLoras = [...this.appliedLoras];
+            this.fusedTimestamp = Date.now();
             
-            // 更新API命令显示
-            this.updateApiCommand();
+            this.updateFusedState();
+            this.showSuccess(result.message || 'LoRAs fused successfully');
             
+            // Update button text
+            const applyBtn = document.getElementById('apply-lora-btn');
+            if (applyBtn) {
+                applyBtn.innerHTML = '<i class="fas fa-link"></i> LoRAs Fused';
+                applyBtn.className = 'btn btn-success fused';
+            }
+
         } catch (error) {
-            console.error('Error applying LoRAs:', error);
-            this.showError(`Failed to apply LoRAs: ${error.message}`);
+            console.error('LoRA fusion error:', error);
+            this.showError(error.message || 'Failed to fuse LoRAs');
         } finally {
-            // 恢复按钮状态
-            applyBtn.disabled = false;
-            applyBtn.innerHTML = originalText;
+            this.hideLoading();
+        }
+    }
+
+    // Unfuse LoRAs
+    async unfuseLoras() {
+        try {
+            this.showLoading('Unfusing LoRAs...');
+            
+            const response = await fetch(`${this.hostBase}/unfuse-loras`, {
+                method: 'DELETE'
+            });
+
+            // Handle different types of errors
+            if (!response.ok) {
+                let errorMessage = `Server error (${response.status}: ${response.statusText})`;
+                
+                try {
+                    // Try to parse error response as JSON
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        errorMessage = errorData.detail || errorData.message || errorMessage;
+                    } else {
+                        // If not JSON, try to get text content
+                        const errorText = await response.text();
+                        if (errorText.trim()) {
+                            errorMessage = errorText.substring(0, 200) + (errorText.length > 200 ? '...' : '');
+                        }
+                    }
+                } catch (parseError) {
+                    console.warn('Failed to parse error response:', parseError);
+                    // Use the default error message
+                }
+                
+                throw new Error(errorMessage);
+            }
+
+            // Parse successful response
+            let result;
+            try {
+                result = await response.json();
+            } catch (parseError) {
+                console.warn('Failed to parse success response as JSON:', parseError);
+                result = { message: 'LoRAs unfused successfully (server response parsing failed)' };
+            }
+            
+            // Reset fusion state
+            this.isFused = false;
+            this.fusedLoras = [];
+            this.fusedTimestamp = null;
+            
+            // Clear applied LoRAs to prevent them from being sent during generation
+            this.appliedLoras = [];
+            
+            // Update the UI to reflect no LoRAs are selected
+            this.renderAppliedLoras();
+            
+            // Also reset the LoRA dropdown selection
+            const dropdown = document.getElementById('lora-dropdown');
+            if (dropdown) {
+                dropdown.value = '';
+            }
+            
+            this.updateFusedState();
+            this.showSuccess(result.message || 'LoRAs unfused successfully');
+            
+            // Update button text
+            const applyBtn = document.getElementById('apply-lora-btn');
+            if (applyBtn) {
+                applyBtn.innerHTML = '<i class="fas fa-magic"></i> Apply LoRAs';
+                applyBtn.className = 'btn btn-primary';
+            }
+
+        } catch (error) {
+            console.error('LoRA unfusion error:', error);
+            this.showError(error.message || 'Failed to unfuse LoRAs');
+        } finally {
+            this.hideLoading();
         }
     }
 
     // 获取LoRA配置（用于API调用）
     getLoraConfigs() {
+        // If LoRAs are fused, return empty array since the fusion is already applied to the model
+        if (this.isFused) {
+            return [];
+        }
+        
         return this.appliedLoras.map(lora => ({
             name: lora.storedName || lora.name,
             weight: lora.weight,
@@ -760,6 +869,89 @@ class FluxAPI {
             repoId: lora.repoId,
             filename: lora.filename
         }));
+    }
+
+    // Update UI to reflect fused state
+    updateFusedState() {
+        const applyBtn = this.getElement('apply-lora-btn');
+        const unfuseBtn = this.getElement('unfuse-loras-btn');
+        const fusionStatus = this.getElement('lora-fusion-status');
+        
+        if (this.isFused) {
+            // Show unfuse button and hide apply button
+            if (unfuseBtn) unfuseBtn.style.display = 'inline-block';
+            if (applyBtn) applyBtn.style.display = 'none';
+            
+            // Show fused LoRA status
+            this.showFusedLoraStatus();
+        } else {
+            // Show apply button and hide unfuse button
+            if (applyBtn) applyBtn.style.display = 'inline-block';
+            if (unfuseBtn) unfuseBtn.style.display = 'none';
+            
+            // Hide fused LoRA status
+            this.hideFusedLoraStatus();
+        }
+    }
+
+    // Show fused LoRA status
+    showFusedLoraStatus() {
+        const fusionStatus = this.getElement('lora-fusion-status');
+        const fusionCount = this.getElement('fusion-count');
+        const fusionTimestamp = this.getElement('fusion-timestamp');
+        
+        if (fusionStatus) {
+            fusionStatus.style.display = 'block';
+            fusionStatus.classList.add('show');
+        }
+        
+        if (fusionCount && this.fusedLoras.length > 0) {
+            fusionCount.textContent = `${this.fusedLoras.length} LoRA${this.fusedLoras.length > 1 ? 's' : ''}`;
+        }
+        
+        if (fusionTimestamp && this.fusedTimestamp) {
+            const date = new Date(this.fusedTimestamp);
+            fusionTimestamp.textContent = `Fused at ${date.toLocaleTimeString()}`;
+        }
+    }
+
+    // Hide fused LoRA status
+    hideFusedLoraStatus() {
+        const fusionStatus = this.getElement('lora-fusion-status');
+        if (fusionStatus) {
+            fusionStatus.style.display = 'none';
+            fusionStatus.classList.remove('show');
+        }
+    }
+
+    // Check fusion status on startup
+    async checkFusionStatus() {
+        try {
+            const response = await fetch(`${this.hostBase}/fused-lora-status`);
+            
+            if (response.ok) {
+                let status;
+                try {
+                    status = await response.json();
+                } catch (parseError) {
+                    console.warn('Failed to parse fusion status response:', parseError);
+                    return; // Exit gracefully if we can't parse the response
+                }
+                
+                this.isFused = status.is_fused || false;
+                if (status.fused_info) {
+                    this.fusedLoras = status.fused_info.fused_lora_configs || [];
+                    this.fusedTimestamp = status.fused_info.fused_timestamp ? 
+                        status.fused_info.fused_timestamp * 1000 : null; // Convert to milliseconds
+                }
+                this.updateFusedState();
+            } else {
+                console.warn(`Failed to check fusion status: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.warn('Error checking fusion status (non-critical):', error);
+            // Don't show error to user as this is a background check
+        }
     }
 
     // 添加自定义LoRA
@@ -867,11 +1059,19 @@ class FluxAPI {
 
         try {
             let response;
+            
+            // Debug logging
+            console.log('Generate image called');
+            console.log('uploadedImageFile:', this.uploadedImageFile);
+            console.log('serverUploadedImagePath:', this.serverUploadedImagePath);
+            console.log('hasUploadedImage():', this.hasUploadedImage());
 
             if (this.hasUploadedImage()) {
+                console.log('Using image-to-image generation');
                 // Use image upload generation endpoint
                 response = await this.generateImageWithUpload();
             } else {
+                console.log('Using text-to-image generation');
                 // Use regular text-to-image generation
                 const params = this.getGenerationParams();
                 response = await fetch(`${this.hostBase}/generate`, {
@@ -1175,7 +1375,9 @@ class FluxAPI {
         if (imagePreview) imagePreview.classList.add('hidden');
         if (uploadControls) uploadControls.style.display = 'none';
 
+        // Clear both image file and server path
         this.uploadedImageFile = null;
+        this.serverUploadedImagePath = null;
 
         // Reset upload area
         if (uploadArea) {
@@ -1190,7 +1392,8 @@ class FluxAPI {
     }
 
     hasUploadedImage() {
-        return this.uploadedImageFile !== null && this.uploadedImageFile !== undefined;
+        return (this.uploadedImageFile !== null && this.uploadedImageFile !== undefined) ||
+               (this.serverUploadedImagePath !== null && this.serverUploadedImagePath !== undefined);
     }
 
     updateButtonVisibility() {
@@ -1494,6 +1697,25 @@ class FluxAPI {
             message.textContent = 'Generating image...';
             status.classList.remove('hidden');
         } else {
+            status.classList.add('hidden');
+        }
+    }
+
+    showLoading(message) {
+        const status = this.getElement('generation-status');
+        const statusMessage = this.getElement('status-message');
+
+        if (statusMessage) {
+            statusMessage.textContent = message || 'Loading...';
+        }
+        if (status) {
+            status.classList.remove('hidden');
+        }
+    }
+
+    hideLoading() {
+        const status = this.getElement('generation-status');
+        if (status) {
             status.classList.add('hidden');
         }
     }

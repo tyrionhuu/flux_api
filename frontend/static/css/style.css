@@ -1986,3 +1986,101 @@ body {
     flex: none !important;
     min-width: unset !important;
 }
+
+/* LoRA Fusion Status Styles */
+.lora-fusion-status {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border: 1px solid #c3e6cb;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.fusion-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.fusion-info i {
+    color: #28a745;
+    font-size: 1.1rem;
+}
+
+.fusion-count {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+.fusion-timestamp {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-left: 1.6rem;
+}
+
+.lora-apply-section {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.lora-apply-section .btn {
+    flex: 1;
+    min-width: 120px;
+}
+
+/* Fusion button states */
+.btn.btn-success.fused {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    border-color: #28a745;
+}
+
+.btn.btn-success.fused:hover {
+    background: linear-gradient(135deg, #218838 0%, #1ea080 100%);
+    border-color: #1e7e34;
+}
+
+.btn.btn-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
+    border-color: #dc3545;
+}
+
+.btn.btn-danger:hover {
+    background: linear-gradient(135deg, #c82333 0%, #c0392b 100%);
+    border-color: #bd2130;
+}
+
+/* Animation for fusion status */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.lora-fusion-status.show {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+/* Responsive fusion styles */
+@media (max-width: 768px) {
+    .lora-apply-section {
+        flex-direction: column;
+    }
+    
+    .lora-apply-section .btn {
+        flex: none;
+        min-width: auto;
+    }
+}

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eigen AI Flux API - ComfyUI Style</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=11">
+    <link rel="stylesheet" href="/static/css/style.css?v=12">
     <!-- For development, you can also use: ?v=<%= Date.now() %> or ?v=3 -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -76,9 +76,22 @@
                             </div>
                         </div>
                         
+                        <!-- LoRA Fusion Status Display -->
+                        <div class="lora-fusion-status" id="lora-fusion-status" style="display: none;">
+                            <div class="fusion-info">
+                                <i class="fas fa-link text-success"></i>
+                                <span id="fusion-status-text">LoRAs Fused</span>
+                                <span id="fusion-count" class="fusion-count"></span>
+                            </div>
+                            <div class="fusion-timestamp" id="fusion-timestamp"></div>
+                        </div>
+
                         <div class="lora-apply-section">
                             <button id="apply-lora-btn" class="btn btn-primary">
-                                <i class="fas fa-magic"></i> Apply Selected LoRAs
+                                <i class="fas fa-magic"></i> Apply LoRAs
+                            </button>
+                            <button id="unfuse-loras-btn" class="btn btn-danger" style="display: none;">
+                                <i class="fas fa-unlink"></i> Unfuse LoRAs
                             </button>
                         </div>
                         
@@ -297,7 +310,7 @@
 
     </div>
 
-    <script src="/static/js/app.js?v=11"></script>
+    <script src="/static/js/app.js?v=13"></script>
 </body>
 </html>
 
