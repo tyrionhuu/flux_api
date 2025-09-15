@@ -194,7 +194,9 @@ class DirectoryCleanup:
                 with open(index_file, "w") as f:
                     json.dump(index_data, f, indent=2)
 
-                logger.info(f"Removed {removed_count} LoRA entry from index: {stored_name}")
+                logger.info(
+                    f"Removed {removed_count} LoRA entry from index: {stored_name}"
+                )
             else:
                 logger.debug(f"LoRA entry not found in index: {stored_name}")
 
@@ -223,7 +225,7 @@ class DirectoryCleanup:
             self.uploads_dir, self.uploads_limit_bytes, "Uploads"
         )
         results["uploads"] = files_removed
-        
+
         # Update LoRA index for removed files
         if removed_files:
             logger.info(f"Updating LoRA index for {len(removed_files)} removed files")
