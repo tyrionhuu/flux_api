@@ -30,7 +30,7 @@ class DirectoryCleanup:
         uploads_dir: str = "uploads/lora_files",
         uploads_images_dir: str = "uploads/images",
         generated_images_limit_gb: float = 1.0,
-        uploads_limit_gb: float = 2.0,
+        uploads_limit_gb: float = 5.0,
         uploads_images_limit_gb: float = 1.0,
     ):
         """
