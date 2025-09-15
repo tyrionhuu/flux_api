@@ -6,8 +6,8 @@ Configuration settings for automatic directory cleanup.
 CLEANUP_ENABLED = True
 
 # Size limits in GB
-GENERATED_IMAGES_SIZE_LIMIT_GB = 1.0
-UPLOADS_SIZE_LIMIT_GB = 2.0
+GENERATED_IMAGES_SIZE_LIMIT_GB = 3.0
+UPLOADS_SIZE_LIMIT_GB = 10.0
 
 # Cleanup intervals (in seconds)
 CLEANUP_INTERVAL_SECONDS = 3600  # 1 hour

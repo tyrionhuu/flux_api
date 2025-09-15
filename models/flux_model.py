@@ -3,7 +3,6 @@ FLUX model management for the FLUX API
 """
 
 import gc
-import hashlib
 import os
 import shutil
 import tempfile
@@ -40,11 +39,6 @@ class FluxModelManager:
         self.current_lora: Optional[Union[str, list]] = None
         self.current_weight: float = 1.0
         self._temp_lora_paths: list = []
-        self._lora_cache_dir = os.path.join("cache", "merged_loras")
-        try:
-            os.makedirs(self._lora_cache_dir, exist_ok=True)
-        except Exception:
-            logger.error("Failed to create LoRA cache directory")
 
     def load_model(self) -> bool:
         """Load the FLUX model with GPU-only support and quantization"""
@@ -828,53 +822,16 @@ class FluxModelManager:
 
             logger.info(f"Merging {len(lora_configs)} LoRAs into a single LoRA...")
 
-            # Resolve all LoRA paths first and build a deterministic cache key
+            # Resolve all LoRA paths first
             resolved_paths: list[str] = []
-            weights_for_key: list[float] = []
             for lora_config in lora_configs:
                 lora_name = lora_config["name"]
-                weight = float(lora_config["weight"])
                 lora_path = self._get_lora_path(lora_name)
                 if not lora_path:
                     logger.error(f"   - Could not resolve path for LoRA: {lora_name}")
                     return None
                 resolved_paths.append(lora_path)
-                weights_for_key.append(weight)
 
-            # Compute a cache key using SHA256 over (file hashes + weights)
-            def _sha256_file(path: str) -> str:
-                h = hashlib.sha256()
-                with open(path, "rb") as f:
-                    for chunk in iter(lambda: f.read(1024 * 1024), b""):
-                        h.update(chunk)
-                return h.hexdigest()
-
-            hasher = hashlib.sha256()
-            for p, w in zip(resolved_paths, weights_for_key):
-                try:
-                    file_hash = _sha256_file(p)
-                    hasher.update(file_hash.encode("utf-8"))
-                except Exception:
-                    # Fall back to size+mtime if hashing fails
-                    try:
-                        stat = os.stat(p)
-                        hasher.update(str(stat.st_size).encode("utf-8"))
-                        hasher.update(str(int(stat.st_mtime)).encode("utf-8"))
-                    except Exception:
-                        hasher.update(p.encode("utf-8"))
-                hasher.update(str(w).encode("utf-8"))
-            cache_key = hasher.hexdigest()
-            cache_filename = f"merged_{cache_key}.safetensors"
-            cached_path = (
-                os.path.join(self._lora_cache_dir, cache_filename)
-                if os.path.isdir(self._lora_cache_dir)
-                else None
-            )
-
-            # Cache hit
-            if cached_path and os.path.exists(cached_path):
-                logger.info(f"   - Using cached merged LoRA: {cached_path}")
-                return cached_path
 
             # Create a temporary directory for the merge operation
             temp_dir = tempfile.mkdtemp(prefix="merged_lora_")
@@ -940,17 +897,7 @@ class FluxModelManager:
 
                     merged_lora[key] = merged_tensor
 
-                # Save the merged LoRA to cache if possible, otherwise temp
-                if cached_path:
-                    try:
-                        safe_save_file(merged_lora, cached_path)
-                        logger.info(f"   - Merged LoRA saved to cache: {cached_path}")
-                        return cached_path
-                    except Exception as cache_save_error:
-                        logger.warning(
-                            f"   - Failed to save merged LoRA to cache ({cache_save_error}), using temp path"
-                        )
-
+                # Save the merged LoRA to temporary file
                 safe_save_file(merged_lora, temp_merge_path)
                 logger.info(f"   - Merged LoRA saved: {temp_merge_path}")
                 return temp_merge_path

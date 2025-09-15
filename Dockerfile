@@ -72,7 +72,7 @@ ENV PATH=/opt/conda/envs/img2img/bin:$PATH
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p logs generated_images uploads/lora_files cache/merged_loras
+RUN mkdir -p logs generated_images uploads/lora_files cache
 
 # Set proper permissions
 RUN chmod +x start_api_service.py docker-entrypoint.sh
