@@ -238,9 +238,7 @@ class FluxModelManager:
                 )
                 try:
                     # Convert default LoRA to nunchaku format
-                    logger.info(
-                        "   - Converting default LoRA to nunchaku format..."
-                    )
+                    logger.info("   - Converting default LoRA to nunchaku format...")
                     transformer.update_lora_params(DEFAULT_LORA_NAME)
                     logger.info(f"   - Default LoRA parameters loaded successfully")
                 except Exception as load_error:
@@ -832,7 +830,6 @@ class FluxModelManager:
                     return None
                 resolved_paths.append(lora_path)
 
-
             # Create a temporary directory for the merge operation
             temp_dir = tempfile.mkdtemp(prefix="merged_lora_")
             temp_merge_path = os.path.join(temp_dir, "merged_lora.safetensors")
@@ -1090,7 +1087,6 @@ class FluxModelManager:
         except Exception as e:
             logger.error(f"Error resolving LoRA path: {e}")
             return None
-
 
     def _cleanup_temp_loras(self):
         """Clean up any temporary LoRA files"""

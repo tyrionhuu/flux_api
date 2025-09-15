@@ -1237,6 +1237,7 @@ async def remove_lora():
 # LoRA Fusion Endpoints
 # ============================================================================
 
+
 @router.post("/apply-lora-permanent")
 async def apply_lora_permanent(request: dict):
     """Apply LoRAs permanently (fusion)"""
