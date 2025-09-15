@@ -41,12 +41,10 @@ class FluxModelManager:
         self.current_weight: float = 1.0
         self._temp_lora_paths: list = []
         self._lora_cache_dir = os.path.join("cache", "merged_loras")
-        self._nunchaku_cache_dir = os.path.join("cache", "nunchaku_loras")
         try:
             os.makedirs(self._lora_cache_dir, exist_ok=True)
-            os.makedirs(self._nunchaku_cache_dir, exist_ok=True)
         except Exception:
-            logger.error("Failed to create LoRA cache directories")
+            logger.error("Failed to create LoRA cache directory")
 
     def load_model(self) -> bool:
         """Load the FLUX model with GPU-only support and quantization"""
@@ -245,21 +243,11 @@ class FluxModelManager:
                     f"   - Loading default LoRA parameters from {DEFAULT_LORA_NAME}"
                 )
                 try:
-                    # Try to load cached nunchaku conversion first
-                    if self._load_cached_nunchaku_conversion(
-                        DEFAULT_LORA_NAME, transformer
-                    ):
-                        logger.info(
-                            "   - Using cached nunchaku conversion for default LoRA"
-                        )
-                    else:
-                        # No cache hit, perform the conversion
-                        logger.info(
-                            "   - Converting default LoRA to nunchaku format..."
-                        )
-                        transformer.update_lora_params(DEFAULT_LORA_NAME)
-                        # Cache the conversion result for future use
-                        self._cache_nunchaku_conversion(DEFAULT_LORA_NAME, transformer)
+                    # Convert default LoRA to nunchaku format
+                    logger.info(
+                        "   - Converting default LoRA to nunchaku format..."
+                    )
+                    transformer.update_lora_params(DEFAULT_LORA_NAME)
                     logger.info(f"   - Default LoRA parameters loaded successfully")
                 except Exception as load_error:
                     logger.warning(
@@ -665,15 +653,9 @@ class FluxModelManager:
 
             logger.info(f"   - Loading LoRA parameters from: {lora_path}")
 
-            # Try to load cached nunchaku conversion first
-            if self._load_cached_nunchaku_conversion(lora_path, transformer):
-                logger.info("   - Using cached nunchaku conversion")
-            else:
-                # No cache hit, perform the conversion
-                logger.info("   - Converting LoRA to nunchaku format...")
-                transformer.update_lora_params(lora_path)
-                # Cache the conversion result for future use
-                self._cache_nunchaku_conversion(lora_path, transformer)
+            # Convert LoRA to nunchaku format
+            logger.info("   - Converting LoRA to nunchaku format...")
+            transformer.update_lora_params(lora_path)
 
             logger.info(f"   - Setting LoRA strength to {weight}")
             transformer.set_lora_strength(weight)
@@ -1162,75 +1144,6 @@ class FluxModelManager:
             logger.error(f"Error resolving LoRA path: {e}")
             return None
 
-    def _get_nunchaku_cache_path(self, lora_path: str) -> Optional[str]:
-        """Get the cache path for a nunchaku-converted LoRA"""
-        try:
-            if not os.path.isdir(self._nunchaku_cache_dir):
-                return None
-
-            # Create cache key from file path and modification time
-            stat = os.stat(lora_path)
-            cache_key = (
-                f"{os.path.basename(lora_path)}_{int(stat.st_mtime)}_{stat.st_size}"
-            )
-            # Make filename safe
-            cache_key = "".join(c for c in cache_key if c.isalnum() or c in "._-")
-            return os.path.join(self._nunchaku_cache_dir, f"{cache_key}.nunchaku")
-        except Exception:
-            return None
-
-    def _cache_nunchaku_conversion(self, lora_path: str, transformer) -> bool:
-        """Cache the nunchaku conversion result for a LoRA"""
-        try:
-            cache_path = self._get_nunchaku_cache_path(lora_path)
-            if not cache_path:
-                return False
-
-            # Get the converted LoRA parameters from the transformer
-            # This is a bit hacky but we need to extract the converted format
-            if (
-                hasattr(transformer, "_lora_params")
-                and transformer._lora_params is not None
-            ):
-                # Save the converted parameters
-                torch.save(transformer._lora_params, cache_path)
-                logger.info(f"   - Cached nunchaku conversion: {cache_path}")
-                return True
-            else:
-                logger.warning("   - Could not extract nunchaku parameters for caching")
-                return False
-        except Exception as e:
-            logger.warning(f"   - Failed to cache nunchaku conversion: {e}")
-            return False
-
-    def _load_cached_nunchaku_conversion(self, lora_path: str, transformer) -> bool:
-        """Load cached nunchaku conversion if available"""
-        try:
-            cache_path = self._get_nunchaku_cache_path(lora_path)
-            if not cache_path or not os.path.exists(cache_path):
-                return False
-
-            # Check if cache is still valid (file hasn't changed)
-            if os.path.exists(lora_path):
-                stat = os.stat(lora_path)
-                cache_stat = os.stat(cache_path)
-                if cache_stat.st_mtime < stat.st_mtime:
-                    # Cache is stale, remove it
-                    os.remove(cache_path)
-                    return False
-
-            # Load cached conversion
-            cached_params = torch.load(cache_path, map_location="cpu")
-            if hasattr(transformer, "_lora_params"):
-                transformer._lora_params = cached_params
-                logger.info(f"   - Loaded cached nunchaku conversion: {cache_path}")
-                return True
-            else:
-                logger.warning("   - Transformer doesn't support cached parameters")
-                return False
-        except Exception as e:
-            logger.warning(f"   - Failed to load cached nunchaku conversion: {e}")
-            return False
 
     def _cleanup_temp_loras(self):
         """Clean up any temporary LoRA files"""
