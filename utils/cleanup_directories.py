@@ -5,6 +5,7 @@ Run this script to manually clean up directories and maintain size limits.
 """
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -104,7 +105,7 @@ class DirectoryCleanup:
 
     def cleanup_directory(
         self, directory: Path, size_limit_bytes: int, directory_name: str
-    ) -> int:
+    ) -> Tuple[int, List[str]]:
         """
         Clean up directory to stay under size limit by removing oldest files first.
 
@@ -114,14 +115,14 @@ class DirectoryCleanup:
             directory_name: Human-readable name for logging
 
         Returns:
-            Number of files removed
+            Tuple of (number of files removed, list of removed filenames)
         """
         current_size = self.get_directory_size(directory)
         if current_size <= size_limit_bytes:
             logger.debug(
                 f"{directory_name} size ({current_size / (1024**3):.2f}GB) is under limit ({size_limit_bytes / (1024**3):.2f}GB)"
             )
-            return 0
+            return 0, []
 
         logger.info(
             f"{directory_name} size ({current_size / (1024**3):.2f}GB) exceeds limit ({size_limit_bytes / (1024**3):.2f}GB), cleaning up..."
@@ -130,13 +131,14 @@ class DirectoryCleanup:
         files = self.get_file_info(directory)
         if not files:
             logger.warning(f"No files found in {directory_name}")
-            return 0
+            return 0, []
 
         # Sort files by modification time (oldest first)
         files.sort(key=lambda x: x[2])
 
         files_removed = 0
         total_removed_size = 0
+        removed_filenames = []
 
         for file_path, file_size, _ in files:
             if current_size - total_removed_size <= size_limit_bytes:
@@ -147,6 +149,7 @@ class DirectoryCleanup:
                 file_path.unlink()
                 total_removed_size += file_size
                 files_removed += 1
+                removed_filenames.append(file_path.name)
                 logger.info(
                     f"Removed old file: {file_path.name} ({file_size / (1024**2):.1f}MB)"
                 )
@@ -163,7 +166,40 @@ class DirectoryCleanup:
         else:
             logger.warning(f"Could not free enough space in {directory_name}")
 
-        return files_removed
+        return files_removed, removed_filenames
+
+    def remove_lora_from_index(self, stored_name: str):
+        """Remove a LoRA entry from the index.json file"""
+        try:
+            index_file = Path("uploads/lora_files/index.json")
+
+            if not index_file.exists():
+                logger.debug(f"Index file does not exist: {index_file}")
+                return
+
+            with open(index_file, "r") as f:
+                index_data = json.loads(f.read())
+
+            # Remove the entry
+            original_count = len(index_data["entries"])
+            index_data["entries"] = [
+                entry
+                for entry in index_data["entries"]
+                if entry["stored_name"] != stored_name
+            ]
+            removed_count = original_count - len(index_data["entries"])
+
+            if removed_count > 0:
+                # Save updated index
+                with open(index_file, "w") as f:
+                    json.dump(index_data, f, indent=2)
+
+                logger.info(f"Removed {removed_count} LoRA entry from index: {stored_name}")
+            else:
+                logger.debug(f"LoRA entry not found in index: {stored_name}")
+
+        except Exception as e:
+            logger.error(f"Failed to remove LoRA from index: {e}")
 
     def cleanup_all(self) -> dict:
         """
@@ -175,21 +211,30 @@ class DirectoryCleanup:
         results = {}
 
         # Clean up generated images
-        results["generated_images"] = self.cleanup_directory(
+        files_removed, removed_files = self.cleanup_directory(
             self.generated_images_dir,
             self.generated_images_limit_bytes,
             "Generated Images",
         )
+        results["generated_images"] = files_removed
 
-        # Clean up uploads
-        results["uploads"] = self.cleanup_directory(
+        # Clean up uploads (LoRA files)
+        files_removed, removed_files = self.cleanup_directory(
             self.uploads_dir, self.uploads_limit_bytes, "Uploads"
         )
+        results["uploads"] = files_removed
+        
+        # Update LoRA index for removed files
+        if removed_files:
+            logger.info(f"Updating LoRA index for {len(removed_files)} removed files")
+            for filename in removed_files:
+                self.remove_lora_from_index(filename)
 
         # Clean up uploads images
-        results["uploads_images"] = self.cleanup_directory(
+        files_removed, removed_files = self.cleanup_directory(
             self.uploads_images_dir, self.uploads_images_limit_bytes, "Uploads Images"
         )
+        results["uploads_images"] = files_removed
 
         return results
 
@@ -392,6 +437,8 @@ Examples:
             print(f"\n{dir_name.upper().replace('_', ' ')}:")
             if files_removed > 0:
                 print(f"  ✅ Removed {files_removed} files")
+                if dir_name == "uploads":
+                    print(f"  📝 Updated LoRA index.json")
             else:
                 print(f"  ℹ️  No files removed")
 
