@@ -31,6 +31,9 @@ class GenerateRequest(BaseModel):
     """Request model for image generation with optional LoRA parameters"""
 
     prompt: str = Field(..., description="Text prompt for image generation")
+    negative_prompt: Optional[str] = Field(
+        "", description="Text to steer the model away from (optional)"
+    )
     # Support for multiple LoRAs
     loras: Optional[list[LoRAConfig]] = Field(
         None,
@@ -70,6 +73,12 @@ class GenerateRequest(BaseModel):
         ge=-10.0,
         le=10.0,
         description="Guidance scale for generation (-10.0 to 10.0, default: 3.5)",
+    )
+    true_cfg_scale: Optional[float] = Field(
+        1.0,
+        ge=0.0,
+        le=20.0,
+        description="True CFG scale (>1.0 enables negative_prompt in FluxKontext)",
     )
     upscale: Optional[bool] = Field(
         False, description="Whether to upscale the generated image using Remacri ESRGAN"
@@ -96,6 +105,9 @@ class ImageUploadGenerateRequest(BaseModel):
     """Request model for image generation with uploaded image and prompt"""
 
     prompt: str = Field(..., description="Text prompt for image generation")
+    negative_prompt: Optional[str] = Field(
+        "", description="Text to steer the model away from (optional)"
+    )
     # Support for multiple LoRAs
     loras: Optional[list[LoRAConfig]] = Field(
         None,
@@ -135,6 +147,12 @@ class ImageUploadGenerateRequest(BaseModel):
         ge=-10.0,
         le=10.0,
         description="Guidance scale for generation (-10.0 to 10.0, default: 3.5)",
+    )
+    true_cfg_scale: Optional[float] = Field(
+        1.0,
+        ge=0.0,
+        le=20.0,
+        description="True CFG scale (>1.0 enables negative_prompt in FluxKontext)",
     )
     upscale: Optional[bool] = Field(
         False, description="Whether to upscale the generated image using Remacri ESRGAN"
