@@ -602,7 +602,11 @@ async def generate_image(request: GenerateRequest):
             seed=request.seed,
             num_inference_steps=request.num_inference_steps or INFERENCE_STEPS,
             guidance_scale=request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
-            true_cfg_scale=(getattr(request, "true_cfg_scale", 1.0) if getattr(request, "negative_prompt", "") else 1.0),
+            true_cfg_scale=(
+                getattr(request, "true_cfg_scale", 1.0)
+                if getattr(request, "negative_prompt", "")
+                else 1.0
+            ),
             processor=processor,
             context={},
         )
@@ -776,7 +780,9 @@ async def generate_with_image_and_return(
                 negative_prompt=negative_prompt,
                 num_inference_steps=_req.num_inference_steps,
                 guidance_scale=_req.guidance_scale,
-                true_cfg_scale=(getattr(_req, "true_cfg_scale", 1.0) if negative_prompt else 1.0),
+                true_cfg_scale=(
+                    getattr(_req, "true_cfg_scale", 1.0) if negative_prompt else 1.0
+                ),
                 width=tgt_w,
                 height=tgt_h,
                 seed=_req.seed,
@@ -1027,7 +1033,11 @@ async def generate_with_image(
                 negative_prompt=_req.negative_prompt,
                 num_inference_steps=_req.num_inference_steps,
                 guidance_scale=_req.guidance_scale,
-                true_cfg_scale=(getattr(_req, "true_cfg_scale", 1.0) if _req.negative_prompt else 1.0),
+                true_cfg_scale=(
+                    getattr(_req, "true_cfg_scale", 1.0)
+                    if _req.negative_prompt
+                    else 1.0
+                ),
                 width=_req.width,
                 height=_req.height,
                 seed=_req.seed,
