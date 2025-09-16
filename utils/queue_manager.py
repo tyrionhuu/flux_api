@@ -42,8 +42,10 @@ class QueueRequest:
     lora_weight: float = 1.0  # For backward compatibility
     loras: Optional[list[dict]] = None  # New multiple LoRA support
     # Generation parameters
+    negative_prompt: Optional[str] = ""
     num_inference_steps: int = INFERENCE_STEPS
     guidance_scale: float = DEFAULT_GUIDANCE_SCALE
+    true_cfg_scale: float = 1.0
     width: int = 512
     height: int = 512
     seed: Optional[int] = None
@@ -93,12 +95,14 @@ class QueueManager:
     async def submit_request(
         self,
         prompt: str,
+        negative_prompt: Optional[str] = "",
         lora_name: Optional[str] = None,
         lora_weight: float = 1.0,
         loras: Optional[list[dict]] = None,  # New multiple LoRA support
         priority: int = 0,
         num_inference_steps: int = INFERENCE_STEPS,
         guidance_scale: float = DEFAULT_GUIDANCE_SCALE,
+        true_cfg_scale: float = 1.0,
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,
@@ -113,6 +117,7 @@ class QueueManager:
         request = QueueRequest(
             id=request_id,
             prompt=prompt,
+            negative_prompt=negative_prompt,
             status=RequestStatus.PENDING,
             created_at=time.time(),
             lora_name=lora_name,
@@ -121,6 +126,7 @@ class QueueManager:
             priority=priority,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
+            true_cfg_scale=true_cfg_scale,
             width=width,
             height=height,
             seed=seed,
@@ -246,12 +252,14 @@ class QueueManager:
         self,
         *,
         prompt: str,
+        negative_prompt: Optional[str] = "",
         lora_name: Optional[str] = None,
         lora_weight: float = 1.0,
         loras: Optional[list[dict]] = None,
         priority: int = 0,
         num_inference_steps: int = INFERENCE_STEPS,
         guidance_scale: float = DEFAULT_GUIDANCE_SCALE,
+        true_cfg_scale: float = 1.0,
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,
@@ -265,12 +273,14 @@ class QueueManager:
 
         request_id = await self.submit_request(
             prompt=prompt,
+            negative_prompt=negative_prompt,
             lora_name=lora_name,
             lora_weight=lora_weight,
             loras=loras,
             priority=priority,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
+            true_cfg_scale=true_cfg_scale,
             width=width,
             height=height,
             seed=seed,

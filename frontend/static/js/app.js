@@ -38,9 +38,11 @@ class FluxAPI {
     getFormValues() {
         return {
             prompt: this.getElement('prompt').value.trim(),
+            negativePrompt: (this.getElement('negative_prompt')?.value || '').trim(),
             seed: this.getElement('seed').value,
             numInferenceSteps: this.getElement('inference_steps').value,
-            guidanceScale: this.getElement('guidance_scale').value
+            guidanceScale: this.getElement('guidance_scale').value,
+            trueCfgScale: this.getElement('true_cfg_scale')?.value || this.getElement('guidance_scale').value
         };
     }
 
@@ -63,6 +65,11 @@ class FluxAPI {
         // Optional parameters
         if (params.seed || values.seed) {
             formData.append('seed', params.seed || values.seed);
+        }
+
+        // Negative prompt for form-data endpoints
+        if (params.negativePrompt || values.negativePrompt) {
+            formData.append('negative_prompt', params.negativePrompt || values.negativePrompt);
         }
 
         // LoRA configurations
@@ -160,9 +167,16 @@ class FluxAPI {
             prompt: values.prompt
         };
 
+        if (values.negativePrompt) {
+            jsonPayload.negative_prompt = values.negativePrompt;
+        }
+
         if (includeInferenceParams) {
             jsonPayload.num_inference_steps = parseInt(values.numInferenceSteps);
             jsonPayload.guidance_scale = parseFloat(values.guidanceScale);
+            if (values.negativePrompt) {
+                jsonPayload.true_cfg_scale = parseFloat(values.trueCfgScale);
+            }
         }
 
         if (values.seed) {
@@ -212,6 +226,22 @@ class FluxAPI {
         // Random seed button
         const randomSeedBtn = this.getElement('random-seed');
         if (randomSeedBtn) randomSeedBtn.addEventListener('click', () => this.randomSeed());
+
+        // Negative prompt input updates API command
+        const negativePromptInput = this.getElement('negative_prompt');
+        if (negativePromptInput) negativePromptInput.addEventListener('input', () => this.updateApiCommand());
+
+        // True CFG scale slider
+        const trueCfgSlider = this.getElement('true_cfg_scale');
+        if (trueCfgSlider) {
+            trueCfgSlider.addEventListener('input', (e) => {
+                const valueDisplay = this.getElement('true_cfg_scale_value');
+                if (valueDisplay) {
+                    valueDisplay.textContent = parseFloat(e.target.value).toFixed(1);
+                }
+                this.updateApiCommand();
+            });
+        }
 
         // LoRA controls
         const addLoraBtnMain = this.getElement('add-custom-lora');
@@ -1107,7 +1137,7 @@ class FluxAPI {
         if (this.serverUploadedImagePath) {
             formData.append('uploaded_image_path', this.serverUploadedImagePath);
         } else if (this.uploadedImageFile) {
-            formData.append('file', this.uploadedImageFile);
+            formData.append('image', this.uploadedImageFile);
         } else {
             throw new Error('No image selected or uploaded');
         }
@@ -1510,12 +1540,19 @@ class FluxAPI {
             const imageFileName = this.uploadedImageFile ? this.uploadedImageFile.name : 'your_image.jpg';
             command = `curl -s -X POST "${window.location.origin}/generate-with-image-and-return" -F "image=@${imageFileName}" -F "prompt=${this.escapeForShell(values.prompt)}"`;
 
+            if (values.negativePrompt) {
+                command += ` -F "negative_prompt=${this.escapeForShell(values.negativePrompt)}"`;
+            }
+
             if (values.seed) {
                 command += ` -F "seed=${values.seed}"`;
             }
 
             command += ` -F "num_inference_steps=${values.numInferenceSteps}"`;
             command += ` -F "guidance_scale=${values.guidanceScale}"`;
+            if (values.negativePrompt) {
+                command += ` -F "true_cfg_scale=${values.trueCfgScale}"`;
+            }
 
             if (loras && loras.length > 0) {
                 // Convert LoRAs to JSON string for form data

@@ -286,8 +286,10 @@ class FluxModelManager:
     def generate_image(
         self,
         prompt: str,
+        negative_prompt: Optional[str] = "",
         num_inference_steps: int = INFERENCE_STEPS,
         guidance_scale: float = DEFAULT_GUIDANCE_SCALE,
+        true_cfg_scale: float = 1.0,
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,
@@ -341,9 +343,10 @@ class FluxModelManager:
                 "prompt": prompt,
                 "num_inference_steps": num_inference_steps,
                 "guidance_scale": guidance_scale,
+                "negative_prompt": negative_prompt,
+                "true_cfg_scale": true_cfg_scale,
                 "width": width,
                 "height": height,
-                # Force the FLUX pipeline to respect our exact dimensions
                 "max_area": width * height,
                 "_auto_resize": False,
             }
@@ -372,8 +375,10 @@ class FluxModelManager:
         self,
         prompt: str,
         image: Union[str, Image.Image],
+        negative_prompt: Optional[str] = "",
         num_inference_steps: int = INFERENCE_STEPS,
         guidance_scale: float = DEFAULT_GUIDANCE_SCALE,
+        true_cfg_scale: float = 1.0,
         width: int = 512,
         height: int = 512,
         seed: Optional[int] = None,
@@ -439,6 +444,10 @@ class FluxModelManager:
                 "guidance_scale": guidance_scale,
             }
 
+            if negative_prompt and negative_prompt.strip():
+                generation_kwargs["negative_prompt"] = negative_prompt
+                logger.info("Negative prompt provided for img2img")
+
             # Add width and height parameters
             generation_kwargs["width"] = width
             generation_kwargs["height"] = height
@@ -447,6 +456,9 @@ class FluxModelManager:
             # This prevents the automatic resizing that overrides our width/height
             generation_kwargs["max_area"] = width * height
             generation_kwargs["_auto_resize"] = False
+
+            # True CFG for stronger negative prompt effect
+            generation_kwargs["true_cfg_scale"] = true_cfg_scale
 
             logger.info(
                 f"Using requested dimensions: {width}x{height} with max_area={width * height},_auto_resize=False"

@@ -412,6 +412,7 @@ def _apply_loras(loras_to_apply, remove_all_loras):
 
 async def _queue_txt2img_and_get_result(
     prompt: str,
+    negative_prompt: Optional[str],
     width: int,
     height: int,
     seed: Optional[int],
@@ -427,6 +428,7 @@ async def _queue_txt2img_and_get_result(
     def processor(_req, _ctx):
         return generate_image_internal(
             prompt,
+            negative_prompt,
             "FLUX",
             lora_applied,
             lora_weight_applied,
@@ -478,6 +480,7 @@ async def generate_and_return_image(request: GenerateRequest):
         logger.info(f"=== GENERATE ENDPOINT CALLED ===")
         logger.info(f"Request received: {request}")
         logger.info(f"Prompt: {request.prompt}")
+        logger.info(f"Negative prompt: {getattr(request, 'negative_prompt', '')}")
         logger.info(f"Dimensions: {request.width}x{request.height}")
         logger.info(f"LoRAs: {request.loras}")
         logger.info(f"Seed: {request.seed}")
@@ -501,6 +504,7 @@ async def generate_and_return_image(request: GenerateRequest):
         # Auto-size for txt2img: default to 1024x1024 and ignore client-provided size
         result = await _queue_txt2img_and_get_result(
             prompt,
+            getattr(request, "negative_prompt", None),
             1024,
             1024,
             request.seed,
@@ -545,6 +549,7 @@ async def generate_image(request: GenerateRequest):
         logger.info(f"=== GENERATE ENDPOINT CALLED ===")
         logger.info(f"Request received: {request}")
         logger.info(f"Prompt: {request.prompt}")
+        logger.info(f"Negative prompt: {getattr(request, 'negative_prompt', '')}")
         logger.info(f"Dimensions: {request.width}x{request.height}")
         logger.info(f"LoRAs: {request.loras}")
         logger.info(f"Seed: {request.seed}")
@@ -566,8 +571,12 @@ async def generate_image(request: GenerateRequest):
         )
 
         def processor(_req, _ctx):
+            neg_prompt = getattr(request, "negative_prompt", "")
+            if neg_prompt:
+                logger.info(f"Processor using negative prompt: {neg_prompt}")
             return generate_image_internal(
                 prompt,
+                neg_prompt,
                 "FLUX",
                 lora_applied,
                 lora_weight_applied,
@@ -579,10 +588,12 @@ async def generate_image(request: GenerateRequest):
                 request.downscale if hasattr(request, "downscale") else True,
                 _req.num_inference_steps,
                 _req.guidance_scale,
+                (getattr(_req, "true_cfg_scale", 1.0) if neg_prompt else 1.0),
             )
 
         result = await queue_manager.submit_and_wait(
             prompt=prompt,
+            negative_prompt=getattr(request, "negative_prompt", ""),
             loras=loras_to_apply if loras_to_apply else None,
             lora_name=lora_applied,
             lora_weight=lora_weight_applied or 1.0,
@@ -591,6 +602,7 @@ async def generate_image(request: GenerateRequest):
             seed=request.seed,
             num_inference_steps=request.num_inference_steps or INFERENCE_STEPS,
             guidance_scale=request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
+            true_cfg_scale=(getattr(request, "true_cfg_scale", 1.0) if getattr(request, "negative_prompt", "") else 1.0),
             processor=processor,
             context={},
         )
@@ -627,9 +639,11 @@ async def generate_image(request: GenerateRequest):
 @router.post("/generate-with-image-and-return")
 async def generate_with_image_and_return(
     prompt: str = Form(...),
+    negative_prompt: Optional[str] = Form(""),
     image: UploadFile = File(...),
     num_inference_steps: Optional[int] = Form(INFERENCE_STEPS),
     guidance_scale: Optional[float] = Form(DEFAULT_GUIDANCE_SCALE),
+    true_cfg_scale: Optional[float] = Form(1.0),
     width: Optional[int] = Form(512),
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
@@ -759,8 +773,10 @@ async def generate_with_image_and_return(
             return model_manager.generate_image_with_image(
                 prompt=prompt,
                 image=pre_img,
+                negative_prompt=negative_prompt,
                 num_inference_steps=_req.num_inference_steps,
                 guidance_scale=_req.guidance_scale,
+                true_cfg_scale=(getattr(_req, "true_cfg_scale", 1.0) if negative_prompt else 1.0),
                 width=tgt_w,
                 height=tgt_h,
                 seed=_req.seed,
@@ -769,11 +785,13 @@ async def generate_with_image_and_return(
         try:
             result = await queue_manager.submit_and_wait(
                 prompt=prompt,
+                negative_prompt=negative_prompt,
                 width=tgt_w,
                 height=tgt_h,
                 seed=seed,
                 num_inference_steps=num_inference_steps or INFERENCE_STEPS,
                 guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
+                true_cfg_scale=(true_cfg_scale or 1.0) if negative_prompt else 1.0,
                 processor=processor,
                 context={},
             )
@@ -872,9 +890,11 @@ async def generate_with_image_and_return(
 @router.post("/generate-with-image")
 async def generate_with_image(
     prompt: str = Form(...),
+    negative_prompt: Optional[str] = Form(""),
     image: UploadFile = File(...),
     num_inference_steps: Optional[int] = Form(INFERENCE_STEPS),
     guidance_scale: Optional[float] = Form(DEFAULT_GUIDANCE_SCALE),
+    true_cfg_scale: Optional[float] = Form(1.0),
     width: Optional[int] = Form(512),
     height: Optional[int] = Form(512),
     seed: Optional[int] = Form(None),
@@ -999,11 +1019,15 @@ async def generate_with_image(
             logger.info(
                 f"Using parameters from request: num_inference_steps={_req.num_inference_steps}, guidance_scale={_req.guidance_scale}, width={_req.width}, height={_req.height}, seed={_req.seed}"
             )
+            if _req.negative_prompt:
+                logger.info(f"Processor using negative prompt: {_req.negative_prompt}")
             return model_manager.generate_image_with_image(
                 prompt=prompt,
                 image=pre_img,
+                negative_prompt=_req.negative_prompt,
                 num_inference_steps=_req.num_inference_steps,
                 guidance_scale=_req.guidance_scale,
+                true_cfg_scale=(getattr(_req, "true_cfg_scale", 1.0) if _req.negative_prompt else 1.0),
                 width=_req.width,
                 height=_req.height,
                 seed=_req.seed,
@@ -1012,11 +1036,13 @@ async def generate_with_image(
         try:
             result = await queue_manager.submit_and_wait(
                 prompt=prompt,
+                negative_prompt=negative_prompt,
                 width=tgt_w,
                 height=tgt_h,
                 seed=seed,
                 num_inference_steps=num_inference_steps or INFERENCE_STEPS,
                 guidance_scale=guidance_scale or DEFAULT_GUIDANCE_SCALE,
+                true_cfg_scale=(true_cfg_scale or 1.0) if negative_prompt else 1.0,
                 processor=processor,
                 context={},
             )
@@ -1438,6 +1464,7 @@ async def get_queue_stats():
 
 def generate_image_internal(
     prompt: str,
+    negative_prompt: Optional[str] = None,
     model_type_name: str = "FLUX",
     lora_applied: Optional[str] = None,
     lora_weight: Optional[float] = None,
@@ -1449,9 +1476,12 @@ def generate_image_internal(
     downscale: Optional[bool] = None,
     num_inference_steps: int = INFERENCE_STEPS,
     guidance_scale: float = DEFAULT_GUIDANCE_SCALE,
+    true_cfg_scale: float = 1.0,
 ):
     """Internal function to generate images - used by both endpoints"""
     logger.info(f"Starting image generation for prompt: {prompt}")
+    if negative_prompt:
+        logger.info(f"Using negative prompt: {negative_prompt}")
 
     # Model should already be loaded at this point
     if not model_manager.is_loaded():
@@ -1497,8 +1527,10 @@ def generate_image_internal(
         # Generate the image
         result = model_manager.generate_image(
             prompt,
+            negative_prompt,
             num_inference_steps,
             guidance_scale,
+            true_cfg_scale,
             width,
             height,
             seed,
