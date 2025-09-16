@@ -77,6 +77,15 @@ cd frontend && python -m http.server 9001
 
 ## LoRA Support
 
+### LoRA Fusing (Permanent Integration)
+
+The system now supports **permanent LoRA fusing**, where LoRA weights are permanently merged into the model:
+
+- **Apply LoRAs**: Click "Apply LoRAs" to permanently fuse selected LoRAs into the model
+- **Unfuse LoRAs**: Click "Unfuse LoRAs" to revert to the original model state
+- **Fusion Status**: The UI shows when LoRAs are fused and which ones are active
+- **Automatic Unfusing**: When applying new LoRAs, previously fused LoRAs are automatically unfused first
+
 ### Using Hugging Face LoRAs
 
 ```bash
@@ -88,12 +97,12 @@ curl -X POST "http://localhost:8000/apply-lora" \
 
 ### Uploading Local LoRA Files
 
-The web interface now supports uploading local LoRA files:
+The web interface supports uploading local LoRA files with duplicate prevention:
 
 1. **Click "Upload LoRA"** button in the frontend
 2. **Select your LoRA file** (.safetensors, .bin, .pt, .pth)
 3. **Set the weight** (0.0 - 2.0)
-4. **Apply the LoRA** using the "Apply LoRA" button
+4. **Apply the LoRA** using the "Apply LoRAs" button
 
 **Supported Formats**:
 - `.safetensors` (recommended)
@@ -102,6 +111,8 @@ The web interface now supports uploading local LoRA files:
 
 **File Size Limit**: 1GB maximum
 
+**Duplicate Prevention**: The system automatically prevents uploading files with the same name and size
+
 ### Multiple LoRA Support
 
 The FP4 model supports applying multiple LoRAs simultaneously:
@@ -109,6 +120,7 @@ The FP4 model supports applying multiple LoRAs simultaneously:
 - **FP4 Model**: Merges multiple LoRAs into a single LoRA
 - **Maximum**: 3 LoRA layers
 - **Weight Combination**: Automatic weight calculation
+- **Fusion Support**: Multiple LoRAs can be permanently fused together
 
 ## API Usage
 
@@ -261,6 +273,31 @@ curl -X POST "http://localhost:9001/apply-lora?lora_name=username/model-name&wei
 curl -X POST "http://localhost:9001/remove-lora"
 ```
 
+- **Permanently fuse LoRAs** (new feature):
+
+```bash
+curl -X POST "http://localhost:9001/apply-lora-permanent" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "loras": [
+      {"name": "username/style-lora", "weight": 1.0},
+      {"name": "uploaded_lora_1700000000.safetensors", "weight": 0.8}
+    ]
+  }'
+```
+
+- **Check fusion status**:
+
+```bash
+curl "http://localhost:9001/fused-lora-status"
+```
+
+- **Unfuse LoRAs** (revert to original model):
+
+```bash
+curl -X DELETE "http://localhost:9001/unfuse-loras"
+```
+
 - Upload a LoRA file (server stores it under `uploads/lora_files/`):
 
 ```bash
@@ -358,6 +395,12 @@ flux_api/
    - Check file format (.safetensors recommended)
    - Ensure file size < 1GB
    - Verify file integrity
+   - Check for duplicate files (same name and size)
+
+4. **LoRA Fusion Issues**
+   - Ensure sufficient disk space for temporary fusion files
+   - Check that LoRA files are valid and not corrupted
+   - Restart the API service if fusion state becomes inconsistent
 
 ### Logs
 
