@@ -5,7 +5,7 @@ This guide explains how to run the FLUX API using Docker.
 ### 1. Build the Docker Image
 
 ```bash
-docker build -t img2img-api .
+docker build -t img2img-dev .
 ```
 
 ### 2. Run the Container
@@ -16,8 +16,8 @@ docker run -d \
   --gpus all \
   -p 9200:9200 \
   -e HUGGINGFACE_HUB_TOKEN=your_token_here \
-  --name img2img-api \
-  img2img-api
+  --name img2img-dev \
+  img2img-dev
 ```
 
 ## Configuration Options
@@ -49,8 +49,8 @@ docker run -d \
   --gpus all \
   -p 9200:9200 \
   -e HUGGINGFACE_HUB_TOKEN=your_token_here \
-  --name img2img-api \
-  img2img-api
+  --name img2img-dev \
+  img2img-dev
 ```
 
 ### Custom Port and GPU
@@ -63,8 +63,8 @@ docker run -d \
   -e HUGGINGFACE_HUB_TOKEN=your_token_here \
   -e FP4_API_PORT=9002 \
   -e CUDA_VISIBLE_DEVICES=0 \
-  --name img2img-api-gpu0 \
-  img2img-api
+  --name img2img-dev-gpu0 \
+  img2img-dev
 ```
 
 ### With Volume Mounts
@@ -78,6 +78,6 @@ docker run -d \
   -v $(pwd)/generated_images:/app/generated_images \
   -v $(pwd)/logs:/app/logs \
   -v $(pwd)/uploads:/app/uploads \
-  --name img2img-api \
-  img2img-api
+  --name img2img-dev \
+  img2img-dev
 ```
