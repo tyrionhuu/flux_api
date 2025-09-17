@@ -12,11 +12,12 @@ docker build -t img2img-api .
 
 ```bash
 # Basic usage with Hugging Face token
-docker run -d \
-  --gpus all \
-  -p 9200:9200 \
-  -e HUGGINGFACE_HUB_TOKEN=your_token_here \
-  --name img2img-api \
+docker run -d 
+  --gpus all 
+  -p 9200:9200 
+  -e CUDA_VISIBLE_DEVICES=3
+  -e HUGGINGFACE_HUB_TOKEN=your_token_here 
+  --name img2img-api 
   img2img-api
 ```
 

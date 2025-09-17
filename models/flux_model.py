@@ -41,6 +41,7 @@ class FluxModelManager:
         self.current_weight: float = 1.0
         self._temp_lora_paths: list = []
         self._lora_cache_dir = os.path.join("cache", "merged_loras")
+        self.fusion_mode = False  # Production fusion mode flag
         try:
             os.makedirs(self._lora_cache_dir, exist_ok=True)
         except Exception:
@@ -418,6 +419,31 @@ class FluxModelManager:
 
         try:
             logger.info(f"Generating image with prompt: {prompt} and input image")
+            
+            # CRITICAL FIX: Re-apply LoRA just before generation to ensure it's active
+            if self.current_lora is not None:
+                try:
+                    transformer = self._get_pipe_transformer()
+                    logger.info(f"LORA_FIX: Re-applying LoRA before generation: {self.current_lora}")
+                    
+                    if isinstance(self.current_lora, list):
+                        # Multiple LoRAs - use the first one's name and combined weight
+                        lora_name = self.current_lora[0]["name"] if self.current_lora else None
+                        if lora_name:
+                            lora_path = self._get_lora_path(lora_name)
+                            if lora_path:
+                                transformer.update_lora_params(lora_path)
+                                transformer.set_lora_strength(self.current_weight)
+                                logger.info(f"LORA_FIX: Re-applied LoRA with strength {self.current_weight}")
+                    elif isinstance(self.current_lora, str):
+                        # Single LoRA
+                        lora_path = self._get_lora_path(self.current_lora)
+                        if lora_path:
+                            transformer.update_lora_params(lora_path)
+                            transformer.set_lora_strength(self.current_weight)
+                            logger.info(f"LORA_FIX: Re-applied LoRA '{self.current_lora}' with strength {self.current_weight}")
+                except Exception as lora_fix_e:
+                    logger.error(f"LORA_FIX: Failed to re-apply LoRA before generation: {lora_fix_e}")
 
             # Set seed if provided
             generator = None
@@ -659,6 +685,17 @@ class FluxModelManager:
 
             logger.info(f"   - Setting LoRA strength to {weight}")
             transformer.set_lora_strength(weight)
+            
+            # Debug: Try to verify LoRA was applied
+            try:
+                # Check if the transformer has any LoRA-related attributes we can inspect
+                lora_attrs = [attr for attr in dir(transformer) if 'lora' in attr.lower()]
+                if lora_attrs:
+                    logger.info(f"   - DEBUG: Available LoRA attributes: {lora_attrs}")
+                else:
+                    logger.info("   - DEBUG: No LoRA attributes found in transformer")
+            except Exception as debug_e:
+                logger.warning(f"   - DEBUG: Error checking LoRA attributes: {debug_e}")
             logger.info(
                 f"   - LoRA '{lora_source}' applied successfully with weight {weight}"
             )
@@ -669,6 +706,8 @@ class FluxModelManager:
 
     def apply_lora(self, lora_name: str, lora_weight: float = 1.0) -> bool:
         """Apply a single LoRA to the pipeline - for backward compatibility"""
+        if not self._check_fusion_mode("apply_lora"):
+            return False
         return self.apply_multiple_loras([{"name": lora_name, "weight": lora_weight}])
 
     def apply_multiple_loras(self, lora_configs: list) -> bool:
@@ -692,9 +731,17 @@ class FluxModelManager:
             if len(lora_configs) == 1:
                 # Single LoRA - apply directly
                 lora_config = lora_configs[0]
-                return self._apply_lora_to_transformer(
+                success = self._apply_lora_to_transformer(
                     lora_config["name"], lora_config["weight"]
                 )
+                if success:
+                    # Store info about the applied LoRA for reference
+                    self.current_lora = lora_config["name"]
+                    self.current_weight = lora_config["weight"]
+                    logger.info(
+                        f"   - Single LoRA applied successfully: {lora_config['name']} (weight: {lora_config['weight']})"
+                    )
+                return success
 
             else:
                 # Multiple LoRAs - merge them into a single LoRA
@@ -766,6 +813,9 @@ class FluxModelManager:
 
     def remove_lora(self) -> bool:
         """Remove currently applied LoRA(s) from the pipeline"""
+        if not self._check_fusion_mode("remove_lora"):
+            return False
+            
         if not self.model_loaded or self.pipe is None:
             logger.error(
                 f"Cannot remove LoRA: Model not loaded or pipeline not available"
@@ -1157,3 +1207,22 @@ class FluxModelManager:
                 self._temp_lora_paths = []
         except Exception as e:
             logger.warning(f"Error cleaning up temporary LoRAs: {e}")
+
+    def set_fusion_mode(self, enabled: bool) -> None:
+        """Set fusion mode to prevent runtime LoRA changes"""
+        self.fusion_mode = enabled
+        if enabled:
+            logger.info("Fusion mode enabled - runtime LoRA changes disabled")
+        else:
+            logger.info("Fusion mode disabled - runtime LoRA changes enabled")
+
+    def is_fusion_mode_enabled(self) -> bool:
+        """Check if fusion mode is enabled"""
+        return self.fusion_mode
+
+    def _check_fusion_mode(self, operation: str) -> bool:
+        """Check if operation is allowed in fusion mode"""
+        if self.fusion_mode and operation in ["apply_lora", "remove_lora"]:
+            logger.warning(f"Operation '{operation}' blocked in fusion mode")
+            return False
+        return True

@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from api.routes import get_model_manager, router
 from config.settings import API_DESCRIPTION, API_TITLE, API_VERSION
 from utils.cleanup_service import start_cleanup_service, stop_cleanup_service
+from utils.lora_fusion import LoRAFusionConfig, apply_startup_lora
 
 # Hugging Face token setup
 if "HUGGINGFACE_HUB_TOKEN" in os.environ:
@@ -87,7 +88,13 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         start_cleanup_service()
-        logger.info("FP4 FLUX API started with cleanup service")
+        logger.info("Kontext API started with cleanup service")
+
+        # Parse LoRA fusion configuration
+        lora_config = LoRAFusionConfig()
+        if not lora_config.parse_from_env():
+            logger.error("Failed to parse LoRA fusion configuration")
+            raise RuntimeError("Invalid LoRA fusion configuration")
 
         # Auto-load the FLUX model
         logger.info("Auto-loading FLUX model...")
@@ -96,20 +103,33 @@ async def lifespan(app: FastAPI):
 
         if model_manager.load_model():
             logger.info("FLUX model loaded successfully during startup")
+            
+            # Apply LoRA fusion if configured
+            if lora_config.is_fusion_mode_enabled():
+                logger.info("Applying LoRA fusion...")
+                if apply_startup_lora(model_manager, lora_config):
+                    logger.info("LoRA fusion completed successfully")
+                else:
+                    logger.error("LoRA fusion failed")
+                    raise RuntimeError("LoRA fusion failed")
+            else:
+                logger.info("No LoRA fusion configured")
         else:
             logger.error("Failed to load FLUX model during startup")
+            raise RuntimeError("Failed to load FLUX model")
 
         time.sleep(2)
 
     except Exception as e:
         logger.error(f"Failed to start services: {e}")
+        raise
 
     yield
 
     # Shutdown
     try:
         stop_cleanup_service()
-        logger.info("FP4 FLUX API shutdown, cleanup service stopped")
+        logger.info("Kontext API shutdown, cleanup service stopped")
     except Exception as e:
         logger.error(f"Error stopping cleanup service: {e}")
 
@@ -198,36 +218,94 @@ else:
 # Health check endpoint
 @app.get("/health")
 def health_check():
-    """Health check endpoint"""
+    """Production-ready health check endpoint"""
     try:
         model_manager = get_model_manager()
         model_loaded = model_manager.is_loaded()
+        
+        # Get fusion mode status
+        fusion_mode = getattr(model_manager, 'fusion_mode', False)
+        lora_info = model_manager.get_lora_info() if hasattr(model_manager, 'get_lora_info') else None
+        
+        # Get uptime
+        import time
+        uptime = time.time() - getattr(app.state, 'start_time', time.time())
 
         return {
             "status": "healthy" if model_loaded else "model_loading",
-            "service": "FP4 FLUX API",
+            "service": "Kontext API",
+            "version": "kontext-api-20250918-v1",
             "model_loaded": model_loaded,
             "model_ready": model_loaded,
+            "fusion_mode": fusion_mode,
+            "lora_info": lora_info,
+            "timestamp": time.time(),
+            "uptime": uptime,
         }
     except Exception as e:
         return {
             "status": "error",
-            "service": "FP4 FLUX API",
+            "service": "Kontext API",
+            "version": "kontext-api-20250918-v1",
             "error": str(e),
             "model_loaded": False,
+            "fusion_mode": False,
+            "lora_info": None,
         }
+
+
+# Kubernetes readiness probe
+@app.get("/ready")
+def readiness_check():
+    """Kubernetes readiness probe"""
+    try:
+        model_manager = get_model_manager()
+        if not model_manager.is_loaded():
+            raise HTTPException(status_code=503, detail="Model not ready")
+        return {"status": "ready"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Not ready: {str(e)}")
+
+
+# Kubernetes liveness probe
+@app.get("/live")
+def liveness_check():
+    """Kubernetes liveness probe"""
+    return {"status": "alive"}
 
 
 if __name__ == "__main__":
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="FLUX API Service")
+    parser = argparse.ArgumentParser(description="Kontext API Service")
     parser.add_argument(
         "--port", type=int, default=9200, help="API port number (default: 9200)"
     )
+    parser.add_argument(
+        "--host", type=str, default="0.0.0.0", help="API host (default: 0.0.0.0)"
+    )
+    parser.add_argument(
+        "--lora-name", type=str, help="LoRA file path or HF repo for fusion"
+    )
+    parser.add_argument(
+        "--lora-weight", type=float, default=1.0, help="LoRA weight (default: 1.0)"
+    )
+    parser.add_argument(
+        "--loras-config", type=str, help="JSON config for multiple LoRAs"
+    )
+    parser.add_argument(
+        "--fusion-mode", action="store_true", help="Enable LoRA fusion mode"
+    )
+    parser.add_argument(
+        "--log-level", type=str, default="INFO", help="Log level (default: INFO)"
+    )
+    parser.add_argument(
+        "--max-workers", type=int, default=1, help="Maximum workers (default: 1)"
+    )
     args = parser.parse_args()
 
-    # Store port in app state for access by routes
+    # Store configuration in app state for access by routes
     app.state.port = args.port
+    app.state.start_time = time.time()
 
     # Ensure uvicorn also writes to our file
     LOG_CONFIG = {
@@ -292,4 +370,10 @@ if __name__ == "__main__":
         },
     }
 
-    uvicorn.run(app, host="0.0.0.0", port=args.port, log_config=LOG_CONFIG)
+    uvicorn.run(
+        app, 
+        host=args.host, 
+        port=args.port, 
+        log_config=LOG_CONFIG,
+        workers=args.max_workers
+    )

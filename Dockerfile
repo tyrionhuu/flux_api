@@ -1,12 +1,31 @@
 # Use NVIDIA CUDA 12.8 base image with Ubuntu 24.04
 FROM nvidia/cuda:12.8.0-runtime-ubuntu24.04
 
+# Production labels
+LABEL maintainer="EigenAI"
+LABEL version="kontext-api-20250918-v1"
+LABEL description="Kontext API - FLUX Image Generation with LoRA Fusion"
+LABEL service="kontext-api"
+LABEL date="2025-09-18"
+
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Production environment variables
+ENV SERVICE_NAME="kontext-api"
+ENV SERVICE_VERSION="kontext-api-20250918-v1"
+ENV PORT=9200
+ENV HOST=0.0.0.0
+ENV FUSION_MODE=true
+ENV LORA_NAME="Fihade/Apple_Emoji_Style_Kontext_LoRA"
+ENV LORA_WEIGHT=1.0
+ENV LORAS_CONFIG=""
+ENV LOG_LEVEL=INFO
+ENV MAX_WORKERS=1
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -75,14 +94,14 @@ COPY . .
 RUN mkdir -p logs generated_images uploads/lora_files cache/merged_loras cache/nunchaku_loras
 
 # Set proper permissions
-RUN chmod +x start_api_service.py docker-entrypoint.sh
+RUN chmod +x start_api_service.py docker-entrypoint.sh start_server.sh
 
 # Expose the API port
 EXPOSE 9200
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
+# Enhanced health check for production
+HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
     CMD conda run -n img2img curl -f http://localhost:9200/health || exit 1
 
-ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["--port", "9200", "--cleanup"]
+# Production-ready entry point
+ENTRYPOINT ["./start_server.sh"]

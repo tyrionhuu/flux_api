@@ -134,7 +134,6 @@ def main():
         "--port", type=int, default=9200, help="API port number (default: 9200)"
     )
 
-
     args = parser.parse_args()
 
     print("FLUX API Service Starter")

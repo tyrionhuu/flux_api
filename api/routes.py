@@ -1178,6 +1178,11 @@ async def apply_lora(request: ApplyLoRARequest):
     if not model_manager.is_loaded():
         logger.error(f"Cannot apply LoRA {request.lora_name}: Model not loaded")
         raise HTTPException(status_code=500, detail="Model not loaded")
+    
+    # Check fusion mode
+    if hasattr(model_manager, 'fusion_mode') and model_manager.fusion_mode:
+        logger.warning(f"Cannot apply LoRA {request.lora_name}: Fusion mode enabled")
+        raise HTTPException(status_code=403, detail="LoRA changes blocked in fusion mode")
 
     try:
         # Determine the LoRA source and construct the appropriate identifier
@@ -1217,6 +1222,11 @@ async def remove_lora():
     if not model_manager.is_loaded():
         logger.error(f"Cannot remove LoRA: Model not loaded")
         raise HTTPException(status_code=500, detail="Model not loaded")
+    
+    # Check fusion mode
+    if hasattr(model_manager, 'fusion_mode') and model_manager.fusion_mode:
+        logger.warning("Cannot remove LoRA: Fusion mode enabled")
+        raise HTTPException(status_code=403, detail="LoRA changes blocked in fusion mode")
 
     try:
         if model_manager.remove_lora():
