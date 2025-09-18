@@ -94,7 +94,7 @@ COPY . .
 RUN mkdir -p logs generated_images uploads/lora_files cache/merged_loras cache/nunchaku_loras
 
 # Set proper permissions
-RUN chmod +x start_api_service.py docker-entrypoint.sh start_server.sh
+# No chmod needed - Python scripts don't require execute permissions
 
 # Expose the API port
 EXPOSE 9200
