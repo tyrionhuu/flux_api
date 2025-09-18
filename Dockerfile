@@ -18,7 +18,7 @@ ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 # Production environment variables
 ENV SERVICE_NAME="kontext-api"
 ENV SERVICE_VERSION="kontext-api-20250918-v1"
-ENV PORT=9200
+ENV PORT=9300
 ENV HOST=0.0.0.0
 ENV FUSION_MODE=true
 ENV LORA_NAME="Fihade/Apple_Emoji_Style_Kontext_LoRA"
@@ -97,11 +97,11 @@ RUN mkdir -p logs generated_images uploads/lora_files cache/merged_loras cache/n
 # No chmod needed - Python scripts don't require execute permissions
 
 # Expose the API port
-EXPOSE 9200
+EXPOSE 9300
 
 # Enhanced health check for production
 HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
-    CMD conda run -n img2img curl -f http://localhost:9200/health || exit 1
+    CMD conda run -n img2img curl -f http://localhost:9300/health || exit 1
 
 # Production-ready entry point (single line as per EigenAI SOP)
 ENTRYPOINT ["/opt/conda/envs/img2img/bin/python", "main.py"]

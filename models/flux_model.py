@@ -245,9 +245,7 @@ class FluxModelManager:
                 )
                 try:
                     # Convert LoRA to nunchaku format
-                    logger.info(
-                        "   - Converting default LoRA to nunchaku format..."
-                    )
+                    logger.info("   - Converting default LoRA to nunchaku format...")
                     transformer.update_lora_params(DEFAULT_LORA_NAME)
                     logger.info(f"   - Default LoRA parameters loaded successfully")
                 except Exception as load_error:
@@ -419,31 +417,41 @@ class FluxModelManager:
 
         try:
             logger.info(f"Generating image with prompt: {prompt} and input image")
-            
+
             # CRITICAL FIX: Re-apply LoRA just before generation to ensure it's active
             if self.current_lora is not None:
                 try:
                     transformer = self._get_pipe_transformer()
-                    logger.info(f"LORA_FIX: Re-applying LoRA before generation: {self.current_lora}")
-                    
+                    logger.info(
+                        f"LORA_FIX: Re-applying LoRA before generation: {self.current_lora}"
+                    )
+
                     if isinstance(self.current_lora, list):
                         # Multiple LoRAs - use the first one's name and combined weight
-                        lora_name = self.current_lora[0]["name"] if self.current_lora else None
+                        lora_name = (
+                            self.current_lora[0]["name"] if self.current_lora else None
+                        )
                         if lora_name:
                             lora_path = self._get_lora_path(lora_name)
                             if lora_path:
                                 transformer.update_lora_params(lora_path)
                                 transformer.set_lora_strength(self.current_weight)
-                                logger.info(f"LORA_FIX: Re-applied LoRA with strength {self.current_weight}")
+                                logger.info(
+                                    f"LORA_FIX: Re-applied LoRA with strength {self.current_weight}"
+                                )
                     elif isinstance(self.current_lora, str):
                         # Single LoRA
                         lora_path = self._get_lora_path(self.current_lora)
                         if lora_path:
                             transformer.update_lora_params(lora_path)
                             transformer.set_lora_strength(self.current_weight)
-                            logger.info(f"LORA_FIX: Re-applied LoRA '{self.current_lora}' with strength {self.current_weight}")
+                            logger.info(
+                                f"LORA_FIX: Re-applied LoRA '{self.current_lora}' with strength {self.current_weight}"
+                            )
                 except Exception as lora_fix_e:
-                    logger.error(f"LORA_FIX: Failed to re-apply LoRA before generation: {lora_fix_e}")
+                    logger.error(
+                        f"LORA_FIX: Failed to re-apply LoRA before generation: {lora_fix_e}"
+                    )
 
             # Set seed if provided
             generator = None
@@ -685,11 +693,13 @@ class FluxModelManager:
 
             logger.info(f"   - Setting LoRA strength to {weight}")
             transformer.set_lora_strength(weight)
-            
+
             # Debug: Try to verify LoRA was applied
             try:
                 # Check if the transformer has any LoRA-related attributes we can inspect
-                lora_attrs = [attr for attr in dir(transformer) if 'lora' in attr.lower()]
+                lora_attrs = [
+                    attr for attr in dir(transformer) if "lora" in attr.lower()
+                ]
                 if lora_attrs:
                     logger.info(f"   - DEBUG: Available LoRA attributes: {lora_attrs}")
                 else:
@@ -815,7 +825,7 @@ class FluxModelManager:
         """Remove currently applied LoRA(s) from the pipeline"""
         if not self._check_fusion_mode("remove_lora"):
             return False
-            
+
         if not self.model_loaded or self.pipe is None:
             logger.error(
                 f"Cannot remove LoRA: Model not loaded or pipeline not available"

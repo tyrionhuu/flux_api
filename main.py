@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 import loguru
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -66,19 +66,19 @@ logger.add(
     "logs/api_routes.log",
     level="INFO",
     format="{time} - {name} - {level} - {message}",
-    filter=lambda record: "api.routes" in record["name"],
+    filter=lambda record: record["name"] == "api.routes",
 )
 logger.add(
     "logs/models_flux_model.log",
     level="INFO",
     format="{time} - {name} - {level} - {message}",
-    filter=lambda record: "models.flux_model" in record["name"],
+    filter=lambda record: record["name"] == "models.flux_model",
 )
 logger.add(
     "logs/utils_cleanup_service.log",
     level="INFO",
     format="{time} - {name} - {level} - {message}",
-    filter=lambda record: "utils.cleanup_service" in record["name"],
+    filter=lambda record: record["name"] == "utils.cleanup_service",
 )
 
 
@@ -103,7 +103,7 @@ async def lifespan(app: FastAPI):
 
         if model_manager.load_model():
             logger.info("FLUX model loaded successfully during startup")
-            
+
             # Apply LoRA fusion if configured
             if lora_config.is_fusion_mode_enabled():
                 logger.info("Applying LoRA fusion...")
@@ -212,9 +212,6 @@ else:
     logger.warning("generated_images directory not found - downloads may not work")
 
 
-
-
-
 # Health check endpoint
 @app.get("/health")
 def health_check():
@@ -222,14 +219,19 @@ def health_check():
     try:
         model_manager = get_model_manager()
         model_loaded = model_manager.is_loaded()
-        
+
         # Get fusion mode status
-        fusion_mode = getattr(model_manager, 'fusion_mode', False)
-        lora_info = model_manager.get_lora_info() if hasattr(model_manager, 'get_lora_info') else None
-        
+        fusion_mode = getattr(model_manager, "fusion_mode", False)
+        lora_info = (
+            model_manager.get_lora_info()
+            if hasattr(model_manager, "get_lora_info")
+            else None
+        )
+
         # Get uptime
         import time
-        uptime = time.time() - getattr(app.state, 'start_time', time.time())
+
+        uptime = time.time() - getattr(app.state, "start_time", time.time())
 
         return {
             "status": "healthy" if model_loaded else "model_loading",
@@ -278,7 +280,7 @@ if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Kontext API Service")
     parser.add_argument(
-        "--port", type=int, default=9200, help="API port number (default: 9200)"
+        "--port", type=int, default=9300, help="API port number (default: 9300)"
     )
     parser.add_argument(
         "--host", type=str, default="0.0.0.0", help="API host (default: 0.0.0.0)"
@@ -371,9 +373,9 @@ if __name__ == "__main__":
     }
 
     uvicorn.run(
-        app, 
-        host=args.host, 
-        port=args.port, 
+        app,
+        host=args.host,
+        port=args.port,
         log_config=LOG_CONFIG,
-        workers=args.max_workers
+        workers=args.max_workers,
     )
