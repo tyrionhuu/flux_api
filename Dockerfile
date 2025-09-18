@@ -103,5 +103,5 @@ EXPOSE 9200
 HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
     CMD conda run -n img2img curl -f http://localhost:9200/health || exit 1
 
-# Production-ready entry point
-ENTRYPOINT ["./start_server.sh"]
+# Production-ready entry point (single line as per EigenAI SOP)
+ENTRYPOINT ["/opt/conda/envs/img2img/bin/python", "main.py"]
