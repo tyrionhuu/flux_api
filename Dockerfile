@@ -3,10 +3,10 @@ FROM nvidia/cuda:12.8.0-runtime-ubuntu24.04
 
 # Production labels
 LABEL maintainer="EigenAI"
-LABEL version="kontext-api-20250918-v1"
+LABEL version="kontext-clean-0924-v1"
 LABEL description="Kontext API - FLUX Image Generation with LoRA Fusion"
 LABEL service="kontext-api"
-LABEL date="2025-09-18"
+LABEL date="2025-09-24"
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -17,13 +17,13 @@ ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
 # Production environment variables
 ENV SERVICE_NAME="kontext-api"
-ENV SERVICE_VERSION="kontext-api-20250918-v1"
+ENV SERVICE_VERSION="kontext-clean-0924-v1"
 ENV PORT=9300
 ENV HOST=0.0.0.0
-ENV FUSION_MODE=true
-ENV LORA_NAME="Fihade/Apple_Emoji_Style_Kontext_LoRA"
-ENV LORA_WEIGHT=1.0
-ENV LORAS_CONFIG=""
+# ENV FUSION_MODE=true
+# ENV LORA_NAME="Fihade/Apple_Emoji_Style_Kontext_LoRA"
+# ENV LORA_WEIGHT=1.0
+# ENV LORAS_CONFIG=""
 ENV LOG_LEVEL=INFO
 ENV MAX_WORKERS=1
 

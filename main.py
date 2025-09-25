@@ -96,6 +96,23 @@ async def lifespan(app: FastAPI):
             logger.error("Failed to parse LoRA fusion configuration")
             raise RuntimeError("Invalid LoRA fusion configuration")
 
+        # Override with command line arguments from app.state if available
+        if hasattr(app.state, 'fusion_mode') and app.state.fusion_mode:
+            lora_config.fusion_mode = True
+            logger.info("Fusion mode enabled via command line argument")
+            
+            # Set LoRA from command line arguments
+            if hasattr(app.state, 'lora_name') and app.state.lora_name:
+                lora_config.lora_name = app.state.lora_name
+                lora_config.lora_weight = getattr(app.state, 'lora_weight', 1.0)
+                lora_config.loras_config = []  # Clear any env-based config
+                logger.info(f"Using LoRA from command line: {lora_config.lora_name} (weight: {lora_config.lora_weight})")
+                
+                # Re-validate with new configuration
+                if not lora_config._validate_config():
+                    logger.error("Failed to validate LoRA configuration from command line")
+                    raise RuntimeError("Invalid LoRA configuration from command line")
+
         # Auto-load the FLUX model
         logger.info("Auto-loading FLUX model...")
 
@@ -305,9 +322,13 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Store configuration in app state for access by routes
+    # Store configuration in app state for access by routes and startup
     app.state.port = args.port
     app.state.start_time = time.time()
+    app.state.lora_name = args.lora_name
+    app.state.lora_weight = args.lora_weight
+    app.state.loras_config = args.loras_config
+    app.state.fusion_mode = args.fusion_mode
 
     # Ensure uvicorn also writes to our file
     LOG_CONFIG = {
