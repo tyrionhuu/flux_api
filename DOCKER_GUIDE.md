@@ -9,6 +9,7 @@ docker pull eigenai/kontext-api-20250918:kontext-api-20250918-v1
 ```bash
 docker run -d \
   --name kontext-api \
+  --gpus all \
   -p 9300:9300 \
   -e CUDA_VISIBLE_DEVICES=5 \
   -e HUGGINGFACE_HUB_TOKEN=$HUGGINGFACE_HUB_TOKEN \
