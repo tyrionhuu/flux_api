@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Kontext FLUX API - CORS 测试</h1>
+    
+    <div class="test-section">
+        <h2>测试1: 健康检查 (GET 请求)</h2>
+        <p>测试基本的GET请求是否支持CORS</p>
+        <button onclick="testHealth()">测试 /health</button>
+        <div id="health-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>测试2: 模型状态 (GET 请求)</h2>
+        <p>测试获取模型状态</p>
+        <button onclick="testModelStatus()">测试 /model-status</button>
+        <div id="model-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>测试3: 生成请求 (POST 请求)</h2>
+        <p>测试POST请求是否支持CORS</p>
+        <button onclick="testGenerate()">测试 /generate</button>
+        <div id="generate-result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:9300';
+
+        async function testHealth() {
+            const resultDiv = document.getElementById('health-result');
+            resultDiv.innerHTML = '<p>测试中...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        <h3>✅ CORS 工作正常！</h3>
+                        <p>状态码: ${response.status}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ CORS 错误</h3>
+                        <p>${error.message}</p>
+                        <p>请检查：</p>
+                        <ul>
+                            <li>后端服务是否在运行 (http://localhost:9300)</li>
+                            <li>CORS配置是否正确</li>
+                            <li>浏览器控制台的详细错误信息</li>
+                        </ul>
+                    </div>
+                `;
+                console.error('详细错误:', error);
+            }
+        }
+
+        async function testModelStatus() {
+            const resultDiv = document.getElementById('model-result');
+            resultDiv.innerHTML = '<p>测试中...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/model-status`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        <h3>✅ 模型状态获取成功！</h3>
+                        <p>状态码: ${response.status}</p>
+                        <p>模型已加载: ${data.model_loaded ? '是' : '否'}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ 请求失败</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+                console.error('详细错误:', error);
+            }
+        }
+
+        async function testGenerate() {
+            const resultDiv = document.getElementById('generate-result');
+            resultDiv.innerHTML = '<p>测试中... (这可能需要一些时间)</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: "a beautiful sunset over mountains",
+                        width: 512,
+                        height: 512,
+                        seed: 42
+                    })
+                });
+                
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        <h3>✅ POST 请求成功！</h3>
+                        <p>状态码: ${response.status}</p>
+                        <p>生成时间: ${data.generation_time}</p>
+                        <p>图片URL: ${data.download_url}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ 请求失败</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+                console.error('详细错误:', error);
+            }
+        }
+    </script>
+</body>
+</html>
