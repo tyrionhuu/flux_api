@@ -103,15 +103,20 @@ async def lifespan(app: FastAPI):
             
             # Set LoRA from command line arguments
             if hasattr(app.state, 'lora_name') and app.state.lora_name:
-                lora_config.lora_name = app.state.lora_name
-                lora_config.lora_weight = getattr(app.state, 'lora_weight', 1.0)
-                lora_config.loras_config = []  # Clear any env-based config
-                logger.info(f"Using LoRA from command line: {lora_config.lora_name} (weight: {lora_config.lora_weight})")
-                
-                # Re-validate with new configuration
-                if not lora_config._validate_config():
-                    logger.error("Failed to validate LoRA configuration from command line")
-                    raise RuntimeError("Invalid LoRA configuration from command line")
+                # Strip whitespace from lora_name to handle edge cases like " "
+                lora_name_stripped = app.state.lora_name.strip()
+                if lora_name_stripped:
+                    lora_config.lora_name = lora_name_stripped
+                    lora_config.lora_weight = getattr(app.state, 'lora_weight', 1.0)
+                    lora_config.loras_config = []  # Clear any env-based config
+                    logger.info(f"Using LoRA from command line: {lora_config.lora_name} (weight: {lora_config.lora_weight})")
+                    
+                    # Re-validate with new configuration
+                    if not lora_config._validate_config():
+                        logger.error("Failed to validate LoRA configuration from command line")
+                        raise RuntimeError("Invalid LoRA configuration from command line")
+                else:
+                    logger.info("LoRA name is empty after stripping whitespace, skipping LoRA configuration")
 
         # Auto-load the FLUX model
         logger.info("Auto-loading FLUX model...")
