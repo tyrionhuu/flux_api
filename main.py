@@ -98,14 +98,15 @@ async def lifespan(app: FastAPI):
 
         # Override with command line arguments from app.state if available
         if hasattr(app.state, 'fusion_mode') and app.state.fusion_mode:
-            lora_config.fusion_mode = True
             logger.info("Fusion mode enabled via command line argument")
             
             # Set LoRA from command line arguments
-            if hasattr(app.state, 'lora_name') and app.state.lora_name:
+            lora_name_provided = hasattr(app.state, 'lora_name') and app.state.lora_name
+            if lora_name_provided:
                 # Strip whitespace from lora_name to handle edge cases like " "
                 lora_name_stripped = app.state.lora_name.strip()
                 if lora_name_stripped:
+                    lora_config.fusion_mode = True
                     lora_config.lora_name = lora_name_stripped
                     lora_config.lora_weight = getattr(app.state, 'lora_weight', 1.0)
                     lora_config.loras_config = []  # Clear any env-based config
@@ -116,7 +117,9 @@ async def lifespan(app: FastAPI):
                         logger.error("Failed to validate LoRA configuration from command line")
                         raise RuntimeError("Invalid LoRA configuration from command line")
                 else:
-                    logger.info("LoRA name is empty after stripping whitespace, skipping LoRA configuration")
+                    logger.info("LoRA name is empty after stripping whitespace, fusion mode will not be enabled")
+            else:
+                logger.info("Fusion mode requested but no LoRA name provided, fusion mode will not be enabled")
 
         # Auto-load the FLUX model
         logger.info("Auto-loading FLUX model...")
