@@ -123,11 +123,7 @@ curl -X POST "http://localhost:9001/generate" \
     "guidance_scale": 3.5,
     "upscale": false,
     "upscale_factor": 2,
-    "remove_background": false,
-    "loras": [
-      {"name": "username/style-lora", "weight": 1.0},
-      {"name": "uploaded_lora_1700000000.safetensors", "weight": 0.8}
-    ]
+    "remove_background": false
   }'
 ```
 
@@ -149,9 +145,8 @@ Response (example):
 ```
 
 Notes:
-- `loras` is optional. If provided as an empty list `[]`, all LoRAs are removed before generation.
-- If you prefer a single LoRA, you can also send `lora_name` and `lora_weight` instead of `loras`.
 - This endpoint auto-sizes to 1024x1024.
+- To apply LoRAs, use the `/apply-lora` endpoint before generating images.
 
 ### Text-to-Image (binary image) — `/generate-and-return-image`
 
@@ -186,7 +181,7 @@ curl -X POST "http://localhost:9001/generate-with-image" \
 Response fields:
 - `image_url` and `download_url` (for this endpoint, download URL is under `/generated_images/...`).
 - `filename`, `generation_time`, `width`, `height`, `seed`.
- - `lora_applied`, `lora_weight` if a LoRA is active.
+- To use LoRAs with this endpoint, apply them beforehand using `/apply-lora`.
 
 ### Image-to-Image (binary image) — `/generate-with-image-and-return`
 
@@ -203,7 +198,6 @@ curl -X POST "http://localhost:9001/generate-with-image-and-return" \
   -F "seed=123" \
   -F "remove_background=true" \
   -F "bg_strength=0.6" \
-  -F 'loras_json=[{"name":"username/model-name","weight":1.0}]' \
   -o output.png
 ```
 
@@ -217,9 +211,8 @@ Parameters (multipart/form-data):
 - `seed` (int, optional): Random seed for reproducibility.
 - `remove_background` (bool, optional, default false): If true, applies background removal to the final image.
 - `bg_strength` (float 0..1, optional): Controls background removal aggressiveness when `remove_background=true`.
-- `loras_json` (JSON array, optional): Multiple LoRAs, e.g., `[{"name":"user/model","weight":1.0}]`. Use empty array `[]` to remove all LoRAs.
-- `lora_name` (string, optional) and `lora_weight` (float 0..2, optional): Single LoRA shorthand.
-- `use_default_lora` (bool, optional): Apply server default LoRA (currently disabled - no default LoRA configured).
+- `upscale` (bool, optional, default false): If true, upscales the generated image.
+- `upscale_factor` (int, optional, default 2): Upscaling factor (2x, 4x, etc.).
 
 Behavior and constraints:
 - The endpoint validates that the uploaded file is an image (MIME type + extension) and ≤ 10MB; otherwise it returns HTTP 400.
