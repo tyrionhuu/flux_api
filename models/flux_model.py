@@ -722,6 +722,10 @@ class FluxModelManager:
 
     def apply_multiple_loras(self, lora_configs: list) -> bool:
         """Apply multiple LoRAs simultaneously to the pipeline by combining them"""
+        # Check if fusion mode blocks LoRA changes
+        if not self._check_fusion_mode("apply_lora"):
+            return False
+            
         try:
             if not self._is_ready_with_lora():
                 return False
