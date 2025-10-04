@@ -7,13 +7,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class LoRAConfig(BaseModel):
-    """Model for individual LoRA configuration"""
-
-    name: str = Field(..., description="Hugging Face repository ID or local path")
-    weight: float = Field(1.0, ge=0.0, le=2.0, description="LoRA weight (0.0 to 2.0)")
-
-
 class ApplyLoRARequest(BaseModel):
     """Request model for applying a single LoRA to the model"""
 
@@ -28,25 +21,9 @@ class ApplyLoRARequest(BaseModel):
 
 
 class GenerateRequest(BaseModel):
-    """Request model for image generation with optional LoRA parameters"""
+    """Request model for image generation"""
 
     prompt: str = Field(..., description="Text prompt for image generation")
-    # Support for multiple LoRAs
-    loras: Optional[list[LoRAConfig]] = Field(
-        None,
-        description="List of LoRAs to apply. Each LoRA has a name and weight. If not specified, no LoRA will be applied.",
-    )
-    # Legacy support for single LoRA (deprecated but maintained for backward compatibility)
-    lora_name: Optional[str] = Field(
-        None,
-        description="[DEPRECATED] Single LoRA name. Use 'loras' list instead for multiple LoRA support.",
-    )
-    lora_weight: Optional[float] = Field(
-        None,
-        ge=0.0,
-        le=2.0,
-        description="[DEPRECATED] Single LoRA weight. Use 'loras' list instead for multiple LoRA support.",
-    )
     width: Optional[int] = Field(
         512, ge=256, le=1024, description="Image width in pixels (256-1024)"
     )
@@ -96,22 +73,6 @@ class ImageUploadGenerateRequest(BaseModel):
     """Request model for image generation with uploaded image and prompt"""
 
     prompt: str = Field(..., description="Text prompt for image generation")
-    # Support for multiple LoRAs
-    loras: Optional[list[LoRAConfig]] = Field(
-        None,
-        description="List of LoRAs to apply. Each LoRA has a name and weight. If not specified, no LoRA will be applied.",
-    )
-    # Legacy support for single LoRA (deprecated but maintained for backward compatibility)
-    lora_name: Optional[str] = Field(
-        None,
-        description="[DEPRECATED] Single LoRA name. Use 'loras' list instead for multiple LoRA support.",
-    )
-    lora_weight: Optional[float] = Field(
-        None,
-        ge=0.0,
-        le=2.0,
-        description="[DEPRECATED] Single LoRA weight. Use 'loras' list instead for multiple LoRA support.",
-    )
     width: Optional[int] = Field(
         512, ge=256, le=1024, description="Image width in pixels (256-1024)"
     )

@@ -380,7 +380,11 @@ class FluxModelManager:
         height: int = 512,
         seed: Optional[int] = None,
     ) -> Any:
-        """Generate image using image + text input (image-to-image generation)"""
+        """Generate image using image + text input (image-to-image generation)
+
+        Args:
+            strength: How much to transform the input image (0.0=no change, 1.0=maximum change)
+        """
         if not self.model_loaded or self.pipe is None:
             raise RuntimeError("Model not loaded")
 
@@ -725,7 +729,7 @@ class FluxModelManager:
         # Check if fusion mode blocks LoRA changes
         if not self._check_fusion_mode("apply_lora"):
             return False
-            
+
         try:
             if not self._is_ready_with_lora():
                 return False

@@ -262,152 +262,6 @@ def _ensure_model_loaded():
                 logger.info("Model was loaded by another thread while waiting")
 
 
-def _extract_loras_from_request(request: GenerateRequest):
-    loras_to_apply = []
-    remove_all_loras = False
-
-    if request.loras is not None:
-        if len(request.loras) == 0:
-            remove_all_loras = True
-        else:
-            for lora_config in request.loras:
-                if not lora_config.name or not lora_config.name.strip():
-                    raise HTTPException(
-                        status_code=400, detail="LoRA name cannot be empty"
-                    )
-                if (
-                    not hasattr(lora_config, "weight")
-                    or lora_config.weight < 0
-                    or lora_config.weight > 2.0
-                ):
-                    raise HTTPException(
-                        status_code=400, detail="LoRA weight must be between 0 and 2.0"
-                    )
-                loras_to_apply.append(
-                    {
-                        "name": lora_config.name.strip(),
-                        "weight": float(lora_config.weight),
-                    }
-                )
-    elif request.lora_name:
-        if not request.lora_name.strip():
-            raise HTTPException(
-                status_code=400, detail="LoRA name cannot be empty if provided"
-            )
-        if (
-            request.lora_weight is None
-            or request.lora_weight < 0
-            or request.lora_weight > 2.0
-        ):
-            raise HTTPException(
-                status_code=400, detail="LoRA weight must be between 0 and 2.0"
-            )
-        loras_to_apply.append(
-            {"name": request.lora_name.strip(), "weight": float(request.lora_weight)}
-        )
-
-    # Only apply default LoRA if explicitly requested or if no LoRAs specified
-    if (
-        not loras_to_apply
-        and not remove_all_loras
-        and request.loras is None
-        and not request.lora_name
-        and hasattr(request, "use_default_lora")
-        and request.use_default_lora
-        and DEFAULT_LORA_NAME is not None
-    ):
-        loras_to_apply = [{"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}]
-
-    return loras_to_apply, remove_all_loras
-
-
-def _apply_loras(loras_to_apply, remove_all_loras):
-    current_lora = model_manager.get_lora_info()
-    lora_applied = None
-    lora_weight_applied = None
-
-    logger.info(
-        f"LoRA application request - loras_to_apply: {loras_to_apply}, remove_all_loras: {remove_all_loras}"
-    )
-    logger.info(f"Current LoRA state: {current_lora}")
-
-    if loras_to_apply:
-        logger.info(f"Applying {len(loras_to_apply)} LoRAs to loaded model")
-        for lora_config in loras_to_apply:
-            logger.info(f"Processing LoRA: {lora_config}")
-            if not lora_config["name"]:
-                raise HTTPException(status_code=400, detail="LoRA name cannot be empty")
-
-            # Handle uploaded LoRAs
-            if lora_config["name"].startswith("uploaded_lora_"):
-                upload_path = f"uploads/lora_files/{lora_config['name']}"
-                if not os.path.exists(upload_path):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Uploaded LoRA file not found: {lora_config['name']} at {upload_path}",
-                    )
-                logger.info(f"Found uploaded LoRA at: {upload_path}")
-            # Handle Hugging Face LoRAs
-            elif "/" in lora_config["name"]:
-                logger.info(f"Processing Hugging Face LoRA: {lora_config['name']}")
-            # Handle local path LoRAs
-            elif os.path.exists(lora_config["name"]):
-                logger.info(f"Processing local LoRA: {lora_config['name']}")
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name'), local path, or uploaded file path"
-                    ),
-                )
-
-        # Apply the LoRAs
-        if not model_manager.apply_multiple_loras(loras_to_apply):
-            logger.error(
-                f"Multiple LoRA application failed - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is None}"
-            )
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to apply LoRAs. Please check if the LoRAs exist and are compatible.",
-            )
-        else:
-            # Log successful LoRA application
-            applied_loras = model_manager.get_lora_info()
-            if applied_loras:
-                logger.info(f"Successfully applied LoRAs: {applied_loras}")
-            else:
-                logger.info(
-                    "LoRAs applied successfully (no current LoRA info available)"
-                )
-
-        current_lora = model_manager.get_lora_info()
-        if current_lora:
-            lora_applied = current_lora.get("name")
-            lora_weight_applied = current_lora.get("weight")
-            logger.info(
-                f"Multiple LoRAs applied successfully. Current LoRAs: {lora_applied} with total weight {lora_weight_applied}"
-            )
-        else:
-            logger.warning("LoRAs were applied but get_lora_info() returned None")
-    elif remove_all_loras:
-        if model_manager.get_lora_info():
-            logger.info("Removing all LoRAs as requested by client (empty list)")
-            model_manager.remove_lora()
-        else:
-            logger.info("No LoRAs to remove")
-    else:
-        if current_lora:
-            lora_applied = current_lora.get("name")
-            lora_weight_applied = current_lora.get("weight")
-            logger.info(
-                f"Using existing LoRA: {lora_applied} with weight {lora_weight_applied}"
-            )
-        else:
-            logger.info("No LoRAs specified and no existing LoRAs")
-
-    return lora_applied, lora_weight_applied
-
-
 async def _queue_txt2img_and_get_result(
     prompt: str,
     width: int,
@@ -477,24 +331,21 @@ async def generate_and_return_image(request: GenerateRequest):
         logger.info(f"Request received: {request}")
         logger.info(f"Prompt: {request.prompt}")
         logger.info(f"Dimensions: {request.width}x{request.height}")
-        logger.info(f"LoRAs: {request.loras}")
         logger.info(f"Seed: {request.seed}")
 
         # Validate request parameters
         if not request.prompt or request.prompt.strip() == "":
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
-        # Handle LoRA support via helper
-        loras_to_apply, remove_all_loras = _extract_loras_from_request(request)
-
         # Clean up input
         prompt = request.prompt.strip()
 
         _ensure_model_loaded()
 
-        lora_applied, lora_weight_applied = _apply_loras(
-            loras_to_apply, remove_all_loras
-        )
+        # Get current LoRA info (if any was applied at startup)
+        current_lora = model_manager.get_lora_info()
+        lora_applied = current_lora.get("name") if current_lora else None
+        lora_weight_applied = current_lora.get("weight") if current_lora else None
 
         # Auto-size for txt2img: default to 1024x1024 and ignore client-provided size
         result = await _queue_txt2img_and_get_result(
@@ -506,7 +357,7 @@ async def generate_and_return_image(request: GenerateRequest):
             request.upscale_factor or 2,
             lora_applied,
             lora_weight_applied,
-            loras_to_apply,
+            None,  # loras_to_apply
             request.num_inference_steps or INFERENCE_STEPS,
             request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
             request.downscale if hasattr(request, "downscale") else True,
@@ -537,31 +388,28 @@ async def generate_and_return_image(request: GenerateRequest):
 
 @router.post("/generate")
 async def generate_image(request: GenerateRequest):
-    """Generate image using FLUX model with optional LoRA support - supports multiple LoRAs"""
+    """Generate image using FLUX model"""
     try:
         # Debug logging for incoming requests
         logger.info(f"=== GENERATE ENDPOINT CALLED ===")
         logger.info(f"Request received: {request}")
         logger.info(f"Prompt: {request.prompt}")
         logger.info(f"Dimensions: {request.width}x{request.height}")
-        logger.info(f"LoRAs: {request.loras}")
         logger.info(f"Seed: {request.seed}")
 
         # Validate request parameters
         if not request.prompt or request.prompt.strip() == "":
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
-        # Handle LoRA support via helper
-        loras_to_apply, remove_all_loras = _extract_loras_from_request(request)
-
         # Clean up input
         prompt = request.prompt.strip()
 
         _ensure_model_loaded()
 
-        lora_applied, lora_weight_applied = _apply_loras(
-            loras_to_apply, remove_all_loras
-        )
+        # Get current LoRA info (if any was applied at startup)
+        current_lora = model_manager.get_lora_info()
+        lora_applied = current_lora.get("name") if current_lora else None
+        lora_weight_applied = current_lora.get("weight") if current_lora else None
 
         def processor(_req, _ctx):
             return generate_image_internal(
@@ -581,7 +429,7 @@ async def generate_image(request: GenerateRequest):
 
         result = await queue_manager.submit_and_wait(
             prompt=prompt,
-            loras=loras_to_apply if loras_to_apply else None,
+            loras=None,
             lora_name=lora_applied,
             lora_weight=lora_weight_applied or 1.0,
             width=1024,
@@ -633,10 +481,6 @@ async def generate_with_image_and_return(
     seed: Optional[int] = Form(None),
     remove_background: Optional[bool] = Form(False),
     bg_strength: Optional[float] = Form(None),
-    lora_name: Optional[str] = Form(None),
-    lora_weight: Optional[float] = Form(None),
-    loras_json: Optional[str] = Form(None),
-    use_default_lora: Optional[bool] = Form(False),
     upscale: Optional[bool] = Form(False),
     upscale_factor: Optional[int] = Form(2),
     downscale: Optional[bool] = Form(True),
@@ -701,47 +545,6 @@ async def generate_with_image_and_return(
                 logger.info("Model not loaded, loading it first...")
                 if not model_manager.load_model():
                     raise HTTPException(status_code=500, detail="Failed to load model")
-
-        # Parse LoRA parameters from form-data
-        loras_to_apply = []
-        remove_all_loras = False
-        try:
-            if loras_json is not None:
-                parsed = json.loads(loras_json)
-                if not isinstance(parsed, list):
-                    raise ValueError("loras_json must be a JSON array")
-                if len(parsed) == 0:
-                    remove_all_loras = True
-                else:
-                    for item in parsed:
-                        name = (item.get("name") or "").strip()
-                        weight = float(item.get("weight", 1.0))
-                        if not name:
-                            raise ValueError("LoRA name cannot be empty")
-                        if weight < 0 or weight > 2.0:
-                            raise ValueError("LoRA weight must be between 0 and 2.0")
-                        loras_to_apply.append({"name": name, "weight": weight})
-            elif lora_name:
-                name = lora_name.strip()
-                if not name:
-                    raise ValueError("LoRA name cannot be empty")
-                w = 1.0 if lora_weight is None else float(lora_weight)
-                if w < 0 or w > 2.0:
-                    raise ValueError("LoRA weight must be between 0 and 2.0")
-                loras_to_apply.append({"name": name, "weight": w})
-            elif use_default_lora:
-                loras_to_apply = [
-                    {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
-                ]
-        except (ValueError, json.JSONDecodeError) as e:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid LoRA parameters: {str(e)}"
-            )
-
-        # Apply LoRAs if requested
-        if loras_to_apply or remove_all_loras:
-            _ensure_model_loaded()
-            _apply_loras(loras_to_apply, remove_all_loras)
 
         # Start timing
         generation_start_time = time.time()
@@ -878,10 +681,6 @@ async def generate_with_image(
     seed: Optional[int] = Form(None),
     remove_background: Optional[bool] = Form(False),
     bg_strength: Optional[float] = Form(None),
-    lora_name: Optional[str] = Form(None),
-    lora_weight: Optional[float] = Form(None),
-    loras_json: Optional[str] = Form(None),
-    use_default_lora: Optional[bool] = Form(False),
     upscale: Optional[bool] = Form(False),
     upscale_factor: Optional[int] = Form(2),
     downscale: Optional[bool] = Form(True),
@@ -948,47 +747,6 @@ async def generate_with_image(
                 logger.info("Model not loaded, loading it first...")
                 if not model_manager.load_model():
                     raise HTTPException(status_code=500, detail="Failed to load model")
-
-        # Parse LoRA parameters from form-data
-        loras_to_apply = []
-        remove_all_loras = False
-        try:
-            if loras_json is not None:
-                parsed = json.loads(loras_json)
-                if not isinstance(parsed, list):
-                    raise ValueError("loras_json must be a JSON array")
-                if len(parsed) == 0:
-                    remove_all_loras = True
-                else:
-                    for item in parsed:
-                        name = (item.get("name") or "").strip()
-                        weight = float(item.get("weight", 1.0))
-                        if not name:
-                            raise ValueError("LoRA name cannot be empty")
-                        if weight < 0 or weight > 2.0:
-                            raise ValueError("LoRA weight must be between 0 and 2.0")
-                        loras_to_apply.append({"name": name, "weight": weight})
-            elif lora_name:
-                name = lora_name.strip()
-                if not name:
-                    raise ValueError("LoRA name cannot be empty")
-                w = 1.0 if lora_weight is None else float(lora_weight)
-                if w < 0 or w > 2.0:
-                    raise ValueError("LoRA weight must be between 0 and 2.0")
-                loras_to_apply.append({"name": name, "weight": w})
-            elif use_default_lora:
-                loras_to_apply = [
-                    {"name": DEFAULT_LORA_NAME, "weight": DEFAULT_LORA_WEIGHT}
-                ]
-        except (ValueError, json.JSONDecodeError) as e:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid LoRA parameters: {str(e)}"
-            )
-
-        # Apply LoRAs if requested
-        if loras_to_apply or remove_all_loras:
-            _ensure_model_loaded()
-            _apply_loras(loras_to_apply, remove_all_loras)
 
         # Start timing
         generation_start_time = time.time()
