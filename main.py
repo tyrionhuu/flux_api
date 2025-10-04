@@ -109,7 +109,9 @@ async def lifespan(app: FastAPI):
             else:
                 logger.info("No LoRA fusion configured")
         else:
-            logger.error(f"Failed to load Diffusion model ({model_type}) during startup")
+            logger.error(
+                f"Failed to load Diffusion model ({model_type}) during startup"
+            )
             raise RuntimeError("Failed to load Diffusion model")
 
         time.sleep(2)
@@ -222,7 +224,10 @@ if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Diffusion API Service")
     parser.add_argument(
-        "--port", type=int, default=API_PORT, help=f"API port number (default: {API_PORT})"
+        "--port",
+        type=int,
+        default=API_PORT,
+        help=f"API port number (default: {API_PORT})",
     )
     parser.add_argument(
         "--host", type=str, default="0.0.0.0", help="API host (default: 0.0.0.0)"

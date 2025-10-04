@@ -83,6 +83,9 @@ RUN conda env create -f environment.yml
 RUN conda run -n txt2img pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
 RUN conda run -n txt2img pip install https://github.com/nunchaku-tech/nunchaku/releases/download/v1.0.0/nunchaku-1.0.0+torch2.8-cp312-cp312-linux_x86_64.whl
 
+# Pin compatible transformers/diffusers/tokenizers versions to avoid compatibility errors
+RUN conda run -n txt2img pip install "transformers==4.46.3" "tokenizers==0.20.3" --force-reinstall
+
 # Make RUN commands use the new environment
 SHELL ["conda", "run", "-n", "txt2img", "/bin/bash", "-c"]
 

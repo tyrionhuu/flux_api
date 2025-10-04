@@ -10,11 +10,12 @@ from typing import Any, Optional, Union
 
 import torch
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
-from diffusers.pipelines.qwenimage.pipeline_qwenimage import QwenImagePipeline
+# QwenImage requires transformers >= 4.55 which has offload_state_dict incompatibility
+# from diffusers.pipelines.qwenimage.pipeline_qwenimage import QwenImagePipeline
 from loguru import logger
 from nunchaku import NunchakuFluxTransformer2dModel
-from nunchaku.models.transformers.transformer_qwenimage import \
-    NunchakuQwenImageTransformer2DModel
+# from nunchaku.models.transformers.transformer_qwenimage import \
+#     NunchakuQwenImageTransformer2DModel
 from nunchaku.utils import get_precision
 from safetensors.torch import load_file as safe_load_file
 from safetensors.torch import save_file as safe_save_file
@@ -29,7 +30,7 @@ class DiffusionModelManager:
     """Manages Diffusion model loading and quantization"""
 
     def __init__(self):
-        self.pipe: Optional[FluxPipeline | QwenImagePipeline] = None
+        self.pipe: Optional[FluxPipeline] = None
         self.model_loaded = False
         self.gpu_manager = GPUManager()
         self.current_model_type = MODEL_TYPE
@@ -168,45 +169,52 @@ class DiffusionModelManager:
                     )
 
             elif model_type == "qwen":
-                logger.info("Loading Qwen model...")
-                # Load the Nunchaku transformer on the same device
-                transformer_result = NunchakuQwenImageTransformer2DModel.from_pretrained(
-                    f"{NUNCHAKU_QWEN_IMAGE_MODEL_ID}/svdq-{precision}_r32-qwen-image.safetensors"
+                logger.error(
+                    "Qwen model is currently disabled due to transformers version incompatibility"
                 )
-
-                # Handle the tuple return: (transformer, config_dict)
-                if isinstance(transformer_result, tuple):
-                    transformer = transformer_result[0].to(
-                        device
-                    )  # Extract transformer from tuple
-                else:
-                    transformer = transformer_result.to(
-                        device
-                    )  # Direct transformer object
-
-                if device_map == "balanced":
-                    # Multi-GPU balanced mode
-                    logger.info("Loading pipeline with balanced device map")
-                    self.pipe = QwenImagePipeline.from_pretrained(
-                        "Qwen/Qwen-Image",
-                        transformer=transformer,
-                        torch_dtype=torch.bfloat16,
-                        device_map=device_map,
-                    )
-                else:
-                    # Single GPU mode
-                    self.pipe = QwenImagePipeline.from_pretrained(
-                        "Qwen/Qwen-Image",
-                        transformer=transformer,
-                        torch_dtype=torch.bfloat16,
-                    ).to(device)
-
-                # Verify device consistency
-                logger.debug(
-                    f"Device consistency - Target: {device}, Transformer: {next(transformer.parameters()).device}, Pipeline: {self.pipe.device if hasattr(self.pipe, 'device') else 'unknown'}"
+                logger.error(
+                    "Qwen requires transformers >= 4.55 which has offload_state_dict issues"
                 )
-
-                logger.info("Qwen model loaded successfully with LoRA support!")
+                raise RuntimeError("Qwen model is not supported in this build")
+                # logger.info("Loading Qwen model...")
+                # # Load the Nunchaku transformer on the same device
+                # transformer_result = NunchakuQwenImageTransformer2DModel.from_pretrained(
+                #     f"{NUNCHAKU_QWEN_IMAGE_MODEL_ID}/svdq-{precision}_r32-qwen-image.safetensors"
+                # )
+                #
+                # # Handle the tuple return: (transformer, config_dict)
+                # if isinstance(transformer_result, tuple):
+                #     transformer = transformer_result[0].to(
+                #         device
+                #     )  # Extract transformer from tuple
+                # else:
+                #     transformer = transformer_result.to(
+                #         device
+                #     )  # Direct transformer object
+                #
+                # if device_map == "balanced":
+                #     # Multi-GPU balanced mode
+                #     logger.info("Loading pipeline with balanced device map")
+                #     self.pipe = QwenImagePipeline.from_pretrained(
+                #         "Qwen/Qwen-Image",
+                #         transformer=transformer,
+                #         torch_dtype=torch.bfloat16,
+                #         device_map=device_map,
+                #     )
+                # else:
+                #     # Single GPU mode
+                #     self.pipe = QwenImagePipeline.from_pretrained(
+                #         "Qwen/Qwen-Image",
+                #         transformer=transformer,
+                #         torch_dtype=torch.bfloat16,
+                #     ).to(device)
+                #
+                # # Verify device consistency
+                # logger.debug(
+                #     f"Device consistency - Target: {device}, Transformer: {next(transformer.parameters()).device}, Pipeline: {self.pipe.device if hasattr(self.pipe, 'device') else 'unknown'}"
+                # )
+                #
+                # logger.info("Qwen model loaded successfully with LoRA support!")
 
             self.model_loaded = True
             # Set the current model type
@@ -391,7 +399,7 @@ class DiffusionModelManager:
         """Check if the model is loaded and pipeline is available"""
         return self.model_loaded and self.pipe is not None
 
-    def get_pipeline(self) -> Optional[FluxPipeline | QwenImagePipeline]:
+    def get_pipeline(self) -> Optional[FluxPipeline]:
         """Get the loaded Diffusion pipeline with Nunchaku transformer"""
         return self.pipe
 

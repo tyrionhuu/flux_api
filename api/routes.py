@@ -229,7 +229,9 @@ async def generate_image(request: GenerateRequest):
         lora_weight_applied = current_lora.get("weight") if current_lora else None
 
         if lora_applied:
-            logger.info(f"Using currently applied LoRA: {lora_applied} (weight: {lora_weight_applied})")
+            logger.info(
+                f"Using currently applied LoRA: {lora_applied} (weight: {lora_weight_applied})"
+            )
         else:
             logger.info("No LoRA currently applied, generating without LoRA")
 
@@ -473,7 +475,7 @@ async def apply_lora(lora_name: str, weight: float = 1.0):
     if model_manager.is_fusion_mode_enabled():
         raise HTTPException(
             status_code=403,
-            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified."
+            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified.",
         )
 
     if not model_manager.is_loaded():
@@ -538,7 +540,7 @@ async def remove_lora():
     if model_manager.is_fusion_mode_enabled():
         raise HTTPException(
             status_code=403,
-            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified."
+            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified.",
         )
 
     if not model_manager.is_loaded():
@@ -854,7 +856,7 @@ async def apply_lora_permanent(request: dict):
     if model_manager.is_fusion_mode_enabled():
         raise HTTPException(
             status_code=403,
-            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified."
+            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified.",
         )
 
     try:
@@ -933,7 +935,11 @@ async def get_fusion_mode_status():
 
         return {
             "fusion_mode": fusion_mode,
-            "description": "Fusion mode prevents runtime LoRA changes. LoRAs were configured at startup." if fusion_mode else "Fusion mode is disabled. Runtime LoRA changes are allowed.",
+            "description": (
+                "Fusion mode prevents runtime LoRA changes. LoRAs were configured at startup."
+                if fusion_mode
+                else "Fusion mode is disabled. Runtime LoRA changes are allowed."
+            ),
             "lora_info": lora_info,
         }
 
@@ -949,7 +955,7 @@ async def unfuse_loras():
     if model_manager.is_fusion_mode_enabled():
         raise HTTPException(
             status_code=403,
-            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified."
+            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified.",
         )
 
     try:
