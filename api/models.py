@@ -17,25 +17,13 @@ class LoRAConfig(BaseModel):
 
 
 class GenerateRequest(BaseModel):
-    """Request model for image generation with optional LoRA parameters"""
+    """Request model for image generation
+
+    Note: LoRAs must be applied separately via /apply-lora endpoint or configured at startup via fusion mode.
+    This endpoint does not accept LoRA parameters in the request.
+    """
 
     prompt: str = Field(..., description="Text prompt for image generation")
-    # Support for multiple LoRAs
-    loras: Optional[list[LoRAConfig]] = Field(
-        None,
-        description="List of LoRAs to apply. Each LoRA has a name and weight. If not specified, default LoRA will be used.",
-    )
-    # Legacy support for single LoRA (deprecated but maintained for backward compatibility)
-    lora_name: Optional[str] = Field(
-        None,
-        description="[DEPRECATED] Single LoRA name. Use 'loras' list instead for multiple LoRA support.",
-    )
-    lora_weight: Optional[float] = Field(
-        None,
-        ge=0.0,
-        le=2.0,
-        description="[DEPRECATED] Single LoRA weight. Use 'loras' list instead for multiple LoRA support.",
-    )
     width: Optional[int] = Field(
         512, ge=256, le=1024, description="Image width in pixels (256-1024)"
     )
@@ -48,17 +36,23 @@ class GenerateRequest(BaseModel):
         le=2**32 - 1,
         description="Random seed for reproducible results (0-4294967295)",
     )
-    upscale: Optional[bool] = Field(
-        False, description="Whether to upscale the generated image using Remacri ESRGAN"
-    )
-    upscale_factor: Optional[int] = Field(
-        2, ge=2, le=4, description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
+    num_inference_steps: Optional[int] = Field(
+        DEFAULT_INFERENCE_STEPS,
+        ge=1,
+        le=100,
+        description=f"Number of inference steps for generation (1-100, default: {DEFAULT_INFERENCE_STEPS})",
     )
     guidance_scale: Optional[float] = Field(
         DEFAULT_GUIDANCE_SCALE,
         ge=-10.0,
         le=10.0,
         description=f"Guidance scale for image generation (-10.0 to 10.0, default: {DEFAULT_GUIDANCE_SCALE})",
+    )
+    upscale: Optional[bool] = Field(
+        False, description="Whether to upscale the generated image using Remacri ESRGAN"
+    )
+    upscale_factor: Optional[int] = Field(
+        2, ge=2, le=4, description="Upscaling factor: 2 for 2x, 4 for 4x (default: 2)"
     )
 
 

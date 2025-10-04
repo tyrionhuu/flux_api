@@ -184,66 +184,20 @@ def download_image(filename: str):
 
 @router.post("/generate")
 async def generate_image(request: GenerateRequest):
-    """Generate image using Diffusion model with optional LoRA support - supports multiple LoRAs"""
+    """Generate image using Diffusion model
+
+    Note: LoRAs must be applied separately via /apply-lora endpoint or configured at startup via fusion mode.
+    This endpoint uses whatever LoRA is currently applied to the model.
+    """
     try:
         # Validate request parameters
         if not request.prompt or request.prompt.strip() == "":
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
-        # Handle multiple LoRA support
-        loras_to_apply = []
-        remove_all_loras = False
-
-        # Check for new multiple LoRA format first
-        if request.loras is not None:
-            if len(request.loras) == 0:
-                # Explicitly requested to use NO LoRA
-                remove_all_loras = True
-            else:
-                for lora_config in request.loras:
-                    if not lora_config.name or not lora_config.name.strip():
-                        raise HTTPException(
-                            status_code=400, detail="LoRA name cannot be empty"
-                        )
-                    if lora_config.weight < 0 or lora_config.weight > 2.0:
-                        raise HTTPException(
-                            status_code=400,
-                            detail="LoRA weight must be between 0 and 2.0",
-                        )
-                    loras_to_apply.append(
-                        {
-                            "name": lora_config.name.strip(),
-                            "weight": lora_config.weight,
-                        }
-                    )
-        # Legacy support for single LoRA
-        elif request.lora_name:
-            if not request.lora_name.strip():
-                raise HTTPException(
-                    status_code=400, detail="LoRA name cannot be empty if provided"
-                )
-            if (
-                request.lora_weight is None
-                or request.lora_weight < 0
-                or request.lora_weight > 2.0
-            ):
-                raise HTTPException(
-                    status_code=400, detail="LoRA weight must be between 0 and 2.0"
-                )
-            loras_to_apply.append(
-                {
-                    "name": request.lora_name.strip(),
-                    "weight": request.lora_weight,
-                }
-            )
-
-        # No default LoRA - users must explicitly specify LoRAs if they want them
-        # No default LoRA - users must explicitly specify LoRAs if they want them
-
         # Clean up input
         prompt = request.prompt.strip()
 
-        # First, ensure the model is loaded with thread safety and force check
+        # First, ensure the model is loaded with thread safety
         with _model_manager_lock:
             # Force a more thorough check - sometimes the state gets inconsistent
             model_actually_loaded = (
@@ -269,99 +223,18 @@ async def generate_image(request: GenerateRequest):
                 else:
                     logger.info("Model was loaded by another thread while waiting")
 
-        # Now check if LoRAs are already applied
+        # Get current LoRA info (if any was applied via /apply-lora or fusion mode)
         current_lora = model_manager.get_lora_info()
-        lora_applied = None
-        lora_weight_applied = None
+        lora_applied = current_lora.get("name") if current_lora else None
+        lora_weight_applied = current_lora.get("weight") if current_lora else None
 
-        if loras_to_apply:
-            # Check if LoRAs are already fused
-            if model_manager.is_fused():
-                logger.info("LoRAs are already fused, skipping temporary application")
-                fused_info = model_manager.get_fused_lora_info()
-                lora_applied = "fused_loras"
-                lora_weight_applied = 1.0
-            else:
-                # Apply multiple LoRAs simultaneously
-                logger.info(f"Applying {len(loras_to_apply)} LoRAs to loaded model")
-            try:
-                # Validate all LoRA names first
-                for lora_config in loras_to_apply:
-                    if not lora_config["name"]:
-                        raise HTTPException(
-                            status_code=400, detail="LoRA name cannot be empty"
-                        )
-
-                    # Allow uploaded file paths (uploads/lora_files/...)
-                    if lora_config["name"].startswith("uploaded_lora_"):
-                        # This is an uploaded file, validate it exists
-                        import os
-
-                        upload_path = f"uploads/lora_files/{lora_config['name']}"
-                        if not os.path.exists(upload_path):
-                            raise HTTPException(
-                                status_code=400,
-                                detail=f"Uploaded LoRA file not found: {lora_config['name']}",
-                            )
-                    elif "/" not in lora_config["name"]:
-                        # Must be a Hugging Face repository ID or local path
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Invalid LoRA name format for '{lora_config['name']}'. Must be a Hugging Face repository ID (e.g., 'username/model-name'), local path, or uploaded file path",
-                        )
-
-                # Apply all LoRAs at once using the new method
-                if not model_manager.apply_multiple_loras(loras_to_apply):
-                    logger.error(
-                        f"Multiple LoRA application failed - Model: {model_manager.is_loaded()}, Pipeline: {model_manager.get_pipeline() is None}"
-                    )
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to apply LoRAs. Please check if the LoRAs exist and are compatible.",
-                    )
-                else:
-                    logger.info(f"All {len(loras_to_apply)} LoRAs applied successfully")
-
-                # Get the updated LoRA info
-                current_lora = model_manager.get_lora_info()
-                if current_lora:
-                    lora_applied = current_lora.get("name")
-                    lora_weight_applied = current_lora.get("weight")
-                    logger.info(
-                        f"Multiple LoRAs applied successfully. Current LoRAs: {lora_applied} with total weight {lora_weight_applied}"
-                    )
-            except Exception as lora_error:
-                logger.error(
-                    f"Exception during LoRA application: {lora_error} (Type: {type(lora_error).__name__})"
-                )
-                if "not found" in str(lora_error).lower() or "404" in str(lora_error):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"One or more LoRAs not found. Please check the repository IDs.",
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to apply LoRAs: {str(lora_error)}",
-                    )
-        elif remove_all_loras:
-            # Explicit removal requested
-            if model_manager.get_lora_info():
-                logger.info("Removing all LoRAs as requested by client (empty list)")
-                model_manager.remove_lora()
-                current_lora = None
-                lora_applied = None
-                lora_weight_applied = None
+        if lora_applied:
+            logger.info(f"Using currently applied LoRA: {lora_applied} (weight: {lora_weight_applied})")
         else:
-            # No-op
-            if current_lora:
-                lora_applied = current_lora.get("name")
-                lora_weight_applied = current_lora.get("weight")
-
-        processed_prompt = prompt
+            logger.info("No LoRA currently applied, generating without LoRA")
 
         result = generate_image_internal(
-            processed_prompt,
+            prompt,
             lora_applied,
             lora_weight_applied,
             request.width or 512,
@@ -443,6 +316,7 @@ def get_model_status():
             "model_actually_ready": (
                 model_manager.is_loaded() and pipeline is not None and has_transformer
             ),
+            "fusion_mode": model_manager.is_fusion_mode_enabled(),
         }
     )
 
@@ -595,6 +469,13 @@ async def upload_lora_file(file: UploadFile = File(...)):
 @router.post("/apply-lora")
 async def apply_lora(lora_name: str, weight: float = 1.0):
     """Apply a LoRA to the current model - lora_name should be a Hugging Face repo ID (e.g., aleksa-codes/flux-ghibsky-illustration)"""
+    # Check if fusion mode is enabled
+    if model_manager.is_fusion_mode_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified."
+        )
+
     if not model_manager.is_loaded():
         logger.error(f"Cannot apply LoRA {lora_name}: Model not loaded")
         raise HTTPException(status_code=500, detail="Model not loaded")
@@ -653,6 +534,13 @@ async def remove_lora_file(filename: str):
 @router.post("/remove-lora")
 async def remove_lora():
     """Remove the currently applied LoRA from the model"""
+    # Check if fusion mode is enabled
+    if model_manager.is_fusion_mode_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified."
+        )
+
     if not model_manager.is_loaded():
         logger.error(f"Cannot remove LoRA: Model not loaded")
         raise HTTPException(status_code=500, detail="Model not loaded")
@@ -683,43 +571,28 @@ def get_lora_status():
 # Queue management endpoints
 @router.post("/submit-request")
 async def submit_generation_request(request: GenerateRequest):
-    """Submit a generation request to the queue"""
+    """Submit a generation request to the queue
+
+    Note: Uses currently applied LoRA (via /apply-lora or fusion mode).
+    LoRA parameters cannot be specified per-request.
+    """
     try:
         # Validate request
         if not request.prompt or request.prompt.strip() == "":
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
-        if request.lora_name and not request.lora_name.strip():
-            raise HTTPException(
-                status_code=400, detail="LoRA name cannot be empty if provided"
-            )
-
-        if request.lora_weight is not None and (
-            request.lora_weight < 0 or request.lora_weight > 2.0
-        ):
-            raise HTTPException(
-                status_code=400, detail="LoRA weight must be between 0 and 2.0"
-            )
+        # Get current LoRA info
+        current_lora = model_manager.get_lora_info()
+        lora_name = current_lora.get("name") if current_lora else None
+        lora_weight = current_lora.get("weight") if current_lora else None
 
         # Submit to queue
         request_id = await queue_manager.submit_request(
             prompt=request.prompt.strip(),
-            lora_name=(
-                request.loras[0].name
-                if request.loras and len(request.loras) > 0
-                else None
-            ),
-            lora_weight=(
-                request.loras[0].weight
-                if request.loras and len(request.loras) > 0
-                else 1.0
-            ),
-            loras=(
-                [{"name": lora.name, "weight": lora.weight} for lora in request.loras]
-                if request.loras
-                else None
-            ),
-            num_inference_steps=DEFAULT_INFERENCE_STEPS,  # Fixed value
+            lora_name=lora_name,
+            lora_weight=lora_weight,
+            loras=None,  # Not supported in queue mode
+            num_inference_steps=request.num_inference_steps or DEFAULT_INFERENCE_STEPS,
             guidance_scale=request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
             width=request.width or 512,
             height=request.height or 512,
@@ -977,6 +850,13 @@ async def switch_model(request: SwitchModelRequest):
 @router.post("/apply-lora-permanent")
 async def apply_lora_permanent(request: dict):
     """Apply LoRAs permanently (fusion)"""
+    # Check if fusion mode is enabled
+    if model_manager.is_fusion_mode_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified."
+        )
+
     try:
         if "loras" not in request:
             raise HTTPException(
@@ -1044,9 +924,34 @@ async def get_fused_lora_status():
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@router.get("/fusion-mode-status")
+async def get_fusion_mode_status():
+    """Get fusion mode status (startup fusion lock)"""
+    try:
+        fusion_mode = model_manager.is_fusion_mode_enabled()
+        lora_info = model_manager.get_lora_info() if fusion_mode else None
+
+        return {
+            "fusion_mode": fusion_mode,
+            "description": "Fusion mode prevents runtime LoRA changes. LoRAs were configured at startup." if fusion_mode else "Fusion mode is disabled. Runtime LoRA changes are allowed.",
+            "lora_info": lora_info,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting fusion mode status: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
 @router.delete("/unfuse-loras")
 async def unfuse_loras():
     """Unfuse LoRAs"""
+    # Check if fusion mode is enabled
+    if model_manager.is_fusion_mode_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="Runtime LoRA changes are disabled in fusion mode. LoRAs were configured at startup and cannot be modified."
+        )
+
     try:
         if model_manager.unfuse_loras():
             return {"message": "LoRAs unfused successfully"}

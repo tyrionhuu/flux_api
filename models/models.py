@@ -43,6 +43,8 @@ class DiffusionModelManager:
         self.fused_lora_configs: Optional[list] = None
         self.fused_timestamp: Optional[float] = None
         self.is_fused_state: bool = False
+        # Production fusion mode flag
+        self.fusion_mode: bool = False
 
     def __del__(self):
         """Cleanup when object is destroyed"""
@@ -573,6 +575,8 @@ class DiffusionModelManager:
 
     def apply_lora(self, lora_name: str, lora_weight: float = 1.0) -> bool:
         """Apply a single LoRA to the pipeline - for backward compatibility"""
+        if not self._check_fusion_mode("apply_lora"):
+            return False
         return self.apply_multiple_loras([{"name": lora_name, "weight": lora_weight}])
 
     def apply_multiple_loras(self, lora_configs: list) -> bool:
@@ -667,6 +671,9 @@ class DiffusionModelManager:
 
     def remove_lora(self) -> bool:
         """Remove currently applied LoRA(s) from the pipeline"""
+        if not self._check_fusion_mode("remove_lora"):
+            return False
+
         if not self.model_loaded or self.pipe is None:
             logger.error(
                 f"Cannot remove LoRA: Model not loaded or pipeline not available"
@@ -1219,3 +1226,22 @@ class DiffusionModelManager:
         except Exception as e:
             logger.error(f"Error applying fused LoRA: {e}")
             return False
+
+    def set_fusion_mode(self, enabled: bool) -> None:
+        """Set fusion mode to prevent runtime LoRA changes"""
+        self.fusion_mode = enabled
+        if enabled:
+            logger.info("Fusion mode enabled - runtime LoRA changes disabled")
+        else:
+            logger.info("Fusion mode disabled - runtime LoRA changes enabled")
+
+    def is_fusion_mode_enabled(self) -> bool:
+        """Check if fusion mode is enabled"""
+        return self.fusion_mode
+
+    def _check_fusion_mode(self, operation: str) -> bool:
+        """Check if operation is allowed in fusion mode"""
+        if self.fusion_mode and operation in ["apply_lora", "remove_lora"]:
+            logger.warning(f"Operation '{operation}' blocked in fusion mode")
+            return False
+        return True

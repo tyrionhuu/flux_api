@@ -119,6 +119,7 @@ The FP4 model supports applying multiple LoRAs simultaneously by merging multipl
 ### Generate Image
 
 ```bash
+# Generate without LoRA
 curl -X POST "http://localhost:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
@@ -126,10 +127,26 @@ curl -X POST "http://localhost:8000/generate" \
     "width": 512,
     "height": 512,
     "seed": 42,
-    "loras": [
-      {"name": "username/style-lora", "weight": 1.0},
-      {"name": "uploads/lora_files/uploaded_lora_123.safetensors", "weight": 0.8}
-    ]
+    "num_inference_steps": 20,
+    "guidance_scale": 3.5
+  }'
+```
+
+### Using LoRAs (Two-Step Process)
+
+LoRAs must be applied separately before generation:
+
+```bash
+# Step 1: Apply LoRA(s)
+curl -X POST "http://localhost:8000/apply-lora?lora_name=username/style-lora&weight=1.0"
+
+# Step 2: Generate with the applied LoRA
+curl -X POST "http://localhost:8000/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "A beautiful landscape with mountains and a lake",
+    "width": 512,
+    "height": 512
   }'
 ```
 

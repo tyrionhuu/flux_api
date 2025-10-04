@@ -1,12 +1,35 @@
 # Use NVIDIA CUDA 12.8 base image with Ubuntu 24.04
 FROM nvidia/cuda:12.8.0-runtime-ubuntu24.04
 
+# Production labels
+LABEL maintainer="Diffusion API Team"
+LABEL version="txt2img-backend-v1"
+LABEL description="Diffusion Text-to-Image API with LoRA Fusion - Backend Only"
+LABEL service="txt2img-api"
+
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Production environment variables
+ENV SERVICE_NAME="txt2img-api"
+ENV SERVICE_VERSION="txt2img-backend-v1"
+ENV PORT=8000
+ENV HOST=0.0.0.0
+ENV MODEL_TYPE=flux
+ENV FUSION_MODE=false
+ENV LORA_NAME=""
+ENV LORA_WEIGHT=1.0
+ENV LORAS_CONFIG=""
+ENV LOG_LEVEL=INFO
+ENV MAX_WORKERS=1
+
+# Set Hugging Face cache directory
+ENV HF_HOME=/data/hf_cache
+ENV HUGGINGFACE_HUB_CACHE=/data/hf_cache
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -41,10 +64,6 @@ ENV PATH=/opt/conda/bin:$PATH
 # Set working directory
 WORKDIR /app
 
-# Set Hugging Face cache directory
-ENV HF_HOME=/data/hf_cache
-ENV HUGGINGFACE_HUB_CACHE=/data/hf_cache
-
 # Copy environment file first for better caching
 COPY environment.yml .
 
@@ -60,7 +79,7 @@ RUN conda config --set always_yes true && \
 # Create conda environment from environment.yml
 RUN conda env create -f environment.yml
 
-# Install PyTorch with CUDA support from PyTorch index (stable version)
+# Install PyTorch with CUDA support from PyTorch index
 RUN conda run -n txt2img pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
 RUN conda run -n txt2img pip install https://github.com/nunchaku-tech/nunchaku/releases/download/v1.0.0/nunchaku-1.0.0+torch2.8-cp312-cp312-linux_x86_64.whl
 
@@ -75,19 +94,15 @@ ENV PATH=/opt/conda/envs/txt2img/bin:$PATH
 # Copy application code
 COPY . .
 
-# Create necessary directories
+# Create necessary directories (no frontend directories)
 RUN mkdir -p logs generated_images uploads/lora_files cache/merged_loras cache/nunchaku_loras /data/hf_cache
 
-# Set proper permissions
-RUN chmod +x start_api.sh docker-start.sh
-
 # Expose the API port
-EXPOSE 8200 9000
+EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
-    CMD conda run -n txt2img curl -f http://localhost:${FP4_API_PORT:-9001}/health || exit 1
+# Enhanced health check for production
+HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
+    CMD conda run -n txt2img curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Default command - use docker-start.sh for container execution
-# Use exec form to ensure proper signal handling
-CMD ["/bin/bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate txt2img && exec ./docker-start.sh"]
+# Production-ready entry point (direct to Python script)
+ENTRYPOINT ["/opt/conda/envs/txt2img/bin/python", "main.py"]
