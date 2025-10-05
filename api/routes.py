@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from loguru import logger
 
 from api.models import GenerateRequest, SwitchModelRequest, SwitchModelResponse
@@ -258,6 +258,107 @@ async def generate_image(request: GenerateRequest):
             )
 
         return result
+    except Exception as e:
+        logger.error(f"Request processing failed: {e} (Type: {type(e).__name__})")
+        raise HTTPException(
+            status_code=500, detail=f"Request processing failed: {str(e)}"
+        )
+
+
+@router.post("/generate-and-return-image")
+async def generate_and_return_image(request: GenerateRequest):
+    """Generate image and return it directly as binary data
+
+    Note: LoRAs must be applied separately via /apply-lora endpoint or configured at startup via fusion mode.
+    This endpoint uses whatever LoRA is currently applied to the model.
+    Returns the image bytes directly instead of saving to disk.
+    """
+    try:
+        # Validate request parameters
+        if not request.prompt or request.prompt.strip() == "":
+            raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+
+        # Clean up input
+        prompt = request.prompt.strip()
+
+        # First, ensure the model is loaded with thread safety
+        with _model_manager_lock:
+            model_actually_loaded = (
+                model_manager.is_loaded()
+                and model_manager.get_pipeline() is not None
+                and hasattr(model_manager.get_pipeline(), "transformer")
+            )
+
+            if not model_actually_loaded:
+                logger.info(
+                    "Model not properly loaded or pipeline unavailable, loading it first..."
+                )
+                if not (
+                    model_manager.is_loaded()
+                    and model_manager.get_pipeline() is not None
+                ):
+                    if not model_manager.load_model():
+                        raise HTTPException(
+                            status_code=500, detail="Failed to load Diffusion model"
+                        )
+                    logger.info("Model loaded successfully")
+                else:
+                    logger.info("Model was loaded by another thread while waiting")
+
+        # Get current LoRA info (if any was applied via /apply-lora or fusion mode)
+        current_lora = model_manager.get_lora_info()
+        lora_applied = current_lora.get("name") if current_lora else None
+        lora_weight_applied = current_lora.get("weight") if current_lora else None
+
+        if lora_applied:
+            logger.info(
+                f"Using currently applied LoRA: {lora_applied} (weight: {lora_weight_applied})"
+            )
+        else:
+            logger.info("No LoRA currently applied, generating without LoRA")
+
+        # Generate image and get result with file path
+        result = generate_image_internal(
+            prompt,
+            lora_applied,
+            lora_weight_applied,
+            request.width or 512,
+            request.height or 512,
+            request.seed,
+            request.upscale or False,
+            request.upscale_factor or 2,
+            request.guidance_scale or DEFAULT_GUIDANCE_SCALE,
+        )
+
+        # Extract the download URL and read the file
+        download_url = result.get("download_url")
+        if not download_url:
+            raise HTTPException(
+                status_code=500,
+                detail="No download URL received from generate endpoint",
+            )
+
+        # Extract filename from download_url (format: /download/{filename})
+        filename = download_url.split("/")[-1]
+        file_path = Path("generated_images") / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Generated image not found")
+
+        # Read the image file into memory
+        with open(file_path, "rb") as f:
+            image_bytes = f.read()
+
+        # Delete the temporary file
+        try:
+            file_path.unlink()
+            logger.info(f"Deleted temporary image file: {file_path}")
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to cleanup temporary image file: {cleanup_error}")
+
+        # Return the image bytes directly
+        return Response(content=image_bytes, media_type="image/png")
+
     except Exception as e:
         logger.error(f"Request processing failed: {e} (Type: {type(e).__name__})")
         raise HTTPException(

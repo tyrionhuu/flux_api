@@ -602,9 +602,17 @@ class DiffusionModelManager:
             if len(lora_configs) == 1:
                 # Single LoRA - apply directly
                 lora_config = lora_configs[0]
-                return self._apply_lora_to_transformer(
+                success = self._apply_lora_to_transformer(
                     lora_config["name"], lora_config["weight"]
                 )
+                if success:
+                    # Store info about the applied LoRA for reference
+                    self.current_lora = lora_config["name"]
+                    self.current_weight = lora_config["weight"]
+                    logger.info(
+                        f"   - LoRA '{lora_config['name']}' applied successfully (weight: {lora_config['weight']})"
+                    )
+                return success
 
             else:
                 # Multiple LoRAs - merge them into a single LoRA

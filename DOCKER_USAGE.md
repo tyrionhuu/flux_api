@@ -17,16 +17,30 @@ docker run -d \
 ```
 **Description**: Starts backend API on port 8000 with all GPUs, no LoRA fusion.
 
-### Run with LoRA Fusion Mode
+### Run with LoRA Fusion Mode (Local File)
 ```bash
 docker run -d --name flux-dev-clean-ghibli \
   --gpus '"device=7"' -p 8000:8000 \
   -e MODEL_TYPE=flux -e FUSION_MODE=true \
-  -e LORA_NAME="/data/weights/lora_checkpoints/Studio_Ghibli_Flux.safetensors" \
-  -e LORA_WEIGHT=1.0 -e HF_TOKEN=$HUGGINGFACE_HUB_TOKEN\
+  -e LORA_NAME="/lora_weights/Studio_Ghibli_Flux.safetensors" \
+  -e LORA_WEIGHT=1.0 \
+  -e HF_TOKEN=$HUGGINGFACE_HUB_TOKEN \
+  -v /data/weights/lora_checkpoints:/lora_weights:ro \
   flux-dev-clean:latest
 ```
-**Description**: Starts API with LoRA pre-applied at startup. LoRA cannot be changed without restart.
+**Description**: Starts API with local LoRA file pre-applied at startup. Mount host directory and use container path. LoRA cannot be changed without restart.
+
+### Run with LoRA Fusion Mode (Hugging Face)
+```bash
+docker run -d --name flux-dev-clean-ghibli \
+  --gpus '"device=7"' -p 8000:8000 \
+  -e MODEL_TYPE=flux -e FUSION_MODE=true \
+  -e LORA_NAME="username/repo-name" \
+  -e LORA_WEIGHT=1.0 \
+  -e HF_TOKEN=$HUGGINGFACE_HUB_TOKEN \
+  flux-dev-clean:latest
+```
+**Description**: Downloads and applies LoRA from Hugging Face at startup. No volume mount needed.
 
 ### Run with Specific GPU
 ```bash
@@ -120,7 +134,7 @@ curl http://localhost:8000/fusion-mode-status
 
 ## Image Generation
 
-### Generate Image (Simple)
+### Generate Image (Returns JSON with Download URL)
 ```bash
 curl -X POST http://localhost:8000/generate \
   -H "Content-Type: application/json" \
@@ -130,7 +144,16 @@ curl -X POST http://localhost:8000/generate \
     "height": 512
   }'
 ```
-**Description**: Generate image with default settings. Uses currently applied LoRA if any.
+**Description**: Generate image with default settings. Returns JSON with download URL. Uses currently applied LoRA if any.
+
+### Generate and Return Image (Returns PNG Bytes)
+```bash
+curl -X POST http://localhost:8000/generate-and-return-image \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"A sunset over the ocean","width":1024,"height":768,"seed":42}' \
+  --output image.png
+```
+**Description**: Generate image and return PNG bytes directly. Uses currently applied LoRA. **Note: LoRA parameters in request body are ignored.**
 
 ### Generate Image (Full Options)
 ```bash
@@ -304,6 +327,25 @@ curl -X POST "http://localhost:8000/apply-lora?lora_name=test&weight=1.0"
 }
 ```
 
+## Important Notes
+
+### LoRA Parameters in Request Body
+**The `/generate` and `/generate-and-return-image` endpoints do NOT accept LoRA parameters in the request body.** Any `lora_name` or `lora_weight` fields in the request JSON will be **ignored**.
+
+To use LoRAs, you must either:
+1. **Fusion Mode** (Startup): Configure LoRA via environment variables when starting the container
+2. **Runtime Application**: Use `/apply-lora` endpoint before generating (not available in fusion mode)
+
+### Example: LoRA Parameters Are Ignored
+```bash
+# This request includes lora_name and lora_weight, but they will be IGNORED
+curl -X POST http://localhost:8000/generate-and-return-image \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"test","lora_name":"user/repo","lora_weight":1.0}' \
+  --output test.png
+```
+The image will be generated **without** the specified LoRA. The endpoint uses only the LoRA applied at startup or via `/apply-lora`.
+
 ## Tips
 
 1. **Fusion Mode**: Use for production when you want consistent style across all generations
@@ -311,3 +353,4 @@ curl -X POST "http://localhost:8000/apply-lora?lora_name=test&weight=1.0"
 3. **Queue**: Use for batch processing or handling multiple concurrent requests
 4. **Seeds**: Use same seed for reproducible results
 5. **Health Checks**: Monitor `/health` endpoint for service status
+6. **Volume Mounts**: When using local LoRA files, always mount the host directory and use the container path in `LORA_NAME`
